@@ -1,6 +1,6 @@
 # Deployment
 
-The primary deployment target is a small Linux host running Nginx, PostgreSQL, and systemd-managed Node processes.
+The primary deployment target is `https://exam.acgbot.cc.cd`, served from a small Linux host running Nginx, PostgreSQL, and systemd-managed Node processes. Cloudflare proxies the DNS record, so the host only needs to serve the app correctly behind HTTPS.
 
 ## Target Shape
 
@@ -16,6 +16,8 @@ PostgreSQL
   `-- stores imported question bank and student practice data
 ```
 
+Production health check: `https://exam.acgbot.cc.cd/api/health`.
+
 The expected early production size is fewer than 100 users on a 2 core, 2 GB server.
 
 ## Native Process First
@@ -29,8 +31,32 @@ Native process deployment is preferred first:
 5. Run database migrations with `npm run db:migrate -w @bkyexam-practice/api`.
 6. Import or refresh the question-bank corpus if needed, then run `npm run db:smoke -w @bkyexam-practice/api`.
 7. Run the API with `node apps/api/dist/index.js` under systemd.
-8. Serve `apps/web/dist` through Nginx.
+8. Serve `apps/web/dist` through Nginx for `exam.acgbot.cc.cd`.
 9. Reverse proxy `/api/` to the local Fastify port.
+
+Minimal Nginx shape:
+
+```nginx
+server {
+    server_name exam.acgbot.cc.cd;
+
+    root /srv/bkyexam-practice-platform/apps/web/dist;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
 
 Docker is optional. It may be useful after Phase 1 if deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
 
