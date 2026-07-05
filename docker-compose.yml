@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: bkyexam_practice
+      POSTGRES_USER: bkyexam
+      POSTGRES_PASSWORD: bkyexam
+    volumes:
+      - practice_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bkyexam -d bkyexam_practice"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  practice_postgres_data:

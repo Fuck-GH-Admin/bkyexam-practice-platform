@@ -1,0 +1,33 @@
+node_modules/
+dist/
+apps/*/dist/
+packages/*/dist/
+
+# Local runtime configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Local databases, dumps, and question-bank exports stay off GitHub.
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+questionbank/
+data/
+corpus/
+exports/
+
+# Tooling output
+coverage/
+*.log
+npm-debug.log*

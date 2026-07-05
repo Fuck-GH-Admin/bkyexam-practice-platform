@@ -1,0 +1,7 @@
+# qType=3 (YesNo)
+=== Q1 (useCount=1, diff=0.2) ===
+qID: question-2
+cID: class-1 (word)
+qGroup: 0
+Content: Is this true?
+Answer: true

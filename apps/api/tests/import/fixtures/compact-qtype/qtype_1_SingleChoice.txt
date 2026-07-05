@@ -1,0 +1,7 @@
+# qType=1 (SingleChoice)
+=== Q1 (useCount=2, diff=0.5) ===
+qID: question-1
+cID: class-1 (word)
+qGroup: 0
+Content: What is A?
+Answer: option-1
