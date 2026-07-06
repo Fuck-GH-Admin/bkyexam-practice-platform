@@ -9,6 +9,9 @@ export interface PracticeQuestionDto {
   content: string;
   options: { id: string; sort: number; content: string }[];
   answered: boolean;
+  draftAnswer?: SubmittedAnswer;
+  markedForReview: boolean;
+  isCorrect?: boolean | null;
 }
 
 export interface PracticeSessionDto {
@@ -18,6 +21,7 @@ export interface PracticeSessionDto {
   questionCount: number;
   completedCount: number;
   correctCount: number;
+  currentSort: number;
   status: 'active' | 'completed';
 }
 
@@ -53,12 +57,31 @@ export interface PracticeRepository {
     studentId: string;
     sessionId: string;
   }): Promise<{ session: PracticeSessionDto; questions: PracticeQuestionDto[] } | null>;
+  listActiveSessions(input: { studentId: string }): Promise<PracticeSessionDto[]>;
+  saveProgress(input: { studentId: string; sessionId: string; currentSort: number }): Promise<PracticeSessionDto | null>;
+  saveDraft(input: {
+    studentId: string;
+    sessionId: string;
+    questionId: string;
+    answer: SubmittedAnswer;
+  }): Promise<PracticeQuestionDto | null>;
+  clearDraft(input: { studentId: string; sessionId: string; questionId: string }): Promise<boolean>;
+  setReviewFlag(input: {
+    studentId: string;
+    sessionId: string;
+    questionId: string;
+    markedForReview: boolean;
+  }): Promise<PracticeQuestionDto | null>;
   submitAnswer(input: {
     studentId: string;
     sessionId: string;
     questionId: string;
     answer: SubmittedAnswer;
   }): Promise<{ result: PracticeAnswerResultDto; session: PracticeSessionSummaryDto } | null>;
+  submitSession(input: {
+    studentId: string;
+    sessionId: string;
+  }): Promise<{ session: PracticeSessionDto; results: PracticeAnswerResultDto[] } | null>;
 }
 
 interface QueryRows<T> {
@@ -91,6 +114,7 @@ interface SessionRow {
   question_count: number | string;
   completed_count: number | string;
   correct_count: number | string;
+  current_sort: number | string;
   status: 'active' | 'completed';
 }
 
@@ -100,6 +124,9 @@ interface SessionQuestionRow extends SessionRow {
   normalized_type: string;
   content: string;
   answered: boolean;
+  is_correct: boolean | null;
+  draft_answer: string | null;
+  marked_for_review: boolean;
 }
 
 interface SubmitAnswerRow {
@@ -113,10 +140,39 @@ interface SubmitAnswerRow {
   answer_raw: string;
 }
 
+interface SubmitSessionRow {
+  session_id: string;
+  bank_id: string;
+  mode: 'random' | 'sequential';
+  question_count: number | string;
+  current_sort: number | string;
+  status: 'active' | 'completed';
+  session_question_id: string;
+  question_id: string;
+  answered_at: Date | string | null;
+  is_correct: boolean | null;
+  normalized_type: string;
+  answer_raw: string;
+  draft_answer: string | null;
+}
+
+interface DraftQuestionRow {
+  question_id: string;
+  draft_answer: string | null;
+  marked_for_review: boolean;
+}
+
+const memoryQuestionHasDraftState = Symbol('memoryQuestionHasDraftState');
+
+type MemoryPracticeQuestionDto = PracticeQuestionDto & {
+  answerRaw?: string;
+  [memoryQuestionHasDraftState]?: boolean;
+};
+
 export function createMemoryPracticeRepository(): PracticeRepository {
   const sessions = new Map<
     string,
-    { studentId: string; session: PracticeSessionDto; questions: PracticeQuestionDto[] }
+    { studentId: string; session: PracticeSessionDto; questions: MemoryPracticeQuestionDto[] }
   >();
 
   return {
@@ -128,6 +184,7 @@ export function createMemoryPracticeRepository(): PracticeRepository {
         questionCount: 0,
         completedCount: 0,
         correctCount: 0,
+        currentSort: 1,
         status: 'active',
       };
       const result = { session, questions: [] };
@@ -143,6 +200,90 @@ export function createMemoryPracticeRepository(): PracticeRepository {
       }
 
       return { session: record.session, questions: record.questions };
+    },
+
+    async listActiveSessions({ studentId }) {
+      return Array.from(sessions.values())
+        .filter((record) => record.studentId === studentId && record.session.status === 'active')
+        .map((record) => record.session);
+    },
+
+    async saveProgress({ studentId, sessionId, currentSort }) {
+      const record = sessions.get(sessionId);
+      if (!record || record.studentId !== studentId) {
+        return null;
+      }
+      if (record.session.status === 'completed') {
+        throw new CompletedSessionError();
+      }
+      if (!record.questions.some((question) => question.sort === currentSort)) {
+        return null;
+      }
+
+      record.session.currentSort = currentSort;
+      return record.session;
+    },
+
+    async saveDraft({ studentId, sessionId, questionId, answer }) {
+      const record = sessions.get(sessionId);
+      if (!record || record.studentId !== studentId) {
+        return null;
+      }
+      if (record.session.status === 'completed') {
+        throw new CompletedSessionError();
+      }
+
+      const question = record.questions.find((candidate) => candidate.id === questionId);
+      if (!question) {
+        return null;
+      }
+
+      question.draftAnswer = answer;
+      question[memoryQuestionHasDraftState] = true;
+      return question;
+    },
+
+    async clearDraft({ studentId, sessionId, questionId }) {
+      const record = sessions.get(sessionId);
+      if (!record || record.studentId !== studentId) {
+        return false;
+      }
+      if (record.session.status === 'completed') {
+        throw new CompletedSessionError();
+      }
+
+      const question = record.questions.find((candidate) => candidate.id === questionId);
+      if (!question) {
+        return false;
+      }
+      if (question.draftAnswer === undefined && !question.markedForReview && !question[memoryQuestionHasDraftState]) {
+        return false;
+      }
+
+      delete question.draftAnswer;
+      if (!question.markedForReview) {
+        delete question[memoryQuestionHasDraftState];
+      }
+      return true;
+    },
+
+    async setReviewFlag({ studentId, sessionId, questionId, markedForReview }) {
+      const record = sessions.get(sessionId);
+      if (!record || record.studentId !== studentId) {
+        return null;
+      }
+      if (record.session.status === 'completed') {
+        throw new CompletedSessionError();
+      }
+
+      const question = record.questions.find((candidate) => candidate.id === questionId);
+      if (!question) {
+        return null;
+      }
+
+      question.markedForReview = markedForReview;
+      question[memoryQuestionHasDraftState] = true;
+      return question;
     },
 
     async submitAnswer({ studentId, sessionId, questionId }) {
@@ -182,6 +323,52 @@ export function createMemoryPracticeRepository(): PracticeRepository {
           status: record.session.status,
         },
       };
+    },
+
+    async submitSession({ studentId, sessionId }) {
+      const record = sessions.get(sessionId);
+      if (!record || record.studentId !== studentId) {
+        return null;
+      }
+      if (record.session.status === 'completed') {
+        throw new CompletedSessionError();
+      }
+
+      const results: PracticeAnswerResultDto[] = [];
+      let completedCount = 0;
+      let correctCount = 0;
+
+      for (const question of record.questions) {
+        if (question.answered || question.isCorrect !== undefined) {
+          completedCount += 1;
+          if (question.isCorrect === true) {
+            correctCount += 1;
+          }
+          continue;
+        }
+
+        if (!hasSubmittedAnswerValue(question.draftAnswer)) {
+          continue;
+        }
+
+        const grade = gradeAnswer(
+          { normalizedType: question.type, answerRaw: question.answerRaw ?? '' },
+          question.draftAnswer,
+        );
+        question.answered = true;
+        question.isCorrect = grade.isCorrect;
+        completedCount += 1;
+        if (grade.isCorrect === true) {
+          correctCount += 1;
+        }
+        results.push(mapGradeResult(question.id, grade));
+      }
+
+      record.session.completedCount = completedCount;
+      record.session.correctCount = correctCount;
+      record.session.status = 'completed';
+
+      return { session: record.session, results };
     },
   };
 }
@@ -254,7 +441,7 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
               question_count
             )
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, bank_id, mode, question_count, completed_count, correct_count, status
+            RETURNING id, bank_id, mode, question_count, completed_count, correct_count, current_sort, status
           `,
           [input.studentId, input.bankId, input.mode, input.limit, questionRows.length],
         )) as QueryRows<SessionRow>;
@@ -296,7 +483,7 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
     async getSession({ studentId, sessionId }) {
       const sessionResult = (await client.query(
         `
-          SELECT id, bank_id, mode, question_count, completed_count, correct_count, status
+          SELECT id, bank_id, mode, question_count, completed_count, correct_count, current_sort, status
           FROM practice_sessions
           WHERE id = $1
             AND student_id = $2
@@ -318,15 +505,23 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
             practice_sessions.question_count,
             practice_sessions.completed_count,
             practice_sessions.correct_count,
+            practice_sessions.current_sort,
             practice_sessions.status,
             practice_session_questions.question_id,
             practice_session_questions.sort,
+            practice_session_questions.is_correct,
             questions.normalized_type,
             questions.content,
-            (practice_session_questions.answered_at IS NOT NULL) AS answered
+            (practice_session_questions.answered_at IS NOT NULL) AS answered,
+            practice_session_drafts.draft_answer,
+            COALESCE(practice_session_drafts.marked_for_review, false) AS marked_for_review
           FROM practice_session_questions
           JOIN practice_sessions ON practice_sessions.id = practice_session_questions.session_id
           JOIN questions ON questions.id = practice_session_questions.question_id
+          LEFT JOIN practice_session_drafts
+            ON practice_session_drafts.session_id = practice_session_questions.session_id
+            AND practice_session_drafts.question_id = practice_session_questions.question_id
+            AND practice_session_drafts.student_id = practice_sessions.student_id
           WHERE practice_session_questions.session_id = $1
             AND practice_sessions.student_id = $2
           ORDER BY practice_session_questions.sort
@@ -355,8 +550,164 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
             .filter((option) => option.question_id === row.question_id)
             .map(mapOptionRow),
           answered: row.answered,
+          draftAnswer: parseStoredAnswer(row.draft_answer),
+          markedForReview: row.marked_for_review === true,
+          isCorrect: row.is_correct ?? null,
         })),
       };
+    },
+
+    async listActiveSessions({ studentId }) {
+      const result = (await client.query(
+        `
+          SELECT id, bank_id, mode, question_count, completed_count, correct_count, current_sort, status
+          FROM practice_sessions
+          WHERE practice_sessions.student_id = $1
+            AND practice_sessions.status = 'active'
+          ORDER BY updated_at DESC, id
+        `,
+        [studentId],
+      )) as QueryRows<SessionRow>;
+
+      return result.rows.map(mapSessionRow);
+    },
+
+    async saveProgress({ studentId, sessionId, currentSort }) {
+      const result = (await client.query(
+        `
+          UPDATE practice_sessions
+          SET current_sort = $3,
+              updated_at = now()
+          WHERE practice_sessions.student_id = $1
+            AND practice_sessions.id = $2
+            AND practice_sessions.status = 'active'
+            AND EXISTS (
+              SELECT 1
+              FROM practice_session_questions
+              WHERE practice_session_questions.session_id = practice_sessions.id
+                AND practice_session_questions.sort = $3
+            )
+          RETURNING id, bank_id, mode, question_count, completed_count, correct_count, current_sort, status
+        `,
+        [studentId, sessionId, currentSort],
+      )) as QueryRows<SessionRow>;
+
+      if (result.rows[0]) {
+        return mapSessionRow(result.rows[0]);
+      }
+
+      await throwIfCompletedOwnedSession(client, studentId, sessionId);
+      return null;
+    },
+
+    async saveDraft(input) {
+      const result = (await client.query(
+        `
+          INSERT INTO practice_session_drafts (session_id, question_id, student_id, draft_answer, marked_for_review, updated_at)
+          SELECT practice_sessions.id, practice_session_questions.question_id, practice_sessions.student_id, $4, false, now()
+          FROM practice_sessions
+          JOIN practice_session_questions ON practice_session_questions.session_id = practice_sessions.id
+          WHERE practice_sessions.student_id = $1
+            AND practice_sessions.id = $2
+            AND practice_session_questions.question_id = $3
+            AND practice_sessions.status = 'active'
+          ON CONFLICT (session_id, question_id) DO UPDATE SET
+            draft_answer = EXCLUDED.draft_answer,
+            updated_at = now()
+          RETURNING question_id, draft_answer, marked_for_review
+        `,
+        [input.studentId, input.sessionId, input.questionId, serializeDraftAnswer(input.answer)],
+      )) as QueryRows<DraftQuestionRow>;
+
+      if (result.rows[0]) {
+        return loadPracticeQuestion(client, input.studentId, input.sessionId, input.questionId);
+      }
+
+      await throwIfCompletedOwnedSession(client, input.studentId, input.sessionId);
+      return null;
+    },
+
+    async clearDraft({ studentId, sessionId, questionId }) {
+      const result = (await client.query(
+        `
+          WITH eligible AS (
+            SELECT practice_session_drafts.session_id, practice_session_drafts.question_id, practice_session_drafts.marked_for_review
+            FROM practice_session_drafts
+            JOIN practice_sessions ON practice_sessions.id = practice_session_drafts.session_id
+            JOIN practice_session_questions
+              ON practice_session_questions.session_id = practice_sessions.id
+              AND practice_session_questions.question_id = practice_session_drafts.question_id
+            WHERE practice_sessions.student_id = $1
+              AND practice_sessions.id = $2
+              AND practice_session_questions.question_id = $3
+              AND practice_sessions.status = 'active'
+          ), preserved AS (
+            UPDATE practice_session_drafts
+            SET draft_answer = '',
+                updated_at = now()
+            FROM eligible
+            WHERE practice_session_drafts.session_id = eligible.session_id
+              AND practice_session_drafts.question_id = eligible.question_id
+              AND eligible.marked_for_review = true
+            RETURNING practice_session_drafts.question_id
+          ), removed AS (
+            DELETE FROM practice_session_drafts
+            USING eligible
+            WHERE practice_session_drafts.session_id = eligible.session_id
+              AND practice_session_drafts.question_id = eligible.question_id
+              AND eligible.marked_for_review = false
+            RETURNING practice_session_drafts.question_id
+          )
+          SELECT question_id FROM preserved
+          UNION ALL
+          SELECT question_id FROM removed
+        `,
+        [studentId, sessionId, questionId],
+      )) as QueryRows<{ question_id: string }>;
+
+      if (result.rows.length > 0) {
+        return true;
+      }
+
+      await throwIfCompletedOwnedSession(client, studentId, sessionId);
+      return false;
+    },
+
+    async setReviewFlag(input) {
+      const result = (await client.query(
+        `
+          INSERT INTO practice_session_drafts (session_id, question_id, student_id, draft_answer, marked_for_review, updated_at)
+          SELECT
+            practice_sessions.id,
+            practice_session_questions.question_id,
+            practice_sessions.student_id,
+            COALESCE(practice_session_drafts.draft_answer, ''),
+            $4,
+            now()
+          FROM practice_sessions
+          JOIN practice_session_questions ON practice_session_questions.session_id = practice_sessions.id
+          LEFT JOIN practice_session_drafts
+            ON practice_session_drafts.session_id = practice_sessions.id
+            AND practice_session_drafts.question_id = practice_session_questions.question_id
+            AND practice_session_drafts.student_id = practice_sessions.student_id
+          WHERE practice_sessions.student_id = $1
+            AND practice_sessions.id = $2
+            AND practice_session_questions.question_id = $3
+            AND practice_sessions.status = 'active'
+          ON CONFLICT (session_id, question_id) DO UPDATE SET
+            marked_for_review = EXCLUDED.marked_for_review,
+            updated_at = now()
+          RETURNING question_id, draft_answer, marked_for_review
+        `,
+        [input.studentId, input.sessionId, input.questionId, input.markedForReview],
+      )) as QueryRows<DraftQuestionRow>;
+
+      if (result.rows[0]) {
+        return loadPracticeQuestion(client, input.studentId, input.sessionId, input.questionId);
+      }
+
+      await throwIfCompletedOwnedSession(client, input.studentId, input.sessionId);
+      return null;
     },
 
     async submitAnswer(input) {
@@ -490,6 +841,146 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
         transactionClient.release?.();
       }
     },
+
+    async submitSession(input) {
+      const transactionClient = await checkoutTransactionClient(client);
+      let transactionStarted = false;
+
+      try {
+        await transactionClient.query('BEGIN');
+        transactionStarted = true;
+
+        const sessionResult = (await transactionClient.query(
+          `
+            SELECT
+              practice_sessions.id AS session_id,
+              practice_sessions.bank_id,
+              practice_sessions.mode,
+              practice_sessions.question_count,
+              practice_sessions.current_sort,
+              practice_sessions.status,
+              practice_session_questions.id AS session_question_id,
+              practice_session_questions.question_id,
+              practice_session_questions.answered_at,
+              practice_session_questions.is_correct,
+              questions.normalized_type,
+              questions.answer_raw,
+              practice_session_drafts.draft_answer
+            FROM practice_sessions
+            JOIN practice_session_questions ON practice_session_questions.session_id = practice_sessions.id
+            JOIN questions ON questions.id = practice_session_questions.question_id
+            LEFT JOIN practice_session_drafts
+              ON practice_session_drafts.session_id = practice_sessions.id
+              AND practice_session_drafts.question_id = practice_session_questions.question_id
+              AND practice_session_drafts.student_id = practice_sessions.student_id
+            WHERE practice_sessions.id = $1
+              AND practice_sessions.student_id = $2
+            ORDER BY practice_session_questions.sort
+            FOR UPDATE OF practice_sessions, practice_session_questions
+          `,
+          [input.sessionId, input.studentId],
+        )) as QueryRows<SubmitSessionRow>;
+        const rows = sessionResult.rows;
+        if (rows.length === 0) {
+          await transactionClient.query('COMMIT');
+          return null;
+        }
+        if (rows[0]?.status === 'completed') {
+          throw new CompletedSessionError();
+        }
+
+        const results: PracticeAnswerResultDto[] = [];
+        let completedCount = 0;
+        let correctCount = 0;
+
+        for (const row of rows) {
+          if (row.answered_at != null || row.is_correct != null) {
+            completedCount += 1;
+            if (row.is_correct === true) {
+              correctCount += 1;
+            }
+            continue;
+          }
+
+          const answer = parseStoredAnswer(row.draft_answer);
+          if (!hasSubmittedAnswerValue(answer)) {
+            continue;
+          }
+
+          const grade = gradeAnswer({ normalizedType: row.normalized_type, answerRaw: row.answer_raw }, answer);
+          const serializedAnswer = serializeSubmittedAnswer(answer);
+
+          await transactionClient.query(
+            `
+              INSERT INTO practice_attempts (id, student_id, question_id, bank_id, answer, is_correct, source)
+              VALUES ($1, $2, $3, $4, $5, $6, 'practice')
+            `,
+            [randomUUID(), input.studentId, row.question_id, row.bank_id, serializedAnswer, grade.isCorrect],
+          );
+
+          await transactionClient.query(
+            `
+              UPDATE practice_session_questions
+              SET answered_at = now(), is_correct = $2
+              WHERE id = $1
+            `,
+            [row.session_question_id, grade.isCorrect],
+          );
+
+          if (grade.isCorrect === false) {
+            await transactionClient.query(
+              `
+                INSERT INTO wrong_questions (id, student_id, question_id, bank_id, last_answer, mastered, source, last_wrong_at)
+                VALUES ($1, $2, $3, $4, $5, false, 'practice', now())
+                ON CONFLICT (student_id, question_id, bank_id) DO UPDATE SET
+                  wrong_count = wrong_questions.wrong_count + 1,
+                  last_answer = EXCLUDED.last_answer,
+                  mastered = false,
+                  mastered_at = NULL,
+                  source = EXCLUDED.source,
+                  last_wrong_at = now()
+              `,
+              [randomUUID(), input.studentId, row.question_id, row.bank_id, serializedAnswer],
+            );
+          }
+
+          completedCount += 1;
+          if (grade.isCorrect === true) {
+            correctCount += 1;
+          }
+          results.push(mapGradeResult(row.question_id, grade));
+        }
+
+        const updatedSessionResult = (await transactionClient.query(
+          `
+            UPDATE practice_sessions
+            SET completed_count = $2,
+                correct_count = $3,
+                status = 'completed',
+                completed_at = COALESCE(completed_at, now()),
+                updated_at = now()
+            WHERE id = $1
+            RETURNING id, bank_id, mode, question_count, completed_count, correct_count, current_sort, status
+          `,
+          [input.sessionId, completedCount, correctCount],
+        )) as QueryRows<SessionRow>;
+
+        const updatedSession = updatedSessionResult.rows[0];
+        const result = updatedSession ? { session: mapSessionRow(updatedSession), results } : null;
+
+        await transactionClient.query('COMMIT');
+
+        return result;
+      } catch (error) {
+        if (transactionStarted) {
+          await transactionClient.query('ROLLBACK');
+        }
+
+        throw error;
+      } finally {
+        transactionClient.release?.();
+      }
+    },
   };
 }
 
@@ -501,6 +992,7 @@ function mapSessionRow(row: SessionRow): PracticeSessionDto {
     questionCount: Number(row.question_count),
     completedCount: Number(row.completed_count),
     correctCount: Number(row.correct_count),
+    currentSort: Number(row.current_sort),
     status: row.status,
   };
 }
@@ -521,6 +1013,7 @@ function mapQuestions(questionRows: QuestionRow[], optionRows: OptionRow[]): Pra
     content: question.content,
     options: optionRows.filter((option) => option.question_id === question.id).map(mapOptionRow),
     answered: false,
+    markedForReview: false,
   }));
 }
 
@@ -528,8 +1021,119 @@ function mapOptionRow(row: OptionRow): PracticeQuestionDto['options'][number] {
   return { id: row.id, sort: Number(row.sort), content: row.content };
 }
 
+async function loadPracticeQuestion(
+  client: QueryClient,
+  studentId: string,
+  sessionId: string,
+  questionId: string,
+): Promise<PracticeQuestionDto | null> {
+  const questionResult = (await client.query(
+    `
+      SELECT
+        practice_sessions.id,
+        practice_sessions.bank_id,
+        practice_sessions.mode,
+        practice_sessions.question_count,
+        practice_sessions.completed_count,
+        practice_sessions.correct_count,
+        practice_sessions.current_sort,
+        practice_sessions.status,
+        practice_session_questions.question_id,
+        practice_session_questions.sort,
+        practice_session_questions.is_correct,
+        questions.normalized_type,
+        questions.content,
+        (practice_session_questions.answered_at IS NOT NULL) AS answered,
+        practice_session_drafts.draft_answer,
+        COALESCE(practice_session_drafts.marked_for_review, false) AS marked_for_review
+      FROM practice_session_questions
+      JOIN practice_sessions ON practice_sessions.id = practice_session_questions.session_id
+      JOIN questions ON questions.id = practice_session_questions.question_id
+      LEFT JOIN practice_session_drafts
+        ON practice_session_drafts.session_id = practice_session_questions.session_id
+        AND practice_session_drafts.question_id = practice_session_questions.question_id
+        AND practice_session_drafts.student_id = practice_sessions.student_id
+      WHERE practice_sessions.student_id = $1
+        AND practice_sessions.id = $2
+        AND practice_session_questions.question_id = $3
+      LIMIT 1
+    `,
+    [studentId, sessionId, questionId],
+  )) as QueryRows<SessionQuestionRow>;
+  const row = questionResult.rows[0];
+  if (!row) {
+    return null;
+  }
+
+  const optionsResult = (await client.query(
+    `
+      SELECT id, question_id, sort, content
+      FROM question_options
+      WHERE question_id = $1
+      ORDER BY sort, id
+    `,
+    [questionId],
+  )) as QueryRows<OptionRow>;
+
+  return {
+    id: row.question_id,
+    sort: Number(row.sort),
+    type: row.normalized_type,
+    content: row.content,
+    options: optionsResult.rows.map(mapOptionRow),
+    answered: row.answered,
+    draftAnswer: parseStoredAnswer(row.draft_answer),
+    markedForReview: row.marked_for_review === true,
+    isCorrect: row.is_correct ?? null,
+  };
+}
+
+async function throwIfCompletedOwnedSession(client: QueryClient, studentId: string, sessionId: string): Promise<void> {
+  const result = (await client.query(
+    `
+      SELECT status
+      FROM practice_sessions
+      WHERE student_id = $1
+        AND id = $2
+      LIMIT 1
+    `,
+    [studentId, sessionId],
+  )) as QueryRows<{ status: 'active' | 'completed' }>;
+
+  if (result.rows[0]?.status === 'completed') {
+    throw new CompletedSessionError();
+  }
+}
+
 function serializeSubmittedAnswer(answer: SubmittedAnswer): string {
   return Array.isArray(answer) ? JSON.stringify(answer) : String(answer);
+}
+
+function serializeDraftAnswer(answer: SubmittedAnswer): string {
+  return typeof answer === 'string' || Array.isArray(answer) ? JSON.stringify(answer) : String(answer);
+}
+
+function parseStoredAnswer(answer: string | null | undefined): SubmittedAnswer | undefined {
+  if (!answer) return undefined;
+  try {
+    const parsed = JSON.parse(answer) as unknown;
+    if (typeof parsed === 'string') return parsed;
+    if (Array.isArray(parsed) && parsed.every((item) => typeof item === 'string')) return parsed;
+  } catch {
+    if (answer === 'true') return true;
+    if (answer === 'false') return false;
+    return answer;
+  }
+  if (answer === 'true') return true;
+  if (answer === 'false') return false;
+  return answer;
+}
+
+function hasSubmittedAnswerValue(answer: SubmittedAnswer | undefined): answer is SubmittedAnswer {
+  if (answer === undefined) return false;
+  if (typeof answer === 'string') return answer.length > 0;
+  if (Array.isArray(answer)) return answer.length > 0;
+  return true;
 }
 
 function mapGradeResult(questionId: string, grade: GradeResult): PracticeAnswerResultDto {

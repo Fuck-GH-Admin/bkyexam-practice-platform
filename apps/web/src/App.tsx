@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type Student = {
   id?: string;
@@ -29,6 +29,9 @@ type PracticeQuestion = {
   content: string;
   options: PracticeOption[];
   answered: boolean;
+  draftAnswer?: SavedAnswer;
+  markedForReview?: boolean;
+  isCorrect?: boolean | null;
 };
 
 type PracticeSession = {
@@ -39,6 +42,7 @@ type PracticeSession = {
   completedCount: number;
   correctCount: number;
   status: 'active' | 'completed';
+  currentSort?: number;
 };
 
 type PracticePayload = {
@@ -55,6 +59,8 @@ type AnswerResult = {
 
 type SavedAnswer = string[] | boolean;
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
+
 type WrongQuestion = {
   id: string;
   questionId: string;
@@ -67,12 +73,115 @@ type WrongQuestion = {
 
 const objectiveTypes = ['single_choice', 'multiple_choice', 'yes_no'];
 
+const practiceSections = [
+  { type: 'single_choice', label: '单选题' },
+  { type: 'multiple_choice', label: '多选题' },
+  { type: 'yes_no', label: '判断题' },
+] as const;
+
 export function hasSubmittedAnswer(answer: SavedAnswer | undefined) {
+  if (Array.isArray(answer)) return answer.length > 0;
   return answer !== undefined;
+}
+
+export function groupQuestionsByType(questions: PracticeQuestion[]) {
+  return practiceSections
+    .map((section) => ({ ...section, questions: questions.filter((question) => question.type === section.type) }))
+    .filter((section) => section.questions.length > 0);
+}
+
+export function getAnsweredCount(questions: PracticeQuestion[], answersByQuestion: Record<string, SavedAnswer>) {
+  return questions.filter((question) => hasSubmittedAnswer(answersByQuestion[question.id])).length;
+}
+
+export function getUnansweredCount(questions: PracticeQuestion[], answersByQuestion: Record<string, SavedAnswer>) {
+  return questions.length - getAnsweredCount(questions, answersByQuestion);
+}
+
+export function getQuestionState(
+  question: PracticeQuestion,
+  answersByQuestion: Record<string, SavedAnswer>,
+  reviewFlags: Record<string, boolean>,
+) {
+  const answered = hasSubmittedAnswer(answersByQuestion[question.id]);
+  const review = reviewFlags[question.id] === true;
+  if (answered && review) return 'answered-review';
+  if (answered) return 'answered';
+  if (review) return 'review';
+  return 'empty';
+}
+
+export function buildSectionScores(questions: PracticeQuestion[], resultsByQuestion: Record<string, AnswerResult>) {
+  return groupQuestionsByType(questions).map((section) => ({
+    type: section.type,
+    label: section.label,
+    correctCount: section.questions.filter((question) => resultsByQuestion[question.id]?.isCorrect === true).length,
+    totalCount: section.questions.length,
+  }));
+}
+
+export function hydrateAnswersFromQuestions(questions: PracticeQuestion[]) {
+  return questions.reduce<Record<string, SavedAnswer>>((answers, question) => {
+    if (question.draftAnswer !== undefined) {
+      answers[question.id] = question.draftAnswer;
+    }
+    return answers;
+  }, {});
+}
+
+export function hydrateReviewFlagsFromQuestions(questions: PracticeQuestion[]) {
+  return questions.reduce<Record<string, boolean>>((flags, question) => {
+    if (question.markedForReview) {
+      flags[question.id] = true;
+    }
+    return flags;
+  }, {});
+}
+
+export function getFirstSectionType(questions: PracticeQuestion[]) {
+  return groupQuestionsByType(questions)[0]?.type ?? '';
+}
+
+export function getInitialQuestionIndex(questions: PracticeQuestion[], currentSort?: number) {
+  if (currentSort === undefined) return 0;
+  const index = questions.findIndex((question) => question.sort === currentSort);
+  return index >= 0 ? index : 0;
 }
 
 export function getVisibleChips(subjectName: string, keywords: string[]) {
   return Array.from(new Set([subjectName, ...keywords].filter(Boolean))).slice(0, 4);
+}
+
+export function getFilterOptions(banks: Bank[]) {
+  return Array.from(
+    new Set(banks.flatMap((bank) => [bank.subjectCategory, bank.subjectName]).filter(Boolean)),
+  ).sort(compareFilterLabels);
+}
+
+function compareFilterLabels(first: string, second: string) {
+  const firstAscii = /^[\x00-\x7F]/.test(first);
+  const secondAscii = /^[\x00-\x7F]/.test(second);
+  if (firstAscii !== secondAscii) return firstAscii ? -1 : 1;
+  return first.localeCompare(second, 'zh-Hans-CN');
+}
+
+export function filterBanks(banks: Bank[], filters: { category: string; keyword: string }) {
+  const category = filters.category.trim();
+  const keyword = filters.keyword.trim().toLocaleLowerCase();
+
+  return banks.filter((bank) => {
+    if (category && bank.subjectCategory !== category && bank.subjectName !== category) {
+      return false;
+    }
+
+    if (!keyword) {
+      return true;
+    }
+
+    return [bank.bankName, bank.subjectName, bank.subjectCategory, bank.description, ...bank.keywords]
+      .filter(Boolean)
+      .some((value) => value.toLocaleLowerCase().includes(keyword));
+  });
 }
 
 export function formatCorrectAnswer(answer: AnswerResult['correctAnswer'], options: PracticeOption[] = []) {
@@ -126,24 +235,48 @@ export function App() {
   const [session, setSession] = useState<PracticeSession | null>(null);
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [activeSectionType, setActiveSectionType] = useState('');
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [yesNoAnswer, setYesNoAnswer] = useState<boolean | null>(null);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [answersByQuestion, setAnswersByQuestion] = useState<Record<string, SavedAnswer>>({});
   const [resultsByQuestion, setResultsByQuestion] = useState<Record<string, AnswerResult>>({});
+  const [reviewFlags, setReviewFlags] = useState<Record<string, boolean>>({});
+  const [saveState, setSaveState] = useState<SaveStatus>('idle');
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [sessionResults, setSessionResults] = useState<Record<string, AnswerResult>>({});
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([]);
   const [wrongBankId, setWrongBankId] = useState('');
   const [includeMastered, setIncludeMastered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [view, setView] = useState<'banks' | 'practice' | 'wrong'>('banks');
+  const draftSaveChainRef = useRef(Promise.resolve());
+  const progressSaveChainRef = useRef(Promise.resolve());
+  const draftSaveFailedRef = useRef(false);
 
-  const categories = useMemo(
-    () => Array.from(new Set(banks.map((bank) => bank.subjectCategory))).filter(Boolean),
+  const filterOptions = useMemo(
+    () => getFilterOptions(banks),
     [banks],
   );
+  const filteredBanks = useMemo(() => filterBanks(banks, { category, keyword }), [banks, category, keyword]);
   const currentQuestion = questions[currentIndex];
   const currentAnswer = currentQuestion ? answersByQuestion[currentQuestion.id] : undefined;
+  const sections = useMemo(() => groupQuestionsByType(questions), [questions]);
+  const activeSection = sections.find((section) => section.type === activeSectionType) ?? sections[0];
+  const activeSectionQuestions = activeSection?.questions ?? [];
+  const answeredCount = getAnsweredCount(questions, answersByQuestion);
+  const unansweredCount = getUnansweredCount(questions, answersByQuestion);
+  const isCompleted = session?.status === 'completed';
+  const sectionScores = isCompleted ? buildSectionScores(questions, resultsByQuestion) : [];
+  const saveStatusText = saveState === 'saving'
+    ? '保存中...'
+    : saveState === 'saved'
+      ? '草稿已保存'
+      : saveState === 'failed'
+        ? '草稿保存失败，稍后会重试'
+        : '';
   const filteredWrongQuestions = useMemo(
     () => wrongQuestions.filter((item) => !wrongBankId || item.bankId === wrongBankId),
     [wrongQuestions, wrongBankId],
@@ -159,6 +292,10 @@ export function App() {
       void loadWrongQuestions({ includeMastered });
     }
   }, [student, includeMastered]);
+
+  useEffect(() => {
+    if (student) void loadActiveSession();
+  }, [student]);
 
   useEffect(() => {
     if (view === 'wrong') void loadWrongQuestions({ includeMastered, bankId: wrongBankId });
@@ -196,16 +333,62 @@ export function App() {
     setStudent(null);
     setSession(null);
     setQuestions([]);
+    setAnswersByQuestion({});
+    setReviewFlags({});
+    setSessionResults({});
+    setUserMenuOpen(false);
     setView('banks');
+  }
+
+  function applyPracticePayload(payload: PracticePayload) {
+    const answers = hydrateAnswersFromQuestions(payload.questions);
+    const results = payload.questions.reduce<Record<string, AnswerResult>>((items, question) => {
+      if (question.isCorrect !== undefined && question.isCorrect !== null) {
+        items[question.id] = {
+          questionId: question.id,
+          isCorrect: question.isCorrect,
+          correctAnswer: [],
+          needsSelfReview: false,
+        };
+      }
+      return items;
+    }, {});
+    const nextIndex = getInitialQuestionIndex(payload.questions, payload.session.currentSort);
+    const nextQuestion = payload.questions[nextIndex];
+    const savedAnswer = nextQuestion ? answers[nextQuestion.id] : undefined;
+
+    setSession(payload.session);
+    setQuestions(payload.questions);
+    setCurrentIndex(nextIndex);
+    setActiveSectionType(nextQuestion?.type || getFirstSectionType(payload.questions));
+    setSelectedOptions(Array.isArray(savedAnswer) ? savedAnswer : []);
+    setYesNoAnswer(typeof savedAnswer === 'boolean' ? savedAnswer : null);
+    setLastResult(nextQuestion ? results[nextQuestion.id] ?? null : null);
+    setAnswersByQuestion(answers);
+    setResultsByQuestion(results);
+    setReviewFlags(hydrateReviewFlagsFromQuestions(payload.questions));
+    setSaveState('idle');
+    setShowSubmitConfirm(false);
+    setSessionResults(results);
+  }
+
+  async function loadActiveSession() {
+    try {
+      const activeSessions = await api<PracticeSession[]>('/api/practice/sessions/active');
+      const activeSession = activeSessions[0];
+      if (!activeSession) return;
+
+      const result = await api<PracticePayload>(`/api/practice/sessions/${activeSession.id}`);
+      applyPracticePayload(result);
+    } catch {
+      // Active practice is optional on the home screen.
+    }
   }
 
   async function loadBanks() {
     setMessage('');
-    const params = new URLSearchParams();
-    if (category) params.set('category', category);
-    if (keyword.trim()) params.set('keyword', keyword.trim());
     try {
-      const result = await api<{ banks: Bank[] }>(`/api/banks${params.toString() ? `?${params}` : ''}`);
+      const result = await api<{ banks: Bank[] }>('/api/banks');
       setBanks(result.banks);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '题库加载失败');
@@ -225,14 +408,7 @@ export function App() {
         method: 'POST',
         body: JSON.stringify({ bankId: bank.bankId, mode, limit: 70, questionTypes: objectiveTypes }),
       });
-      setSession(result.session);
-      setQuestions(result.questions);
-      setCurrentIndex(0);
-      setSelectedOptions([]);
-      setYesNoAnswer(null);
-      setLastResult(null);
-      setAnswersByQuestion({});
-      setResultsByQuestion({});
+      applyPracticePayload(result);
       setView('practice');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '创建练习失败');
@@ -241,32 +417,74 @@ export function App() {
     }
   }
 
-  async function submitAnswer() {
-    if (!session || !currentQuestion) return;
-    const answer = currentQuestion.type === 'yes_no' ? yesNoAnswer : selectedOptions;
-    if (answer === null || (Array.isArray(answer) && answer.length === 0)) {
-      setMessage('请先选择答案。');
+  function enqueueDraftSave(question: PracticeQuestion, answer: SavedAnswer | undefined) {
+    if (!session || isCompleted) return;
+    setSaveState('saving');
+    const sessionId = session.id;
+    draftSaveChainRef.current = draftSaveChainRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          if (answer === undefined) {
+            await api(`/api/practice/sessions/${sessionId}/drafts/${question.id}`, { method: 'DELETE' });
+          } else {
+            await api(`/api/practice/sessions/${sessionId}/drafts/${question.id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ answer }),
+            });
+          }
+          draftSaveFailedRef.current = false;
+          setSaveState('saved');
+        } catch (error) {
+          draftSaveFailedRef.current = true;
+          setSaveState('failed');
+          throw error;
+        }
+      });
+  }
+
+  function setDraftAnswer(question: PracticeQuestion, answer: SavedAnswer | undefined) {
+    if (isCompleted) return;
+    setAnswersByQuestion((items) => {
+      if (answer === undefined) {
+        const nextItems = { ...items };
+        delete nextItems[question.id];
+        return nextItems;
+      }
+      return { ...items, [question.id]: answer };
+    });
+    enqueueDraftSave(question, answer);
+  }
+
+  async function submitSession(force = false) {
+    if (!session) return;
+    if (!force && unansweredCount > 0) {
+      setShowSubmitConfirm(true);
       return;
     }
 
     setLoading(true);
     setMessage('');
     try {
-      const result = await api<{ result: AnswerResult; session: Pick<PracticeSession, 'completedCount' | 'correctCount' | 'status'> }>(
-        `/api/practice/sessions/${session.id}/answers`,
-        {
-          method: 'POST',
-          body: JSON.stringify({ questionId: currentQuestion.id, answer }),
-        },
-      );
-      setLastResult(result.result);
-      setAnswersByQuestion((items) => ({ ...items, [currentQuestion.id]: answer }));
-      setResultsByQuestion((items) => ({ ...items, [currentQuestion.id]: result.result }));
-      setSession({ ...session, ...result.session });
-      setQuestions((items) => items.map((item) => (item.id === currentQuestion.id ? { ...item, answered: true } : item)));
-      if (result.result.isCorrect === false) void loadWrongQuestions({ includeMastered });
+      await draftSaveChainRef.current.catch(() => undefined);
+      if (draftSaveFailedRef.current) {
+        setMessage('草稿保存失败，稍后会重试');
+        return;
+      }
+      const result = await api<{ session: PracticeSession; results: AnswerResult[] }>(`/api/practice/sessions/${session.id}/submit`, {
+        method: 'POST',
+        body: '{}',
+      });
+      const nextResults = Object.fromEntries(result.results.map((item) => [item.questionId, item]));
+      setSession(result.session);
+      setResultsByQuestion(nextResults);
+      setSessionResults(nextResults);
+      setLastResult(currentQuestion ? nextResults[currentQuestion.id] ?? null : null);
+      setQuestions((items) => items.map((item) => ({ ...item, answered: hasSubmittedAnswer(answersByQuestion[item.id]) })));
+      setShowSubmitConfirm(false);
+      await loadWrongQuestions({ includeMastered });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '提交失败');
+      setMessage(error instanceof Error ? error.message : '交卷失败');
     } finally {
       setLoading(false);
     }
@@ -285,18 +503,57 @@ export function App() {
     if (!nextQuestionItem) return;
     const savedAnswer = answersByQuestion[nextQuestionItem.id];
     setCurrentIndex(index);
+    setActiveSectionType(nextQuestionItem.type);
     setSelectedOptions(Array.isArray(savedAnswer) ? savedAnswer : []);
     setYesNoAnswer(typeof savedAnswer === 'boolean' ? savedAnswer : null);
-    setLastResult(resultsByQuestion[nextQuestionItem.id] ?? null);
+    setLastResult(isCompleted ? resultsByQuestion[nextQuestionItem.id] ?? null : null);
+    if (session && !isCompleted) {
+      const sessionId = session.id;
+      const currentSort = nextQuestionItem.sort;
+      progressSaveChainRef.current = progressSaveChainRef.current
+        .catch(() => undefined)
+        .then(() => api(`/api/practice/sessions/${sessionId}/progress`, {
+          method: 'PATCH',
+          body: JSON.stringify({ currentSort }),
+        }).then(() => undefined, () => undefined));
+    }
   }
 
   function toggleOption(optionId: string) {
-    if (!currentQuestion) return;
+    if (!currentQuestion || isCompleted) return;
+    let nextAnswer: string[];
     if (currentQuestion.type === 'single_choice') {
-      setSelectedOptions([optionId]);
+      nextAnswer = [optionId];
+      setSelectedOptions(nextAnswer);
+      setDraftAnswer(currentQuestion, nextAnswer);
       return;
     }
-    setSelectedOptions((values) => (values.includes(optionId) ? values.filter((id) => id !== optionId) : [...values, optionId]));
+    setSelectedOptions((values) => {
+      nextAnswer = values.includes(optionId) ? values.filter((id) => id !== optionId) : [...values, optionId];
+      setDraftAnswer(currentQuestion, nextAnswer.length > 0 ? nextAnswer : undefined);
+      return nextAnswer;
+    });
+  }
+
+  function chooseYesNo(answer: boolean) {
+    if (!currentQuestion || isCompleted) return;
+    setYesNoAnswer(answer);
+    setDraftAnswer(currentQuestion, answer);
+  }
+
+  function toggleReviewFlag() {
+    if (!session || !currentQuestion) return;
+    const markedForReview = !reviewFlags[currentQuestion.id];
+    setReviewFlags((items) => ({ ...items, [currentQuestion.id]: markedForReview }));
+    void api(`/api/practice/sessions/${session.id}/review/${currentQuestion.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ markedForReview }),
+    }).catch(() => setReviewFlags((items) => ({ ...items, [currentQuestion.id]: !markedForReview })));
+  }
+
+  function switchSection(type: string) {
+    const index = questions.findIndex((question) => question.type === type);
+    if (index >= 0) goToQuestion(index);
   }
 
   async function loadWrongQuestions(filters: { bankId?: string; includeMastered?: boolean } = {}) {
@@ -321,8 +578,8 @@ export function App() {
       <main className="login-screen">
         <section className="login-card">
           <p className="eyebrow">BKYExam Practice</p>
-          <h1>先登录，马上练题。</h1>
-          <p className="lede">输入一个名字即可进入练习。目标很简单：现在开始刷题，不再等系统“更完美”。</p>
+          <h1>把题库变成每天可继续的练习。</h1>
+          <p className="lede">登录后保留草稿、标记存疑题，完成整套练习后再统一查看结果和错题。</p>
           <form onSubmit={login} className="login-form">
             <input value={loginName} onChange={(event) => setLoginName(event.target.value)} placeholder="例如：student01" autoFocus />
             <button disabled={loading || !loginName.trim()}>{loading ? '登录中...' : '进入题库'}</button>
@@ -341,10 +598,16 @@ export function App() {
           <h1>全题库练习台</h1>
         </div>
         <div className="topbar-actions">
-          <span>{student.displayName || student.loginName}</span>
           <button className="ghost" onClick={() => setView('banks')}>题库</button>
           <button className="ghost" onClick={() => setView('wrong')}>错题 {wrongQuestions.length}</button>
-          <button className="ghost" onClick={logout}>退出</button>
+          <div className="user-menu">
+            <button className="ghost" onClick={() => setUserMenuOpen((open) => !open)}>{student.displayName || student.loginName}</button>
+            {userMenuOpen && (
+              <div className="user-menu-panel">
+                <button className="ghost" onClick={logout}>注销登录</button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -352,21 +615,42 @@ export function App() {
 
       {view === 'banks' && (
         <section className="panel">
+          <div className="home-grid">
+            <article>
+              <p className="eyebrow">Continue</p>
+              <h2>继续练习</h2>
+              <p>{session?.status === 'active' ? `已完成草稿 ${answeredCount}/${questions.length}` : '暂无进行中的练习'}</p>
+              <button onClick={() => session && setView('practice')} disabled={!session}>继续练习</button>
+            </article>
+            <article>
+              <p className="eyebrow">Banks</p>
+              <h2>选择题库</h2>
+              <p>按科目、分类和关键词筛选，创建随机或顺序练习。</p>
+              <button className="ghost" onClick={() => setView('banks')}>选择题库</button>
+            </article>
+            <article>
+              <p className="eyebrow">Review</p>
+              <h2>错题本</h2>
+              <p>当前收录 {wrongQuestions.length} 道错题，可筛选题库或标记掌握。</p>
+              <button className="ghost" onClick={() => setView('wrong')}>打开错题本</button>
+            </article>
+          </div>
+
           <div className="toolbar">
             <select value={category} onChange={(event) => setCategory(event.target.value)}>
               <option value="">全部分类</option>
-              {categories.map((item) => <option key={item} value={item}>{item}</option>)}
+              {filterOptions.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
             <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="搜索题库、科目、关键词" />
             <select value={mode} onChange={(event) => setMode(event.target.value as 'random' | 'sequential')}>
               <option value="random">随机 70 题</option>
               <option value="sequential">顺序 70 题</option>
             </select>
-            <button onClick={loadBanks}>搜索</button>
+            <button onClick={loadBanks}>刷新题库</button>
           </div>
 
           <div className="bank-grid">
-            {banks.map((bank) => (
+            {filteredBanks.map((bank) => (
               <article className="bank-card" key={bank.bankId}>
                 <div className="bank-meta">
                   <span>{bank.subjectCategory}</span>
@@ -388,19 +672,40 @@ export function App() {
         <section className="practice-layout">
           <aside className="progress-panel">
             <p className="eyebrow">Practice session</p>
-            <strong>{session.completedCount}/{session.questionCount}</strong>
-            <span>正确 {session.correctCount}</span>
-            <div className="progress-bar"><span style={{ width: `${session.questionCount ? (session.completedCount / session.questionCount) * 100 : 0}%` }} /></div>
-            <div className="question-map" aria-label="题目导航">
-              {questions.map((item, index) => (
+            <strong>{answeredCount}/{questions.length}</strong>
+            <span>{isCompleted ? `正确 ${session.correctCount}` : `未答 ${unansweredCount}`}</span>
+            <div className="progress-bar"><span style={{ width: `${questions.length ? (answeredCount / questions.length) * 100 : 0}%` }} /></div>
+            <div className="section-tabs" aria-label="题型分区">
+              {sections.map((section) => (
                 <button
-                  key={item.id}
-                  className={`${index === currentIndex ? 'current' : ''} ${item.answered ? 'answered' : ''}`}
-                  onClick={() => goToQuestion(index)}
+                  key={section.type}
+                  className={section.type === activeSection?.type ? 'current' : ''}
+                  onClick={() => switchSection(section.type)}
                 >
-                  {index + 1}
+                  {section.label} <span>{section.questions.length}</span>
                 </button>
               ))}
+            </div>
+            {isCompleted && (
+              <div className="section-summary">
+                {sectionScores.map((section) => (
+                  <span key={section.type}>{section.label} {section.correctCount}/{section.totalCount}</span>
+                ))}
+              </div>
+            )}
+            <div className="question-map" aria-label="题目导航">
+              {activeSectionQuestions.map((item) => {
+                const index = questions.findIndex((question) => question.id === item.id);
+                return (
+                  <button
+                    key={item.id}
+                    className={`${index === currentIndex ? 'current' : ''} ${getQuestionState(item, answersByQuestion, reviewFlags)}`}
+                    onClick={() => goToQuestion(index)}
+                  >
+                    {item.sort}
+                  </button>
+                );
+              })}
             </div>
             <button className="ghost" onClick={() => setView('banks')}>返回题库</button>
           </aside>
@@ -410,17 +715,23 @@ export function App() {
               <span>第 {currentQuestion.sort} 题 / {questions.length}</span>
               <span>{typeLabel(currentQuestion.type)}</span>
             </div>
+            <div className="review">
+              <button className={reviewFlags[currentQuestion.id] ? '' : 'ghost'} onClick={toggleReviewFlag} disabled={isCompleted}>
+                标记存疑
+              </button>
+              <span className={`save-status ${saveState}`}>{saveStatusText}</span>
+            </div>
             <h2>{currentQuestion.content || '（题干为空）'}</h2>
 
             {currentQuestion.type === 'yes_no' ? (
               <div className="answer-grid two">
-                <button className={yesNoAnswer === true ? 'selected' : ''} onClick={() => setYesNoAnswer(true)}>正确 / 是</button>
-                <button className={yesNoAnswer === false ? 'selected' : ''} onClick={() => setYesNoAnswer(false)}>错误 / 否</button>
+                <button className={yesNoAnswer === true ? 'selected' : ''} onClick={() => chooseYesNo(true)} disabled={isCompleted}>正确 / 是</button>
+                <button className={yesNoAnswer === false ? 'selected' : ''} onClick={() => chooseYesNo(false)} disabled={isCompleted}>错误 / 否</button>
               </div>
             ) : (
               <div className="answer-grid">
                 {currentQuestion.options.map((option) => (
-                  <button key={option.id} className={selectedOptions.includes(option.id) ? 'selected' : ''} onClick={() => toggleOption(option.id)}>
+                  <button key={option.id} className={selectedOptions.includes(option.id) ? 'selected' : ''} onClick={() => toggleOption(option.id)} disabled={isCompleted}>
                     <span>{option.sort}</span>
                     {option.content || option.id}
                   </button>
@@ -430,11 +741,28 @@ export function App() {
 
             <div className="question-actions">
               <button className="ghost" onClick={previousQuestion} disabled={currentIndex <= 0}>上一题</button>
-              <button onClick={submitAnswer} disabled={loading || hasSubmittedAnswer(currentAnswer)}>{loading ? '提交中...' : hasSubmittedAnswer(currentAnswer) ? '已提交' : '提交答案'}</button>
+              <button onClick={() => submitSession()} disabled={loading || isCompleted}>{loading ? '交卷中...' : isCompleted ? '已交卷' : '交卷并查看结果'}</button>
               <button className="ghost" onClick={nextQuestion} disabled={currentIndex >= questions.length - 1}>下一题</button>
             </div>
 
-            {lastResult && (
+            {showSubmitConfirm && (
+              <div className="submit-confirm">
+                <strong>还有 {unansweredCount} 题未作答，确定交卷吗？</strong>
+                <div>
+                  <button className="ghost" onClick={() => setShowSubmitConfirm(false)}>继续作答</button>
+                  <button onClick={() => submitSession(true)} disabled={loading}>仍然交卷</button>
+                </div>
+              </div>
+            )}
+
+            {isCompleted && Object.keys(sessionResults).length > 0 && (
+              <div className="score-summary">
+                <strong>本次练习：{session.correctCount}/{questions.length}</strong>
+                <span>已生成 {Object.keys(sessionResults).length} 道题的结果</span>
+              </div>
+            )}
+
+            {isCompleted && lastResult && (
               <div className={lastResult.isCorrect ? 'result correct' : lastResult.isCorrect === false ? 'result wrong' : 'result'}>
                 <strong>{lastResult.needsSelfReview ? '需要自评' : lastResult.isCorrect ? '答对了' : '答错了，已加入错题本'}</strong>
                 <p>参考答案：{formatCorrectAnswer(lastResult.correctAnswer, currentQuestion.options)}</p>

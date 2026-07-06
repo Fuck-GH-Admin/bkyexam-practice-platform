@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -160,6 +161,7 @@ export const practiceSessions = pgTable(
     questionCount: integer('question_count').notNull().default(0),
     completedCount: integer('completed_count').notNull().default(0),
     correctCount: integer('correct_count').notNull().default(0),
+    currentSort: integer('current_sort').notNull().default(1),
     status: text('status').notNull().default('active'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -169,6 +171,7 @@ export const practiceSessions = pgTable(
     index('practice_sessions_student_id_idx').on(table.studentId),
     index('practice_sessions_bank_id_idx').on(table.bankId),
     index('practice_sessions_status_idx').on(table.status),
+    check('practice_sessions_current_sort_positive_check', sql`${table.currentSort} > 0`),
   ],
 );
 
@@ -196,6 +199,34 @@ export const practiceSessionQuestions = pgTable(
     uniqueIndex('practice_session_questions_session_sort_unique_idx').on(
       table.sessionId,
       table.sort,
+    ),
+  ],
+);
+
+export const practiceSessionDrafts = pgTable(
+  'practice_session_drafts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => practiceSessions.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    draftAnswer: text('draft_answer').notNull().default(''),
+    markedForReview: boolean('marked_for_review').notNull().default(false),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('practice_session_drafts_session_id_idx').on(table.sessionId),
+    index('practice_session_drafts_student_id_idx').on(table.studentId),
+    index('practice_session_drafts_question_id_idx').on(table.questionId),
+    uniqueIndex('practice_session_drafts_session_question_unique_idx').on(
+      table.sessionId,
+      table.questionId,
     ),
   ],
 );

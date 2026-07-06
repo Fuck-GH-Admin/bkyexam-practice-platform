@@ -5,6 +5,7 @@ import {
   bankMappings,
   classifications,
   practiceAttempts,
+  practiceSessionDrafts,
   practiceSessionQuestions,
   practiceSessions,
   questionOptions,
@@ -25,6 +26,7 @@ describe('database schema', () => {
     expect(getTableName(practiceAttempts)).toBe('practice_attempts');
     expect(getTableName(practiceSessions)).toBe('practice_sessions');
     expect(getTableName(practiceSessionQuestions)).toBe('practice_session_questions');
+    expect(getTableName(practiceSessionDrafts)).toBe('practice_session_drafts');
     expect(getTableName(wrongQuestions)).toBe('wrong_questions');
   });
 
@@ -32,6 +34,49 @@ describe('database schema', () => {
     expect(studentSessions).toBeDefined();
     expect(practiceSessions).toBeDefined();
     expect(practiceSessionQuestions).toBeDefined();
+  });
+
+  it('tracks current practice position with a positive sort check', () => {
+    const tableConfig = getTableConfig(practiceSessions);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const checkNames = tableConfig.checks.map((tableCheck) => tableCheck.name);
+
+    expect(columnNames).toContain('current_sort');
+    expect(checkNames).toContain('practice_sessions_current_sort_positive_check');
+  });
+
+  it('exports practice draft table for resumable answers and review flags', () => {
+    expect(practiceSessionDrafts).toBeDefined();
+  });
+
+  it('defines practice draft columns, indexes, and session-question uniqueness', () => {
+    const tableConfig = getTableConfig(practiceSessionDrafts);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+    const uniqueSessionQuestionIndex = tableConfig.indexes.find(
+      (tableIndex) => tableIndex.config.name === 'practice_session_drafts_session_question_unique_idx',
+    );
+    const uniqueSessionQuestionColumns = uniqueSessionQuestionIndex?.config.columns.map(
+      (column) => (column as { name?: string }).name,
+    );
+
+    expect(columnNames).toEqual([
+      'id',
+      'session_id',
+      'question_id',
+      'student_id',
+      'draft_answer',
+      'marked_for_review',
+      'updated_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'practice_session_drafts_session_id_idx',
+      'practice_session_drafts_student_id_idx',
+      'practice_session_drafts_question_id_idx',
+      'practice_session_drafts_session_question_unique_idx',
+    ]));
+    expect(uniqueSessionQuestionIndex?.config.unique).toBe(true);
+    expect(uniqueSessionQuestionColumns).toEqual(['session_id', 'question_id']);
   });
 
   it('does not B-tree index unbounded question search text', () => {

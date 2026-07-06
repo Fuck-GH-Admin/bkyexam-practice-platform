@@ -105,4 +105,27 @@ describe('createPgBankRepository', () => {
       },
     ]);
   });
+
+  it('uses objective question counts as the practiceable bank count', async () => {
+    const client = new FakeQueryClient([
+      {
+        bank_id: 'root-bank',
+        bank_name: '成都理工',
+        subject_category: '信息技术',
+        subject_name: '计算机基础',
+        visible: true,
+        status: 'active',
+        keywords: ['计算机基础'],
+        question_count: 0,
+        objective_question_count: 18491,
+        description: 'Imported bank.',
+      },
+    ]);
+    const repository = createPgBankRepository(client);
+
+    const banks = await repository.listBanks({});
+
+    expect(client.sql).toContain('objective_question_count');
+    expect(banks[0]?.questionCount).toBe(18491);
+  });
 });

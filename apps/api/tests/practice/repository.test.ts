@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { QueryClient } from '../../src/db/client';
-import { CompletedSessionError, createPgPracticeRepository } from '../../src/practice/repository';
+import { CompletedSessionError, createMemoryPracticeRepository, createPgPracticeRepository } from '../../src/practice/repository';
 
 class FakeQueryClient implements QueryClient {
   calls: { sql: string; params?: readonly unknown[] }[] = [];
@@ -67,6 +67,7 @@ function createSessionResults() {
         question_count: 2,
         completed_count: 0,
         correct_count: 0,
+        current_sort: 1,
         status: 'active',
       },
     ],
@@ -99,6 +100,73 @@ function createSubmitAnswerResults() {
       },
     ],
   ];
+}
+
+function createSubmitSessionRows() {
+  return [
+    {
+      session_id: 'session-1',
+      bank_id: 'bank-1',
+      mode: 'random',
+      question_count: 2,
+      current_sort: 1,
+      status: 'active',
+      session_question_id: 'session-question-1',
+      question_id: 'question-1',
+      normalized_type: 'single_choice',
+      answer_raw: 'A',
+      draft_answer: '["A"]',
+    },
+    {
+      session_id: 'session-1',
+      bank_id: 'bank-1',
+      mode: 'random',
+      question_count: 2,
+      current_sort: 1,
+      status: 'active',
+      session_question_id: 'session-question-2',
+      question_id: 'question-2',
+      normalized_type: 'yes_no',
+      answer_raw: '11111111-1111-1111-1111-111111111111',
+      draft_answer: 'false',
+    },
+  ];
+}
+
+function createSessionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'session-1',
+    bank_id: 'bank-1',
+    mode: 'sequential',
+    question_count: 2,
+    completed_count: 1,
+    correct_count: 1,
+    current_sort: 2,
+    status: 'active',
+    ...overrides,
+  };
+}
+
+function createSessionQuestionRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'session-1',
+    bank_id: 'bank-1',
+    mode: 'sequential',
+    question_count: 2,
+    completed_count: 1,
+    correct_count: 1,
+    current_sort: 2,
+    status: 'active',
+    question_id: 'question-1',
+    sort: 2,
+    normalized_type: 'multiple_choice',
+    content: 'Question 1 content',
+    answered: true,
+    is_correct: false,
+    draft_answer: '["A"]',
+    marked_for_review: false,
+    ...overrides,
+  };
 }
 
 describe('createPgPracticeRepository', () => {
@@ -184,6 +252,7 @@ describe('createPgPracticeRepository', () => {
         questionCount: 2,
         completedCount: 0,
         correctCount: 0,
+        currentSort: 1,
         status: 'active',
       },
       questions: [
@@ -197,8 +266,17 @@ describe('createPgPracticeRepository', () => {
             { id: 'option-2', sort: 2, content: 'B' },
           ],
           answered: false,
+          markedForReview: false,
         },
-        { id: 'question-2', sort: 2, type: 'yes_no', content: 'Question 2', options: [], answered: false },
+        {
+          id: 'question-2',
+          sort: 2,
+          type: 'yes_no',
+          content: 'Question 2',
+          options: [],
+          answered: false,
+          markedForReview: false,
+        },
       ],
     });
   });
@@ -277,6 +355,97 @@ describe('createPgPracticeRepository', () => {
     })).resolves.toBeNull();
   });
 
+  it('returns grouped session details with progress, drafts, and review markers', async () => {
+    const client = new FakeQueryClient([
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'sequential',
+          question_count: 3,
+          completed_count: 1,
+          correct_count: 1,
+          current_sort: 2,
+          status: 'active',
+        },
+      ],
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'sequential',
+          question_count: 3,
+          completed_count: 1,
+          correct_count: 1,
+          current_sort: 2,
+          status: 'active',
+          question_id: 'question-1',
+          sort: 1,
+          normalized_type: 'single_choice',
+          content: 'Question 1',
+          answered: false,
+          is_correct: null,
+          draft_answer: null,
+          marked_for_review: false,
+        },
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'sequential',
+          question_count: 3,
+          completed_count: 1,
+          correct_count: 1,
+          current_sort: 2,
+          status: 'active',
+          question_id: 'question-2',
+          sort: 2,
+          normalized_type: 'multiple_choice',
+          content: 'Question 2',
+          answered: true,
+          is_correct: true,
+          draft_answer: '["A","B"]',
+          marked_for_review: true,
+        },
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'sequential',
+          question_count: 3,
+          completed_count: 1,
+          correct_count: 1,
+          current_sort: 2,
+          status: 'active',
+          question_id: 'question-3',
+          sort: 3,
+          normalized_type: 'yes_no',
+          content: 'Question 3',
+          answered: false,
+          is_correct: null,
+          draft_answer: 'true',
+          marked_for_review: false,
+        },
+      ],
+      [
+        { id: 'option-1', question_id: 'question-2', sort: 1, content: 'A' },
+        { id: 'option-2', question_id: 'question-2', sort: 2, content: 'B' },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.getSession({ studentId: 'student-1', sessionId: 'session-1' });
+
+    expect(result?.session.currentSort).toBe(2);
+    expect(result?.questions.map((question) => [
+      question.type,
+      question.draftAnswer,
+      question.markedForReview,
+    ])).toEqual([
+      ['single_choice', undefined, false],
+      ['multiple_choice', ['A', 'B'], true],
+      ['yes_no', true, false],
+    ]);
+  });
+
   it('submits an answer, records the attempt, and updates session progress from answered rows', async () => {
     const client = new FakeQueryClient([
       [
@@ -336,6 +505,22 @@ describe('createPgPracticeRepository', () => {
     });
   });
 
+  it('stores formal string answer submissions as raw strings', async () => {
+    const client = new FakeQueryClient(createSubmitAnswerResults());
+    const repository = createPgPracticeRepository(client);
+
+    await repository.submitAnswer({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+      answer: 'A',
+    });
+
+    const attemptInsert = client.calls.find((call) => call.sql.includes('INSERT INTO practice_attempts'));
+
+    expect(attemptInsert?.params?.[4]).toBe('A');
+  });
+
   it('upserts a wrong-question row when an objective answer is incorrect', async () => {
     const client = new FakeQueryClient([
       [
@@ -368,10 +553,13 @@ describe('createPgPracticeRepository', () => {
       studentId: 'student-1',
       sessionId: 'session-1',
       questionId: 'question-1',
-      answer: ['B'],
+      answer: 'B',
     });
 
+    const attemptInsert = client.calls.find((call) => call.sql.includes('INSERT INTO practice_attempts'));
     const wrongQuestionUpsert = client.calls.find((call) => call.sql.includes('INSERT INTO wrong_questions'));
+
+    expect(attemptInsert?.params?.[4]).toBe('B');
 
     expect(wrongQuestionUpsert?.sql).toContain('ON CONFLICT (student_id, question_id, bank_id) DO UPDATE');
     expect(wrongQuestionUpsert?.sql).toContain('wrong_count = wrong_questions.wrong_count + 1');
@@ -380,7 +568,7 @@ describe('createPgPracticeRepository', () => {
       'student-1',
       'question-1',
       'bank-1',
-      '["B"]',
+      'B',
     ]);
   });
 
@@ -516,5 +704,939 @@ describe('createPgPracticeRepository', () => {
       questionId: 'question-1',
       answer: true,
     })).rejects.toBeInstanceOf(CompletedSessionError);
+  });
+
+  it('submits all drafted answers, records attempts, upserts wrong questions, and completes the session', async () => {
+    const client = new FakeQueryClient([
+      createSubmitSessionRows(),
+      [],
+      [],
+      [],
+      [],
+      [],
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 2,
+          completed_count: 2,
+          correct_count: 1,
+          current_sort: 1,
+          status: 'completed',
+        },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' });
+
+    const loadQuery = client.calls.find((call) => call.sql.includes('practice_session_drafts.draft_answer'));
+    const attemptInserts = client.calls.filter((call) => call.sql.includes('INSERT INTO practice_attempts'));
+    const sessionQuestionUpdates = client.calls.filter((call) => call.sql.includes('UPDATE practice_session_questions'));
+    const wrongQuestionUpserts = client.calls.filter((call) => call.sql.includes('INSERT INTO wrong_questions'));
+    const sessionUpdate = client.calls.find((call) => call.sql.includes("status = 'completed'"));
+
+    expect(loadQuery?.sql).toContain('FOR UPDATE OF practice_sessions, practice_session_questions');
+    expect(loadQuery?.params).toEqual(['session-1', 'student-1']);
+    expect(attemptInserts.map((call) => call.params)).toEqual([
+      [expect.any(String), 'student-1', 'question-1', 'bank-1', '["A"]', true],
+      [expect.any(String), 'student-1', 'question-2', 'bank-1', 'false', false],
+    ]);
+    expect(sessionQuestionUpdates.map((call) => call.params)).toEqual([
+      ['session-question-1', true],
+      ['session-question-2', false],
+    ]);
+    expect(wrongQuestionUpserts).toHaveLength(1);
+    expect(wrongQuestionUpserts[0]?.params).toEqual([
+      expect.any(String),
+      'student-1',
+      'question-2',
+      'bank-1',
+      'false',
+    ]);
+    expect(sessionUpdate?.sql).toContain('completed_count = $2');
+    expect(sessionUpdate?.sql).toContain('correct_count = $3');
+    expect(sessionUpdate?.params).toEqual(['session-1', 2, 1]);
+    expect(result).toEqual({
+      session: {
+        id: 'session-1',
+        bankId: 'bank-1',
+        mode: 'random',
+        questionCount: 2,
+        completedCount: 2,
+        correctCount: 1,
+        currentSort: 1,
+        status: 'completed',
+      },
+      results: [
+        { questionId: 'question-1', isCorrect: true, correctAnswer: ['A'], needsSelfReview: false },
+        { questionId: 'question-2', isCorrect: false, correctAnswer: true, needsSelfReview: false },
+      ],
+    });
+  });
+
+  it('ignores empty string and empty array drafts when submitting a session', async () => {
+    const client = new FakeQueryClient([
+      [
+        ...createSubmitSessionRows(),
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 4,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-3',
+          question_id: 'question-3',
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          draft_answer: '""',
+        },
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 4,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-4',
+          question_id: 'question-4',
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          draft_answer: '[]',
+        },
+      ],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 4,
+          completed_count: 2,
+          correct_count: 1,
+          current_sort: 1,
+          status: 'completed',
+        },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' });
+
+    const attemptInserts = client.calls.filter((call) => call.sql.includes('INSERT INTO practice_attempts'));
+    const sessionQuestionUpdates = client.calls.filter((call) => call.sql.includes('UPDATE practice_session_questions'));
+    const wrongQuestionUpserts = client.calls.filter((call) => call.sql.includes('INSERT INTO wrong_questions'));
+    const sessionUpdate = client.calls.find((call) => call.sql.includes("status = 'completed'"));
+
+    expect(attemptInserts.map((call) => call.params?.[2])).toEqual(['question-1', 'question-2']);
+    expect(sessionQuestionUpdates.map((call) => call.params?.[0])).toEqual(['session-question-1', 'session-question-2']);
+    expect(wrongQuestionUpserts.map((call) => call.params?.[2])).toEqual(['question-2']);
+    expect(sessionUpdate?.params).toEqual(['session-1', 2, 1]);
+    expect(result?.session.completedCount).toBe(2);
+    expect(result?.results.map((answer) => answer.questionId)).toEqual(['question-1', 'question-2']);
+  });
+
+  it('stores bulk-submitted string drafts as raw formal answers', async () => {
+    const client = new FakeQueryClient([
+      [
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 1,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-1',
+          question_id: 'question-1',
+          answered_at: null,
+          is_correct: null,
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          draft_answer: '"A"',
+        },
+      ],
+      [],
+      [],
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 1,
+          completed_count: 1,
+          correct_count: 1,
+          current_sort: 1,
+          status: 'completed',
+        },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    await repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' });
+
+    const attemptInsert = client.calls.find((call) => call.sql.includes('INSERT INTO practice_attempts'));
+
+    expect(attemptInsert?.params?.[4]).toBe('A');
+  });
+
+  it('includes existing answered questions when completing a session submission', async () => {
+    const client = new FakeQueryClient([
+      [
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 2,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-1',
+          question_id: 'question-1',
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          answered_at: new Date('2026-01-01T00:00:00.000Z'),
+          is_correct: true,
+          draft_answer: '["B"]',
+        },
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 2,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-2',
+          question_id: 'question-2',
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          answered_at: null,
+          is_correct: null,
+          draft_answer: '["B"]',
+        },
+      ],
+      [],
+      [],
+      [],
+      [
+        {
+          id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 2,
+          completed_count: 2,
+          correct_count: 1,
+          current_sort: 1,
+          status: 'completed',
+        },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' });
+
+    const loadQuery = client.calls.find((call) => call.sql.includes('practice_session_drafts.draft_answer'));
+    const attemptInserts = client.calls.filter((call) => call.sql.includes('INSERT INTO practice_attempts'));
+    const sessionQuestionUpdates = client.calls.filter((call) => call.sql.includes('UPDATE practice_session_questions'));
+    const sessionUpdate = client.calls.find((call) => call.sql.includes("status = 'completed'"));
+
+    expect(loadQuery?.sql).toContain('practice_session_questions.answered_at');
+    expect(loadQuery?.sql).toContain('practice_session_questions.is_correct');
+    expect(attemptInserts.map((call) => call.params?.[2])).toEqual(['question-2']);
+    expect(sessionQuestionUpdates.map((call) => call.params?.[0])).toEqual(['session-question-2']);
+    expect(sessionUpdate?.params).toEqual(['session-1', 2, 1]);
+    expect(result?.session.completedCount).toBe(2);
+    expect(result?.session.correctCount).toBe(1);
+    expect(result?.results.map((answer) => answer.questionId)).toEqual(['question-2']);
+  });
+
+  it('returns null when submitting a session that is missing or not owned by the student', async () => {
+    const client = new FakeQueryClient([[]]);
+    const repository = createPgPracticeRepository(client);
+
+    await expect(repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' })).resolves.toBeNull();
+
+    expect(client.calls.some((call) => call.sql.trim() === 'COMMIT')).toBe(true);
+    expect(client.calls.some((call) => call.sql.includes('INSERT INTO practice_attempts'))).toBe(false);
+  });
+
+  it('throws when submitting a completed owned session', async () => {
+    const client = new FakeQueryClient([
+      [
+        {
+          ...createSubmitSessionRows()[0],
+          status: 'completed',
+          answered_at: new Date('2026-01-01T00:00:00.000Z'),
+          is_correct: true,
+        },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    await expect(repository.submitSession({ studentId: 'student-1', sessionId: 'session-1' })).rejects.toThrow(CompletedSessionError);
+    expect(client.calls.some((call) => call.sql.trim() === 'ROLLBACK')).toBe(true);
+  });
+
+  it('saves a draft for an active owned session question', async () => {
+    const client = new FakeQueryClient([
+      [{ question_id: 'question-1', draft_answer: '["A"]', marked_for_review: false }],
+      [createSessionQuestionRow()],
+      [
+        { id: 'option-1', question_id: 'question-1', sort: 1, content: 'A' },
+        { id: 'option-2', question_id: 'question-1', sort: 2, content: 'B' },
+      ],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+      answer: ['A'],
+    });
+
+    expect(client.calls[0].sql).toContain('INSERT INTO practice_session_drafts');
+    expect(client.calls[0].sql).toContain('JOIN practice_session_questions');
+    expect(client.calls[0].sql).toContain('practice_sessions.student_id = $1');
+    expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1', '["A"]']);
+    expect(result).toEqual({
+      id: 'question-1',
+      sort: 2,
+      type: 'multiple_choice',
+      content: 'Question 1 content',
+      options: [
+        { id: 'option-1', sort: 1, content: 'A' },
+        { id: 'option-2', sort: 2, content: 'B' },
+      ],
+      answered: true,
+      draftAnswer: ['A'],
+      markedForReview: false,
+      isCorrect: false,
+    });
+  });
+
+  it('round-trips draft answer encodings without changing submitted types', async () => {
+    const cases = [
+      { answer: 'true', stored: '"true"' },
+      { answer: 'false', stored: '"false"' },
+      { answer: '["A"]', stored: '"[\\"A\\"]"' },
+      { answer: 'A', stored: '"A"' },
+      { answer: true, stored: 'true' },
+      { answer: ['A'], stored: '["A"]' },
+    ] as const;
+
+    for (const { answer, stored } of cases) {
+      const client = new FakeQueryClient([
+        [{ question_id: 'question-1', draft_answer: stored, marked_for_review: false }],
+        [createSessionQuestionRow({ draft_answer: stored })],
+        [],
+      ]);
+      const repository = createPgPracticeRepository(client);
+
+      const result = await repository.saveDraft({
+        studentId: 'student-1',
+        sessionId: 'session-1',
+        questionId: 'question-1',
+        answer,
+      });
+
+      expect(client.calls[0].params?.[3]).toEqual(stored);
+      expect(result?.draftAnswer).toEqual(answer);
+    }
+  });
+
+  it('clears a draft answer without dropping an existing review flag', async () => {
+    const client = new FakeQueryClient([[{ question_id: 'question-1' }]]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+    });
+
+    expect(client.calls[0].sql).toContain('practice_session_drafts');
+    expect(client.calls[0].sql).toContain('marked_for_review = true');
+    expect(client.calls[0].sql).toContain('DELETE FROM practice_session_drafts');
+    expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1']);
+    expect(result).toBe(true);
+  });
+
+  it('sets a review flag for an active owned session question', async () => {
+    const client = new FakeQueryClient([
+      [{ question_id: 'question-1', draft_answer: 'typed answer', marked_for_review: true }],
+      [createSessionQuestionRow({ draft_answer: 'typed answer', marked_for_review: true })],
+      [{ id: 'option-1', question_id: 'question-1', sort: 1, content: 'A' }],
+    ]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.setReviewFlag({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+      markedForReview: true,
+    });
+
+    expect(client.calls[0].sql).toContain('INSERT INTO practice_session_drafts');
+    expect(client.calls[0].sql).toContain('marked_for_review = EXCLUDED.marked_for_review');
+    expect(client.calls[0].sql).toContain('COALESCE(practice_session_drafts.draft_answer');
+    expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1', true]);
+    expect(result).toEqual({
+      id: 'question-1',
+      sort: 2,
+      type: 'multiple_choice',
+      content: 'Question 1 content',
+      options: [{ id: 'option-1', sort: 1, content: 'A' }],
+      answered: true,
+      draftAnswer: 'typed answer',
+      markedForReview: true,
+      isCorrect: false,
+    });
+  });
+
+  it('saves progress for an active owned session', async () => {
+    const client = new FakeQueryClient([[createSessionRow({ current_sort: 3 })]]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.saveProgress({ studentId: 'student-1', sessionId: 'session-1', currentSort: 3 });
+
+    expect(client.calls[0].sql).toContain('SET current_sort = $3');
+    expect(client.calls[0].sql).toContain('practice_sessions.student_id = $1');
+    expect(client.calls[0].sql).toContain('practice_session_questions.sort = $3');
+    expect(client.calls[0].sql).toContain("status = 'active'");
+    expect(client.calls[0].params).toEqual(['student-1', 'session-1', 3]);
+    expect(result).toEqual({
+      id: 'session-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      questionCount: 2,
+      completedCount: 1,
+      correctCount: 1,
+      currentSort: 3,
+      status: 'active',
+    });
+  });
+
+  it('throws when mutating progress, drafts, or review flags for completed owned sessions', async () => {
+    await expect(createPgPracticeRepository(new FakeQueryClient([[], [createSessionRow({ status: 'completed' })]])).saveProgress({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      currentSort: 2,
+    })).rejects.toThrow(CompletedSessionError);
+
+    await expect(createPgPracticeRepository(new FakeQueryClient([[], [createSessionRow({ status: 'completed' })]])).saveDraft({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+      answer: ['A'],
+    })).rejects.toThrow(CompletedSessionError);
+
+    await expect(createPgPracticeRepository(new FakeQueryClient([[], [createSessionRow({ status: 'completed' })]])).clearDraft({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+    })).rejects.toThrow(CompletedSessionError);
+
+    await expect(createPgPracticeRepository(new FakeQueryClient([[], [createSessionRow({ status: 'completed' })]])).setReviewFlag({
+      studentId: 'student-1',
+      sessionId: 'session-1',
+      questionId: 'question-1',
+      markedForReview: true,
+    })).rejects.toThrow(CompletedSessionError);
+  });
+
+  it('lists active sessions for a student', async () => {
+    const client = new FakeQueryClient([[createSessionRow({ id: 'session-2', current_sort: 4 })]]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.listActiveSessions({ studentId: 'student-1' });
+
+    expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].sql).toContain('practice_sessions.student_id = $1');
+    expect(client.calls[0].sql).toContain('current_sort');
+    expect(client.calls[0].params).toEqual(['student-1']);
+    expect(result).toEqual([
+      {
+        id: 'session-2',
+        bankId: 'bank-1',
+        mode: 'sequential',
+        questionCount: 2,
+        completedCount: 1,
+        correctCount: 1,
+        currentSort: 4,
+        status: 'active',
+      },
+    ]);
+  });
+});
+
+describe('createMemoryPracticeRepository', () => {
+  it('stores drafts, review flags, progress, and active sessions in memory', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push({
+      id: 'question-1',
+      sort: 1,
+      type: 'single_choice',
+      content: 'Question 1',
+      options: [],
+      answered: false,
+      markedForReview: false,
+    });
+    created!.session.questionCount = 1;
+
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+    })).resolves.toBe(false);
+    await expect(repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['A'],
+    })).resolves.toMatchObject({ id: 'question-1', draftAnswer: ['A'], markedForReview: false });
+    await expect(repository.setReviewFlag({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      markedForReview: true,
+    })).resolves.toMatchObject({ id: 'question-1', draftAnswer: ['A'], markedForReview: true });
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+    })).resolves.toBe(true);
+    await expect(repository.saveProgress({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      currentSort: 1,
+    })).resolves.toMatchObject({ id: created!.session.id, currentSort: 1 });
+    await expect(repository.saveProgress({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      currentSort: 99,
+    })).resolves.toBeNull();
+    await expect(repository.listActiveSessions({ studentId: 'student-1' })).resolves.toEqual([created!.session]);
+
+    expect(created?.questions[0]?.draftAnswer).toBeUndefined();
+    expect(created?.questions[0]?.markedForReview).toBe(true);
+    expect(created?.session.currentSort).toBe(1);
+  });
+
+  it('preserves memory draft row state after clearing a false review flag', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push({
+      id: 'question-1',
+      sort: 1,
+      type: 'single_choice',
+      content: 'Question 1',
+      options: [],
+      answered: false,
+      markedForReview: false,
+    });
+
+    const flagged = await repository.setReviewFlag({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      markedForReview: false,
+    });
+
+    expect(flagged).toMatchObject({ markedForReview: false });
+    expect(flagged?.draftAnswer).toBeUndefined();
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+    })).resolves.toBe(true);
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+    })).resolves.toBe(false);
+  });
+
+  it('returns null or false for missing memory sessions', async () => {
+    const repository = createMemoryPracticeRepository();
+
+    await expect(repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: 'missing-session',
+      questionId: 'question-1',
+      answer: ['A'],
+    })).resolves.toBeNull();
+    await expect(repository.setReviewFlag({
+      studentId: 'student-1',
+      sessionId: 'missing-session',
+      questionId: 'question-1',
+      markedForReview: true,
+    })).resolves.toBeNull();
+    await expect(repository.saveProgress({
+      studentId: 'student-1',
+      sessionId: 'missing-session',
+      currentSort: 1,
+    })).resolves.toBeNull();
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: 'missing-session',
+      questionId: 'question-1',
+    })).resolves.toBe(false);
+  });
+
+  it('throws when mutating completed owned memory sessions', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push({
+      id: 'question-1',
+      sort: 1,
+      type: 'single_choice',
+      content: 'Question 1',
+      options: [],
+      answered: false,
+      markedForReview: false,
+    });
+    created!.session.status = 'completed';
+
+    await expect(repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['A'],
+    })).rejects.toThrow(CompletedSessionError);
+    await expect(repository.setReviewFlag({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      markedForReview: true,
+    })).rejects.toThrow(CompletedSessionError);
+    await expect(repository.saveProgress({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      currentSort: 1,
+    })).rejects.toThrow(CompletedSessionError);
+    await expect(repository.clearDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+    })).rejects.toThrow(CompletedSessionError);
+    await expect(repository.listActiveSessions({ studentId: 'student-1' })).resolves.toEqual([]);
+  });
+
+  it('throws when submitting a completed owned memory session', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    created!.session.status = 'completed';
+
+    await expect(repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id })).rejects.toThrow(
+      CompletedSessionError,
+    );
+  });
+
+  it('submits drafted memory answers and completes the session', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'random',
+      limit: 2,
+      questionTypes: ['single_choice'],
+    });
+    const correctQuestion = {
+        id: 'question-1',
+        sort: 1,
+        type: 'single_choice',
+        content: 'Question 1',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      };
+    const incorrectQuestion = {
+        id: 'question-2',
+        sort: 2,
+        type: 'single_choice',
+        content: 'Question 2',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      };
+    created?.questions.push(correctQuestion, incorrectQuestion);
+    created!.session.questionCount = 2;
+
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['A'],
+    });
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-2',
+      answer: ['B'],
+    });
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id });
+
+    expect(result?.session).toMatchObject({
+      id: created!.session.id,
+      bankId: 'bank-1',
+      mode: 'random',
+      questionCount: 2,
+      completedCount: 2,
+      correctCount: 1,
+      currentSort: 1,
+      status: 'completed',
+    });
+    expect(result?.results.map((answer) => [answer.questionId, answer.isCorrect])).toEqual([
+      ['question-1', true],
+      ['question-2', false],
+    ]);
+    expect(created?.questions.map((question) => [question.answered, question.isCorrect])).toEqual([
+      [true, true],
+      [true, false],
+    ]);
+    await expect(repository.submitSession({ studentId: 'student-2', sessionId: created!.session.id })).resolves.toBeNull();
+  });
+
+  it('grades memory session drafts against the stored answer instead of the first option', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    const question = {
+      id: 'question-1',
+      sort: 1,
+      type: 'single_choice',
+      content: 'Question 1',
+      options: [
+        { id: 'option-a', sort: 1, content: 'A' },
+        { id: 'option-b', sort: 2, content: 'B' },
+      ],
+      answered: false,
+      markedForReview: false,
+      answerRaw: 'option-b',
+    };
+    created?.questions.push(question);
+    created!.session.questionCount = 1;
+
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['option-b'],
+    });
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id });
+
+    expect(result?.session.correctCount).toBe(1);
+    expect(result?.results).toEqual([
+      { questionId: 'question-1', isCorrect: true, correctAnswer: ['option-b'], needsSelfReview: false },
+    ]);
+    expect(created?.questions[0]?.isCorrect).toBe(true);
+  });
+
+  it('does not treat the first memory option as correct when answerRaw is missing', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 1,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push({
+      id: 'question-1',
+      sort: 1,
+      type: 'single_choice',
+      content: 'Question 1',
+      options: [
+        { id: 'option-a', sort: 1, content: 'A' },
+        { id: 'option-b', sort: 2, content: 'B' },
+      ],
+      answered: false,
+      markedForReview: false,
+    });
+    created!.session.questionCount = 1;
+
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['option-a'],
+    });
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id });
+
+    expect(result?.session.correctCount).toBe(0);
+    expect(result?.results).toEqual([
+      { questionId: 'question-1', isCorrect: null, correctAnswer: [], needsSelfReview: true },
+    ]);
+    expect(created?.questions[0]?.isCorrect).toBeNull();
+  });
+
+  it('ignores empty memory drafts when submitting a session', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 3,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push(
+      {
+        id: 'question-1',
+        sort: 1,
+        type: 'single_choice',
+        content: 'Question 1',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      },
+      {
+        id: 'question-2',
+        sort: 2,
+        type: 'single_choice',
+        content: 'Question 2',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      },
+      {
+        id: 'question-3',
+        sort: 3,
+        type: 'single_choice',
+        content: 'Question 3',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      },
+    );
+    created!.session.questionCount = 3;
+
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-1',
+      answer: ['A'],
+    });
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-2',
+      answer: '',
+    });
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-3',
+      answer: [],
+    });
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id });
+
+    expect(result?.session.completedCount).toBe(1);
+    expect(result?.session.correctCount).toBe(1);
+    expect(result?.results.map((answer) => answer.questionId)).toEqual(['question-1']);
+    expect(created?.questions.map((question) => [question.answered, question.isCorrect])).toEqual([
+      [true, true],
+      [false, undefined],
+      [false, undefined],
+    ]);
+  });
+
+  it('includes existing answered memory questions when completing a session submission', async () => {
+    const repository = createMemoryPracticeRepository();
+    const created = await repository.createSession({
+      studentId: 'student-1',
+      bankId: 'bank-1',
+      mode: 'sequential',
+      limit: 2,
+      questionTypes: ['single_choice'],
+    });
+    created?.questions.push(
+      {
+        id: 'question-1',
+        sort: 1,
+        type: 'single_choice',
+        content: 'Question 1',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: true,
+        markedForReview: false,
+        isCorrect: true,
+        draftAnswer: ['B'],
+        answerRaw: 'A',
+      },
+      {
+        id: 'question-2',
+        sort: 2,
+        type: 'single_choice',
+        content: 'Question 2',
+        options: [{ id: 'A', sort: 1, content: 'A' }],
+        answered: false,
+        markedForReview: false,
+        answerRaw: 'A',
+      },
+    );
+    created!.session.questionCount = 2;
+
+    await repository.saveDraft({
+      studentId: 'student-1',
+      sessionId: created!.session.id,
+      questionId: 'question-2',
+      answer: ['B'],
+    });
+
+    const result = await repository.submitSession({ studentId: 'student-1', sessionId: created!.session.id });
+
+    expect(result?.session.completedCount).toBe(2);
+    expect(result?.session.correctCount).toBe(1);
+    expect(result?.results.map((answer) => answer.questionId)).toEqual(['question-2']);
+    expect(created?.questions.map((question) => [question.answered, question.isCorrect])).toEqual([
+      [true, true],
+      [true, false],
+    ]);
   });
 });
