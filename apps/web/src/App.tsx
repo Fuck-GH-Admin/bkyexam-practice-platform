@@ -32,6 +32,8 @@ type PracticeQuestion = {
   draftAnswer?: SavedAnswer;
   markedForReview?: boolean;
   isCorrect?: boolean | null;
+  correctAnswer?: string[] | boolean | string;
+  needsSelfReview?: boolean;
 };
 
 type PracticeSession = {
@@ -135,6 +137,20 @@ export function hydrateReviewFlagsFromQuestions(questions: PracticeQuestion[]) {
       flags[question.id] = true;
     }
     return flags;
+  }, {});
+}
+
+export function buildResultsFromQuestions(questions: PracticeQuestion[]) {
+  return questions.reduce<Record<string, AnswerResult>>((items, question) => {
+    if (question.isCorrect !== undefined && question.isCorrect !== null) {
+      items[question.id] = {
+        questionId: question.id,
+        isCorrect: question.isCorrect,
+        correctAnswer: question.correctAnswer ?? [],
+        needsSelfReview: question.needsSelfReview ?? false,
+      };
+    }
+    return items;
   }, {});
 }
 
@@ -342,17 +358,7 @@ export function App() {
 
   function applyPracticePayload(payload: PracticePayload) {
     const answers = hydrateAnswersFromQuestions(payload.questions);
-    const results = payload.questions.reduce<Record<string, AnswerResult>>((items, question) => {
-      if (question.isCorrect !== undefined && question.isCorrect !== null) {
-        items[question.id] = {
-          questionId: question.id,
-          isCorrect: question.isCorrect,
-          correctAnswer: [],
-          needsSelfReview: false,
-        };
-      }
-      return items;
-    }, {});
+    const results = buildResultsFromQuestions(payload.questions);
     const nextIndex = getInitialQuestionIndex(payload.questions, payload.session.currentSort);
     const nextQuestion = payload.questions[nextIndex];
     const savedAnswer = nextQuestion ? answers[nextQuestion.id] : undefined;

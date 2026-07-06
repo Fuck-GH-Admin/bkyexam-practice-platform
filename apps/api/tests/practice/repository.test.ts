@@ -400,6 +400,7 @@ describe('createPgPracticeRepository', () => {
           question_id: 'question-2',
           sort: 2,
           normalized_type: 'multiple_choice',
+          answer_raw: 'A,B',
           content: 'Question 2',
           answered: true,
           is_correct: true,
@@ -418,6 +419,7 @@ describe('createPgPracticeRepository', () => {
           question_id: 'question-3',
           sort: 3,
           normalized_type: 'yes_no',
+          answer_raw: '11111111-1111-1111-1111-111111111111',
           content: 'Question 3',
           answered: false,
           is_correct: null,
@@ -444,6 +446,11 @@ describe('createPgPracticeRepository', () => {
       ['multiple_choice', ['A', 'B'], true],
       ['yes_no', true, false],
     ]);
+    expect(result?.questions[1]).toMatchObject({
+      correctAnswer: ['A', 'B'],
+      needsSelfReview: false,
+    });
+    expect(result?.questions[2]).not.toHaveProperty('correctAnswer');
   });
 
   it('submits an answer, records the attempt, and updates session progress from answered rows', async () => {

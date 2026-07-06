@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   buildSectionScores,
+  buildResultsFromQuestions,
   filterBanks,
   formatCorrectAnswer,
   getAnsweredCount,
@@ -166,6 +167,24 @@ describe('sectioned practice helpers', () => {
 
     expect(hydrateAnswersFromQuestions(questions)).toEqual({ 'single-1': ['option-a'], 'yes-no-1': false });
     expect(hydrateReviewFlagsFromQuestions(questions)).toEqual({ 'single-1': true, 'yes-no-1': true });
+  });
+
+  test('hydrates completed question results with returned reference answers', () => {
+    expect(buildResultsFromQuestions([
+      {
+        ...sampleQuestions[0],
+        isCorrect: true,
+        correctAnswer: ['option-a'],
+        needsSelfReview: false,
+      },
+    ])).toEqual({
+      'single-1': {
+        questionId: 'single-1',
+        isCorrect: true,
+        correctAnswer: ['option-a'],
+        needsSelfReview: false,
+      },
+    });
   });
 
   test('selects the first available section type from practice questions', () => {

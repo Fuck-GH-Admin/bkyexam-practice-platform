@@ -12,6 +12,8 @@ export interface PracticeQuestionDto {
   draftAnswer?: SubmittedAnswer;
   markedForReview: boolean;
   isCorrect?: boolean | null;
+  correctAnswer?: string[] | boolean | string;
+  needsSelfReview?: boolean;
 }
 
 export interface PracticeSessionDto {
@@ -125,6 +127,7 @@ interface SessionQuestionRow extends SessionRow {
   content: string;
   answered: boolean;
   is_correct: boolean | null;
+  answer_raw: string;
   draft_answer: string | null;
   marked_for_review: boolean;
 }
@@ -357,6 +360,8 @@ export function createMemoryPracticeRepository(): PracticeRepository {
         );
         question.answered = true;
         question.isCorrect = grade.isCorrect;
+        question.correctAnswer = grade.correctAnswer;
+        question.needsSelfReview = grade.needsSelfReview;
         completedCount += 1;
         if (grade.isCorrect === true) {
           correctCount += 1;
@@ -511,6 +516,7 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
             practice_session_questions.sort,
             practice_session_questions.is_correct,
             questions.normalized_type,
+            questions.answer_raw,
             questions.content,
             (practice_session_questions.answered_at IS NOT NULL) AS answered,
             practice_session_drafts.draft_answer,
@@ -541,19 +547,7 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
 
       return {
         session: mapSessionRow(sessionRow),
-        questions: questionsResult.rows.map((row) => ({
-          id: row.question_id,
-          sort: Number(row.sort),
-          type: row.normalized_type,
-          content: row.content,
-          options: optionsResult.rows
-            .filter((option) => option.question_id === row.question_id)
-            .map(mapOptionRow),
-          answered: row.answered,
-          draftAnswer: parseStoredAnswer(row.draft_answer),
-          markedForReview: row.marked_for_review === true,
-          isCorrect: row.is_correct ?? null,
-        })),
+        questions: questionsResult.rows.map((row) => mapSessionQuestionRow(row, optionsResult.rows)),
       };
     },
 
@@ -1042,6 +1036,7 @@ async function loadPracticeQuestion(
         practice_session_questions.sort,
         practice_session_questions.is_correct,
         questions.normalized_type,
+        questions.answer_raw,
         questions.content,
         (practice_session_questions.answered_at IS NOT NULL) AS answered,
         practice_session_drafts.draft_answer,
@@ -1075,16 +1070,28 @@ async function loadPracticeQuestion(
     [questionId],
   )) as QueryRows<OptionRow>;
 
+  return mapSessionQuestionRow(row, optionsResult.rows);
+}
+
+function mapSessionQuestionRow(row: SessionQuestionRow, optionRows: OptionRow[]): PracticeQuestionDto {
+  const draftAnswer = parseStoredAnswer(row.draft_answer);
+  const grade = row.answered && typeof row.answer_raw === 'string' && hasSubmittedAnswerValue(draftAnswer)
+    ? gradeAnswer({ normalizedType: row.normalized_type, answerRaw: row.answer_raw }, draftAnswer)
+    : null;
+
   return {
     id: row.question_id,
     sort: Number(row.sort),
     type: row.normalized_type,
     content: row.content,
-    options: optionsResult.rows.map(mapOptionRow),
+    options: optionRows
+      .filter((option) => option.question_id === row.question_id)
+      .map(mapOptionRow),
     answered: row.answered,
-    draftAnswer: parseStoredAnswer(row.draft_answer),
+    draftAnswer,
     markedForReview: row.marked_for_review === true,
     isCorrect: row.is_correct ?? null,
+    ...(grade ? { correctAnswer: grade.correctAnswer, needsSelfReview: grade.needsSelfReview } : {}),
   };
 }
 
