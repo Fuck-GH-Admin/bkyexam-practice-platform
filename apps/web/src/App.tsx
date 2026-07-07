@@ -67,10 +67,22 @@ type WrongQuestion = {
   id: string;
   questionId: string;
   bankId: string;
+  bankName: string;
+  subjectCategory: string;
+  subjectName: string;
+  questionType: string;
+  contentPreview: string;
   wrongCount: number;
   lastAnswer: string;
   mastered: boolean;
   lastWrongAt: string;
+};
+
+type WrongQuestionDetail = WrongQuestion & {
+  content: string;
+  options: PracticeOption[];
+  correctAnswer: string;
+  analysis: string;
 };
 
 const objectiveTypes = ['single_choice', 'multiple_choice', 'yes_no'];
@@ -209,6 +221,29 @@ export function formatCorrectAnswer(answer: AnswerResult['correctAnswer'], optio
   return String(answer);
 }
 
+export function formatStoredAnswer(answer: string) {
+  try {
+    const parsed = JSON.parse(answer) as unknown;
+    if (Array.isArray(parsed)) return parsed.map(String).join('、');
+    return answer;
+  } catch {
+    return answer;
+  }
+}
+
+export function buildWrongbookStats(items: Array<{ mastered: boolean; lastWrongAt: string }>) {
+  const latestWrongAt = items
+    .map((item) => item.lastWrongAt)
+    .sort()
+    .at(-1) ?? '';
+  return {
+    total: items.length,
+    active: items.filter((item) => !item.mastered).length,
+    mastered: items.filter((item) => item.mastered).length,
+    latestWrongAt,
+  };
+}
+
 async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, {
     ...options,
@@ -265,6 +300,9 @@ export function App() {
   const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([]);
   const [wrongBankId, setWrongBankId] = useState('');
   const [includeMastered, setIncludeMastered] = useState(false);
+  const [selectedWrongId, setSelectedWrongId] = useState('');
+  const [wrongDetail, setWrongDetail] = useState<WrongQuestionDetail | null>(null);
+  const [wrongDetailLoading, setWrongDetailLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [view, setView] = useState<'banks' | 'practice' | 'wrong'>('banks');
@@ -297,6 +335,7 @@ export function App() {
     () => wrongQuestions.filter((item) => !wrongBankId || item.bankId === wrongBankId),
     [wrongQuestions, wrongBankId],
   );
+  const wrongStats = useMemo(() => buildWrongbookStats(filteredWrongQuestions), [filteredWrongQuestions]);
 
   useEffect(() => {
     void restoreSession();
@@ -316,6 +355,19 @@ export function App() {
   useEffect(() => {
     if (view === 'wrong') void loadWrongQuestions({ includeMastered, bankId: wrongBankId });
   }, [view, includeMastered, wrongBankId]);
+
+  useEffect(() => {
+    if (view !== 'wrong') return;
+    const first = filteredWrongQuestions[0];
+    if (!first) {
+      setSelectedWrongId('');
+      setWrongDetail(null);
+      return;
+    }
+    if (!selectedWrongId || !filteredWrongQuestions.some((item) => item.id === selectedWrongId)) {
+      void loadWrongQuestionDetail(first.id);
+    }
+  }, [view, filteredWrongQuestions, selectedWrongId]);
 
   async function restoreSession() {
     try {
@@ -574,9 +626,50 @@ export function App() {
     }
   }
 
+  async function loadWrongQuestionDetail(id: string) {
+    setSelectedWrongId(id);
+    setWrongDetailLoading(true);
+    setMessage('');
+    try {
+      const result = await api<{ wrongQuestion: WrongQuestionDetail }>(`/api/wrong-questions/${id}`);
+      setWrongDetail(result.wrongQuestion);
+    } catch (error) {
+      setWrongDetail(null);
+      setMessage(error instanceof Error ? error.message : '错题详情加载失败');
+    } finally {
+      setWrongDetailLoading(false);
+    }
+  }
+
   async function markMastered(id: string) {
     await api(`/api/wrong-questions/${id}/mastered`, { method: 'POST', body: '{}' });
+    setWrongDetail((detail) => (detail && detail.id === id ? { ...detail, mastered: true } : detail));
     await loadWrongQuestions({ bankId: wrongBankId, includeMastered });
+  }
+
+  async function createWrongReviewSession() {
+    setLoading(true);
+    setMessage('');
+    try {
+      const result = await api<{ session: { id: string; questionCount: number } }>('/api/wrong-questions/review-sessions', {
+        method: 'POST',
+        body: JSON.stringify({ bankId: wrongBankId || undefined, includeMastered, limit: 20 }),
+      });
+      const payload = await api<PracticePayload>(`/api/practice/sessions/${result.session.id}`);
+      setSession(payload.session);
+      setQuestions(payload.questions);
+      setCurrentIndex(0);
+      setSelectedOptions([]);
+      setYesNoAnswer(null);
+      setLastResult(null);
+      setAnswersByQuestion({});
+      setResultsByQuestion({});
+      setView('practice');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '错题再练创建失败');
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (!student) {
@@ -784,8 +877,17 @@ export function App() {
             <div>
               <p className="eyebrow">Wrong notebook</p>
               <h2>错题本</h2>
+              <p className="lede">按题库筛选后直接订正，再把这一组错题拉回练习会话。</p>
             </div>
-            <button onClick={() => loadWrongQuestions({ bankId: wrongBankId, includeMastered })}>刷新</button>
+            <div className="topbar-actions">
+              <button className="ghost" onClick={() => loadWrongQuestions({ bankId: wrongBankId, includeMastered })}>刷新</button>
+              <button onClick={createWrongReviewSession} disabled={loading || filteredWrongQuestions.length === 0}>{loading ? '创建中...' : '再练本组'}</button>
+            </div>
+          </div>
+          <div className="wrong-stats">
+            <span><strong>{wrongStats.total}</strong> 当前错题</span>
+            <span><strong>{wrongStats.active}</strong> 待巩固</span>
+            <span><strong>{wrongStats.mastered}</strong> 已掌握</span>
           </div>
           <div className="toolbar wrong-toolbar">
             <select value={wrongBankId} onChange={(event) => setWrongBankId(event.target.value)}>
@@ -797,18 +899,62 @@ export function App() {
               显示已掌握
             </label>
           </div>
-          <div className="wrong-list">
-            {filteredWrongQuestions.length === 0 && <p className="empty">当前筛选下没有错题。先去练一组题，或切换筛选条件。</p>}
-            {filteredWrongQuestions.map((item) => (
-              <article className="wrong-row" key={item.id}>
-                <div>
-                  <strong>{item.questionId}</strong>
-                  <p>错 {item.wrongCount} 次，最近答案：{item.lastAnswer}</p>
-                  <span className={item.mastered ? 'status mastered' : 'status'}>{item.mastered ? '已掌握' : '未掌握'}</span>
+          <div className="wrongbook-layout">
+            <div className="wrong-list">
+              {filteredWrongQuestions.length === 0 && <p className="empty">当前筛选下没有错题。先去练一组题，或切换筛选条件。</p>}
+              {filteredWrongQuestions.map((item) => (
+                <article className={`wrong-row ${selectedWrongId === item.id ? 'selected' : ''}`} key={item.id}>
+                  <button className="wrong-row-main" onClick={() => loadWrongQuestionDetail(item.id)}>
+                    <span className="wrong-row-bank">{item.bankName}</span>
+                    <strong>{item.contentPreview || item.questionId}</strong>
+                    <span>错 {item.wrongCount} 次，最近答案：{formatStoredAnswer(item.lastAnswer)}</span>
+                    <span className={item.mastered ? 'status mastered' : 'status'}>{item.mastered ? '已掌握' : '未掌握'}</span>
+                  </button>
+                  <button className="ghost" onClick={() => markMastered(item.id)} disabled={item.mastered}>{item.mastered ? '已掌握' : '标记掌握'}</button>
+                </article>
+              ))}
+            </div>
+            <aside className="wrong-detail">
+              {wrongDetailLoading && <p className="empty">正在加载错题详情...</p>}
+              {!wrongDetailLoading && !wrongDetail && <p className="empty">选择一道错题，查看题干、答案和解析。</p>}
+              {!wrongDetailLoading && wrongDetail && (
+                <div className="wrong-detail-card">
+                  <div className="bank-meta">
+                    <span>{wrongDetail.subjectCategory || wrongDetail.questionType}</span>
+                    <span>{wrongDetail.bankName}</span>
+                  </div>
+                  <h2>{wrongDetail.content}</h2>
+                  {wrongDetail.options.length > 0 && (
+                    <div className="answer-grid">
+                      {wrongDetail.options.map((option) => (
+                        <div className="review-option" key={option.id}>
+                          <span>{option.sort}</span>
+                          <p>{option.content || option.id}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="review-columns">
+                    <div>
+                      <p className="eyebrow">Your answer</p>
+                      <strong>{formatStoredAnswer(wrongDetail.lastAnswer)}</strong>
+                    </div>
+                    <div>
+                      <p className="eyebrow">Correct</p>
+                      <strong>{formatCorrectAnswer(wrongDetail.correctAnswer, wrongDetail.options)}</strong>
+                    </div>
+                  </div>
+                  <div className="analysis-box">
+                    <p className="eyebrow">订正解析</p>
+                    <p>{wrongDetail.analysis || '暂无解析。先对照参考答案复盘本题，再用“再练本组”巩固。'}</p>
+                  </div>
+                  <div className="question-actions">
+                    <button className="ghost" onClick={() => markMastered(wrongDetail.id)} disabled={wrongDetail.mastered}>{wrongDetail.mastered ? '已掌握' : '标记掌握'}</button>
+                    <button onClick={createWrongReviewSession} disabled={loading}>{loading ? '创建中...' : '再练本组'}</button>
+                  </div>
                 </div>
-                <button onClick={() => markMastered(item.id)} disabled={item.mastered}>{item.mastered ? '已掌握' : '标记掌握'}</button>
-              </article>
-            ))}
+              )}
+            </aside>
           </div>
         </section>
       )}

@@ -214,6 +214,11 @@ Success response:
       "id": "wrong-question-uuid",
       "questionId": "question-uuid",
       "bankId": "bank-uuid",
+      "bankName": "计算机基础",
+      "subjectCategory": "公共基础",
+      "subjectName": "计算机基础",
+      "questionType": "single_choice",
+      "contentPreview": "Question text preview",
       "wrongCount": 2,
       "lastAnswer": "A",
       "mastered": false,
@@ -227,6 +232,80 @@ Errors:
 
 - `400` when `bankId` is present but is not a valid UUID.
 - `401` when unauthenticated.
+
+List entries intentionally include only preview fields for the question body. Use the detail endpoint before showing full content, options, correct answer, or analysis.
+
+### `GET /api/wrong-questions/:id`
+
+Returns one wrong-question notebook entry with the full question content needed for correction review.
+
+Success response:
+
+```json
+{
+  "wrongQuestion": {
+    "id": "wrong-question-uuid",
+    "questionId": "question-uuid",
+    "bankId": "bank-uuid",
+    "bankName": "计算机基础",
+    "subjectCategory": "公共基础",
+    "subjectName": "计算机基础",
+    "questionType": "single_choice",
+    "contentPreview": "Question text preview",
+    "wrongCount": 2,
+    "lastAnswer": "A",
+    "mastered": false,
+    "lastWrongAt": "2026-01-02T03:04:05.000Z",
+    "content": "Question text",
+    "options": [{ "id": "option-uuid", "sort": 1, "content": "Option text" }],
+    "correctAnswer": "A",
+    "analysis": "Explanation text"
+  }
+}
+```
+
+Errors:
+
+- `400` when `id` is not a valid UUID.
+- `401` when unauthenticated.
+- `404` when the entry does not exist or belongs to another student.
+
+### `POST /api/wrong-questions/review-sessions`
+
+Creates a normal active practice session from the current student's wrong-question notebook entries. The first implementation reuses `practice_sessions` with `mode: "sequential"` instead of adding a dedicated wrong-review mode.
+
+Request:
+
+```json
+{
+  "bankId": "optional-bank-uuid",
+  "includeMastered": false,
+  "limit": 20
+}
+```
+
+Defaults and validation:
+
+- `bankId` is optional; when present it must be a valid UUID.
+- `includeMastered` defaults to `false`.
+- `limit` defaults to `20` and must be an integer from `1` through `100`.
+
+Success response:
+
+```json
+{
+  "session": {
+    "id": "session-uuid",
+    "questionCount": 20
+  }
+}
+```
+
+Errors:
+
+- `400` when request fields are malformed.
+- `401` when unauthenticated.
+- `404` when no wrong-question rows match the requested filters.
 
 ### `POST /api/wrong-questions/:id/mastered`
 

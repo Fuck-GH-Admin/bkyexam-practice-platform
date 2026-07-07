@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BKYExam 错题复盘增强视觉稿</title>
+  <style>
+    :root {
+      --mist: #eef5f8;
+      --paper: #fffdf7;
+      --ink: #17202a;
+      --muted: #667789;
+      --line: #d8e4ea;
+      --blue: #4f7f96;
+      --blue-dark: #2d5f78;
+      --clay: #b36a4c;
+      --clay-soft: #f3dfd5;
+      --sage: #8ca58f;
+      --shadow: 0 24px 70px rgba(43, 76, 94, 0.14);
+      color: var(--ink);
+      font-family: "Microsoft YaHei", "Noto Sans SC", "PingFang SC", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at 8% 8%, rgba(79, 127, 150, 0.18), transparent 28rem),
+        linear-gradient(140deg, #edf5f8, #f7f1e8 56%, #f2f6f2);
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; }
+    .page { padding: 28px; }
+    .hero { max-width: 1280px; margin: 0 auto 22px; display: flex; justify-content: space-between; gap: 18px; align-items: end; }
+    .eyebrow { margin: 0 0 8px; color: var(--blue-dark); font-size: 0.78rem; font-weight: 900; letter-spacing: 0.16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(2.4rem, 6vw, 5.6rem); line-height: 0.95; letter-spacing: -0.09em; }
+    .lede { max-width: 42rem; margin: 14px 0 0; color: var(--muted); line-height: 1.8; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(79, 127, 150, 0.24); border-radius: 999px; background: rgba(255,255,255,0.65); color: var(--blue-dark); font-weight: 900; padding: 10px 14px; }
+    .desktop { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: 360px 1fr; gap: 16px; }
+    .panel { border: 1px solid rgba(216, 228, 234, 0.9); border-radius: 32px; background: rgba(255, 253, 247, 0.82); box-shadow: var(--shadow); backdrop-filter: blur(18px); }
+    .queue { padding: 18px; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+    .stat { border-radius: 18px; background: #f4f8f9; padding: 12px; }
+    .stat strong { display: block; color: var(--blue-dark); font-size: 1.7rem; letter-spacing: -0.07em; }
+    .stat span { color: var(--muted); font-size: 0.78rem; font-weight: 800; }
+    .filters { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-bottom: 12px; }
+    select, button { font: inherit; }
+    select { border: 1px solid var(--line); border-radius: 16px; background: white; color: var(--ink); padding: 12px; }
+    button { border: 0; border-radius: 16px; background: var(--blue-dark); color: white; font-weight: 900; padding: 12px 16px; }
+    button.secondary { background: #e8f0f3; color: var(--blue-dark); }
+    .wrong-card { position: relative; display: grid; gap: 8px; border: 1px solid #dfe8eb; border-radius: 22px; background: white; padding: 14px; margin-top: 10px; }
+    .wrong-card.active { border-color: rgba(79, 127, 150, 0.7); box-shadow: inset 5px 0 0 var(--blue); }
+    .card-top, .question-top, .answer-grid, .actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .tag { border-radius: 999px; background: #edf4f6; color: var(--blue-dark); font-size: 0.78rem; font-weight: 900; padding: 6px 9px; }
+    .tag.clay { background: var(--clay-soft); color: #8e4d36; }
+    .wrong-card h3 { margin: 0; font-size: 1rem; line-height: 1.45; }
+    .meta { margin: 0; color: var(--muted); font-size: 0.86rem; line-height: 1.5; }
+    .detail { padding: 24px; display: grid; gap: 18px; }
+    .source { display: flex; flex-wrap: wrap; gap: 8px; }
+    .question-paper { border-radius: 28px; background: linear-gradient(180deg, #fffef9, #fbf5e9); border: 1px solid #eadfcb; padding: clamp(18px, 3vw, 34px); }
+    .question-paper h2 { margin: 12px 0 16px; font-size: clamp(1.35rem, 3vw, 2.15rem); line-height: 1.35; letter-spacing: -0.04em; }
+    .option { border: 1px solid #e5ded2; border-radius: 18px; background: rgba(255,255,255,0.72); padding: 13px 14px; margin-top: 9px; font-weight: 700; }
+    .option.mine { border-color: rgba(179, 106, 76, 0.55); background: #fff4ee; }
+    .option.correct { border-color: rgba(140, 165, 143, 0.7); background: #eff7f0; }
+    .review-blocks { display: grid; grid-template-columns: 0.9fr 0.9fr 1.2fr; gap: 12px; }
+    .review-block { border-radius: 22px; border: 1px solid var(--line); background: white; padding: 16px; }
+    .review-block strong { display: block; margin-bottom: 8px; }
+    .analysis { background: #fbf8ef; }
+    .actions { justify-content: flex-end; flex-wrap: wrap; }
+    .mobile-wrap { max-width: 1280px; margin: 24px auto 0; display: grid; grid-template-columns: 360px 360px; gap: 18px; }
+    .phone { overflow: hidden; border: 12px solid #1d2936; border-radius: 42px; background: var(--paper); min-height: 720px; box-shadow: var(--shadow); }
+    .phone-screen { min-height: 696px; padding: 18px; background: linear-gradient(180deg, #eef6f8, #fff8ed); }
+    .mobile-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .mobile-card { border-radius: 28px; background: white; border: 1px solid #e2e9ec; padding: 18px; box-shadow: 0 14px 38px rgba(43, 76, 94, 0.12); }
+    .mobile-card h2 { margin: 10px 0; font-size: 1.35rem; line-height: 1.45; }
+    .mobile-answer { border-radius: 18px; background: #f7f1e8; margin-top: 12px; padding: 13px; }
+    .bottom-bar { position: sticky; bottom: 0; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 8px; margin-top: 16px; border-radius: 22px; background: rgba(255,253,247,0.9); padding: 10px; backdrop-filter: blur(12px); }
+    .bottom-bar button { padding: 11px 8px; }
+    .drawer { margin-top: 20px; border-radius: 30px 30px 0 0; background: white; padding: 14px; box-shadow: 0 -18px 44px rgba(43, 76, 94, 0.14); }
+    .handle { width: 46px; height: 5px; border-radius: 999px; background: #cbd8df; margin: 0 auto 12px; }
+    .drawer-row { border-radius: 16px; background: #f5f8f9; padding: 12px; margin-top: 8px; }
+    @media (max-width: 920px) {
+      .page { padding: 16px; }
+      .hero { align-items: start; flex-direction: column; }
+      .desktop, .mobile-wrap { grid-template-columns: 1fr; }
+      .review-blocks { grid-template-columns: 1fr; }
+      .phone { max-width: 390px; margin: 0 auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Wrongbook review / enhanced</p>
+        <h1>错题本应该像订正桌面。</h1>
+        <p class="lede">复盘增强版把“错题 ID 列表”升级为真实学习闭环：题干、选项、我的错误答案、参考答案、解析、掌握状态和再练入口都在同一个安静空间里完成。</p>
+      </div>
+      <span class="pill">默认雾蓝 · 订正陶土 · 详情按需加载</span>
+    </section>
+
+    <section class="desktop" aria-label="宽版错题复盘设计">
+      <aside class="panel queue">
+        <p class="eyebrow">Correction queue</p>
+        <h2>待订正错题</h2>
+        <div class="stats">
+          <div class="stat"><strong>18</strong><span>未掌握</span></div>
+          <div class="stat"><strong>7</strong><span>本周新增</span></div>
+          <div class="stat"><strong>3</strong><span>已掌握</span></div>
+        </div>
+        <div class="filters">
+          <select><option>C 语言程序设计</option><option>全部题库</option></select>
+          <button class="secondary">筛选</button>
+        </div>
+        <article class="wrong-card active">
+          <div class="card-top"><span class="tag">单选</span><span class="tag clay">错 2 次</span></div>
+          <h3>下列关于数组初始化的说法，正确的是哪一项？</h3>
+          <p class="meta">最近答案：B · 今天 20:41 · C 语言</p>
+        </article>
+        <article class="wrong-card">
+          <div class="card-top"><span class="tag">判断</span><span class="tag clay">错 1 次</span></div>
+          <h3>局部变量未初始化时，其值总是 0。</h3>
+          <p class="meta">最近答案：正确 · 昨天 23:10 · C 语言</p>
+        </article>
+        <article class="wrong-card">
+          <div class="card-top"><span class="tag">多选</span><span class="tag clay">错 3 次</span></div>
+          <h3>关于指针变量和数组名，下列说法正确的有？</h3>
+          <p class="meta">最近答案：A、D · 7 月 6 日 · C 语言</p>
+        </article>
+      </aside>
+
+      <section class="panel detail">
+        <div class="question-top">
+          <div>
+            <p class="eyebrow">Review detail</p>
+            <div class="source"><span class="tag">C 语言程序设计</span><span class="tag">单选题</span><span class="tag clay">未掌握</span></div>
+          </div>
+          <button class="secondary">标记掌握</button>
+        </div>
+        <article class="question-paper">
+          <p class="meta">第 24 题 · 最近错于今天 20:41</p>
+          <h2>下列关于数组初始化的说法，正确的是哪一项？</h2>
+          <div class="option correct">A. 定义数组时可以按顺序给出部分初值，其余元素按规则补 0。</div>
+          <div class="option mine">B. 数组元素如果没有显式赋值，会自动保持为空。</div>
+          <div class="option">C. 数组长度可以在初始化后动态改变。</div>
+          <div class="option">D. 所有数组都必须一次性写完整个初始化列表。</div>
+        </article>
+        <div class="review-blocks">
+          <div class="review-block"><strong>我的最近错误答案</strong><p class="meta">B · 把“未显式赋值”和“空值”混在一起了。</p></div>
+          <div class="review-block"><strong>参考答案</strong><p class="meta">A · 部分初始化时，其余元素按类型规则初始化。</p></div>
+          <div class="review-block analysis"><strong>解析</strong><p class="meta">数组初始化的关键是“定义时初始化”和“运行中赋值”不是一回事。静态或完整初始化规则会影响未写出的元素，不能理解成空。</p></div>
+        </div>
+        <div class="actions">
+          <button class="secondary">上一道错题</button>
+          <button>再练本组错题</button>
+          <button class="secondary">下一道错题</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="mobile-wrap" aria-label="移动端错题复盘设计">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="mobile-top"><span class="tag">1 / 18</span><span class="tag clay">错 2 次</span></div>
+          <article class="mobile-card">
+            <p class="eyebrow">C 语言 · 单选</p>
+            <h2>下列关于数组初始化的说法，正确的是哪一项？</h2>
+            <div class="option correct">A. 部分初值，其余按规则补 0。</div>
+            <div class="option mine">B. 未赋值会自动保持为空。</div>
+            <div class="mobile-answer"><strong>解析</strong><p class="meta">这道题考的是初始化规则，不是运行时赋值。你选 B 说明把“默认初始化”和“空值”混淆了。</p></div>
+          </article>
+          <div class="bottom-bar"><button class="secondary">上一题</button><button class="secondary">下一题</button><button>掌握了</button></div>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="mobile-top"><span class="tag">错题列表</span><span class="tag">C 语言</span></div>
+          <article class="mobile-card">
+            <p class="eyebrow">当前题仍在背后</p>
+            <h2>底部抽屉只负责找题和筛选，不打断订正阅读。</h2>
+            <p class="meta">移动端默认详情优先。需要换题库、显示已掌握或再练本组时，再打开抽屉。</p>
+          </article>
+          <div class="drawer">
+            <div class="handle"></div>
+            <button>再练当前筛选的 18 道错题</button>
+            <div class="drawer-row">C 语言程序设计 · 未掌握 18</div>
+            <div class="drawer-row">显示已掌握：关闭</div>
+            <div class="drawer-row">数组初始化 · 错 2 次 · 今天 20:41</div>
+            <div class="drawer-row">局部变量默认值 · 错 1 次 · 昨天 23:10</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

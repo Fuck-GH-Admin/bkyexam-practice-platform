@@ -23,9 +23,11 @@
 
 ## Phase 3E
 
-- Add objective grading UI for single choice, multiple choice, and yes/no questions.
-- Add review-session flows sourced from wrong-question notebook entries.
-- Add product copy and analytics around mastered notebook entries.
+- Complete: objective grading UI for single choice, multiple choice, and yes/no questions.
+- Complete: expanded wrong-question APIs for review: list entries include bank/question preview fields, a single-entry detail endpoint returns content, options, correct answer, analysis, last wrong answer, and mastery state.
+- Complete: enhanced wrong-question review UI: two-column desktop correction desk, mobile continuous review cards, answer/analysis comparison, mark-mastered sync, and empty/error states.
+- Complete: review-session flow sourced from filtered wrong-question notebook entries, reusing normal practice sessions for the first implementation.
+- Add product copy and lightweight analytics around mastered notebook entries.
 
 ## Phase 4
 

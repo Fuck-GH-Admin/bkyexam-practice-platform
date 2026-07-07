@@ -203,6 +203,10 @@ Indexes:
 
 The unique wrong-question index keeps one notebook row per student, question, and bank, while allowing later attempts to update `wrong_count`, `last_answer`, and `last_wrong_at`.
 
+Wrong-question review screens do not duplicate question content into `wrong_questions`. List summaries join `questions` and `bank_mappings` for bank labels, normalized type, and content preview. Detail review joins `questions` and `question_options` on demand to return full content, options, correct answer, and analysis for the selected row.
+
+Wrong-question review sessions reuse the existing practice session tables. Creating a review session inserts an active `practice_sessions` row with `mode = 'sequential'`, locks the selected wrong-question IDs into `practice_session_questions`, and then serves the session through the normal practice retrieval route. No dedicated `wrong_review` mode or migration is required for this phase.
+
 ## Migrations
 
 `apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the Drizzle schema in `apps/api/src/db/schema.ts`. It creates the core tables and indexes needed by Phase 1 while preserving the same defaults, nullable columns, foreign keys, and wrong-question uniqueness constraint.

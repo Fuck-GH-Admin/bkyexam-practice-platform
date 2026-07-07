@@ -3,8 +3,10 @@ import { describe, expect, test } from 'vitest';
 import {
   buildSectionScores,
   buildResultsFromQuestions,
+  buildWrongbookStats,
   filterBanks,
   formatCorrectAnswer,
+  formatStoredAnswer,
   getAnsweredCount,
   getFilterOptions,
   getFirstSectionType,
@@ -26,7 +28,6 @@ describe('hasSubmittedAnswer', () => {
   test('treats an undefined answer as not submitted', () => {
     expect(hasSubmittedAnswer(undefined)).toBe(false);
   });
-
   test('treats an empty multiple-choice answer as not submitted', () => {
     expect(hasSubmittedAnswer([])).toBe(false);
   });
@@ -196,5 +197,24 @@ describe('sectioned practice helpers', () => {
     expect(getInitialQuestionIndex(sampleQuestions, 2)).toBe(1);
     expect(getInitialQuestionIndex(sampleQuestions, 999)).toBe(0);
     expect(getInitialQuestionIndex(sampleQuestions)).toBe(0);
+  });
+});
+
+describe('formatStoredAnswer', () => {
+  test('formats JSON array answers', () => {
+    expect(formatStoredAnswer('["B","D"]')).toBe('B、D');
+  });
+
+  test('returns plain stored answers when they are not JSON arrays', () => {
+    expect(formatStoredAnswer('false')).toBe('false');
+  });
+});
+
+describe('buildWrongbookStats', () => {
+  test('counts active and mastered wrong questions', () => {
+    expect(buildWrongbookStats([
+      { mastered: false, lastWrongAt: '2026-01-02T00:00:00.000Z' },
+      { mastered: true, lastWrongAt: '2026-01-03T00:00:00.000Z' },
+    ])).toEqual({ total: 2, active: 1, mastered: 1, latestWrongAt: '2026-01-03T00:00:00.000Z' });
   });
 });
