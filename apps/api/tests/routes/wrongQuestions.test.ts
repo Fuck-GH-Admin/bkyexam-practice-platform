@@ -28,19 +28,45 @@ const wrongQuestion: WrongQuestionItem = {
   id: wrongQuestionId,
   questionId,
   bankId,
+  bankName: 'C 语言程序设计',
+  subjectCategory: '计算机基础',
+  subjectName: 'C 语言',
+  questionType: 'single_choice',
+  contentPreview: '下列关于数组初始化的说法，正确的是哪一项？',
   wrongCount: 2,
   lastAnswer: 'A',
   mastered: false,
   lastWrongAt: '2026-01-02T03:04:05.000Z',
 };
 
-function fakeWrongQuestionRepository(options: { markMasteredResult?: boolean } = {}) {
+function fakeWrongQuestionRepository(
+  options: { markMasteredResult?: boolean; detailResult?: false; reviewSessionResult?: false } = {},
+) {
   const listRequests: Parameters<WrongQuestionRepository['list']>[0][] = [];
+  const detailRequests: Parameters<WrongQuestionRepository['getDetail']>[0][] = [];
+  const createReviewSessionRequests: Parameters<WrongQuestionRepository['createReviewSession']>[0][] = [];
   const markMasteredRequests: Parameters<WrongQuestionRepository['markMastered']>[0][] = [];
   const repository: WrongQuestionRepository = {
     async list(input) {
       listRequests.push(input);
       return [wrongQuestion];
+    },
+    async getDetail(input) {
+      detailRequests.push(input);
+      if (options.detailResult === false) return null;
+      return {
+        ...wrongQuestion,
+        content: '完整题干',
+        options: [{ id: 'option-a', sort: 1, content: 'A. 正确选项' }],
+        correctAnswer: 'A',
+        analysis: '解析文本',
+      };
+    },
+    async createReviewSession(input) {
+      createReviewSessionRequests.push(input);
+      return options.reviewSessionResult === false
+        ? null
+        : { sessionId: '66666666-6666-4666-8666-666666666666', questionCount: 2 };
     },
     async markMastered(input) {
       markMasteredRequests.push(input);
@@ -48,7 +74,7 @@ function fakeWrongQuestionRepository(options: { markMasteredResult?: boolean } =
     },
   };
 
-  return { repository, listRequests, markMasteredRequests };
+  return { repository, listRequests, detailRequests, createReviewSessionRequests, markMasteredRequests };
 }
 
 describe('wrong question routes', () => {
@@ -137,6 +163,103 @@ describe('wrong question routes', () => {
 
     expect(response.statusCode).toBe(200);
     expect(listRequests).toEqual([{ studentId: 'student-1', bankId: canonicalPostgresUuid, includeMastered: false }]);
+  });
+
+  it('returns one wrong-question review detail for the current student', async () => {
+    const { repository, detailRequests } = fakeWrongQuestionRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/wrong-questions/${wrongQuestionId}`,
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      wrongQuestion: {
+        ...wrongQuestion,
+        content: '完整题干',
+        options: [{ id: 'option-a', sort: 1, content: 'A. 正确选项' }],
+        correctAnswer: 'A',
+        analysis: '解析文本',
+      },
+    });
+    expect(detailRequests).toEqual([{ studentId: 'student-1', id: wrongQuestionId }]);
+  });
+
+  it('returns 400 for an invalid detail route id', async () => {
+    const { repository } = fakeWrongQuestionRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/wrong-questions/not-a-uuid',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('returns 404 when a detail is missing or not owned by the current student', async () => {
+    const { repository } = fakeWrongQuestionRepository({ detailResult: false });
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/wrong-questions/${missingWrongQuestionId}`,
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('creates a filtered wrong-question review session for the current student', async () => {
+    const { repository, createReviewSessionRequests } = fakeWrongQuestionRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/wrong-questions/review-sessions',
+      headers: { cookie: 'bky_session=token' },
+      payload: { bankId: filteredBankId, includeMastered: true, limit: 20 },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      session: { id: '66666666-6666-4666-8666-666666666666', questionCount: 2 },
+    });
+    expect(createReviewSessionRequests).toEqual([
+      { studentId: 'student-1', bankId: filteredBankId, includeMastered: true, limit: 20 },
+    ]);
+  });
+
+  it('returns 400 for invalid review-session input', async () => {
+    const { repository } = fakeWrongQuestionRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/wrong-questions/review-sessions',
+      headers: { cookie: 'bky_session=token' },
+      payload: { bankId: 'not-a-uuid', limit: 0 },
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('returns 404 when no wrong questions match the review-session filters', async () => {
+    const { repository } = fakeWrongQuestionRepository({ reviewSessionResult: false });
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/wrong-questions/review-sessions',
+      headers: { cookie: 'bky_session=token' },
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it('returns 401 when marking mastered without login', async () => {
