@@ -33,6 +33,7 @@ npm run typecheck  PASS
 npm run build      PASS
 npm run test:e2e   PASS
 npm run test:integration:db:docker  PASS
+npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 ```
 
 测试结果：
@@ -40,9 +41,9 @@ npm run test:integration:db:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 1 | 2 |
-| `apps/api` | 29 | 226 |
+| `apps/api` | 31 | 233 |
 | `apps/web` | 1 | 27 |
-| **Total** | **31** | **255** |
+| **Total** | **33** | **262** |
 
 仓库内 Playwright smoke：
 
@@ -57,9 +58,21 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 
 | Database | Test files | Tests |
 | --- | ---: | ---: |
-| 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 2 |
+| 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
 该测试从空数据库执行三份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成登录、题库、草稿/断点、整卷提交、错题、再练、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+
+全量题库慢速 smoke：
+
+| Step | Result |
+| --- | ---: |
+| 解析完整源题库 | 2941 classifications / 89922 questions / 180323 raw options |
+| 第一次导入 | 154899 options / 25424 skipped / 2662 mappings |
+| 第二次幂等导入 | 计数完全一致 |
+| 数据库最终 smoke | 2941 / 89922 / 154899 / 2662 |
+| 本地 Docker 总耗时 | 约 142.1 秒 |
+
+慢速 profile 会把解析结果与 `currentCorpusBaseline.ts` 固定基线逐项比较，并在隔离数据库连续执行两次导入。它依赖仓库外的完整题库，因此不放入每次提交的 CI。
 
 生产构建结果：
 
@@ -182,7 +195,7 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 | Student product shell | 功能性 | 60% | 登录、题库、练习、错题 | 清晰首页、URL routes、历史、档案、统一空/错/加载状态 |
 | Admin console | 未实现 | 5% | 数据字段与自动 mapping 为其提供基础 | 整个管理应用、RBAC、API、工作流、审计 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
-| Operations | 可重复验证 | 65% | 配置、migration、import、smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
+| Operations | 可重复验证 | 70% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
 
 ## Known Product And Technical Risks
 

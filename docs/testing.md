@@ -71,7 +71,7 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 255 个 Vitest 测试覆盖：
+当前 262 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
@@ -138,7 +138,34 @@ npm run test:integration:db
 - unit/typecheck/build/Playwright quality gate。
 - 带 PostgreSQL 16 service container 的 database integration。
 
-完整真实题库的慢速验证仍包括：
+### Full Corpus Slow Smoke
+
+完整真实题库可通过可选慢速 profile 重复验证：
+
+```powershell
+npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
+```
+
+该 profile：
+
+1. 启动同一个隔离 `bkyexam_test` PostgreSQL service。
+2. 执行 migration 并清空测试数据库。
+3. 按 `currentCorpusBaseline.ts` 校验源文件解析计数和各题型分布。
+4. 执行第一次全量事务导入并核对数据库计数。
+5. 对相同数据执行第二次全量 upsert。
+6. 确认第二次导入计数与数据库行数均未变化。
+7. 自动删除临时数据库容器。
+
+2026-07-10 本地 Docker profile 实测：
+
+- 解析：2941 classifications、89922 questions、180323 raw options。
+- 入库：154899 options，跳过 25424 orphan options，生成 2662 bank mappings。
+- 两次导入后数据库计数完全一致。
+- 解析约 7.1 秒，第一次导入约 91.4 秒，第二次导入约 42.7 秒，总计约 142.1 秒。
+
+该 profile 依赖未提交到 Git 的完整源题库，因此保持手动/定期运行，不进入每次 push 的 CI。源数据合法更新时，应先审查差异，再同步更新 `currentCorpusBaseline.ts` 与状态文档。
+
+完整真实题库的验证链包括：
 
 - migration。
 - 完整题库导入。
@@ -146,7 +173,7 @@ npm run test:integration:db
 - PostgreSQL repository + Fastify API 全练习闭环。
 - Vite + Fastify + PostgreSQL 的真实 Chrome smoke。
 
-最小 fixture integration 已固化为每次 CI 可运行的快速门；完整 89922 题导入仍是可选慢速 profile，尚未加入每次提交的 CI。
+最小 fixture integration 已固化为每次 CI 可运行的快速门；完整 89922 题导入已固化为可选慢速 profile，但不会加入每次提交的 CI。
 
 ## Change Acceptance
 

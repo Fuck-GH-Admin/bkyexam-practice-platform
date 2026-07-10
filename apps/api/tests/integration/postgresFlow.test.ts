@@ -5,6 +5,7 @@ import { createPgStudentAuthRepository } from '../../src/auth/studentAuth.js';
 import { buildApp } from '../../src/app.js';
 import { createPgPool } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
+import { requireDedicatedTestDatabaseUrl } from '../../src/db/testDatabaseSafety.js';
 import { createPgPracticeRepository } from '../../src/practice/repository.js';
 import { createPgBankRepository } from '../../src/repositories/bankRepository.js';
 import { createPgWrongQuestionRepository } from '../../src/wrongQuestions/repository.js';
@@ -13,7 +14,7 @@ import { fixtureIds, resetAndSeedPostgresFixture } from './postgresFixture.js';
 const migrationsDir = fileURLToPath(new URL('../../src/db/migrations/', import.meta.url));
 
 describe('PostgreSQL-backed API integration', () => {
-  const databaseUrl = readSafeTestDatabaseUrl();
+  const databaseUrl = requireDedicatedTestDatabaseUrl(process.env.TEST_DATABASE_URL);
   const pool = createPgPool(databaseUrl);
   const app = buildApp({
     authRepository: createPgStudentAuthRepository(pool),
@@ -335,48 +336,6 @@ describe('PostgreSQL-backed API integration', () => {
     expect(afterLogout.statusCode).toBe(401);
   });
 });
-
-describe('PostgreSQL integration safety guard', () => {
-  it('accepts explicit test database names and rejects development-like names', () => {
-    expect(validateTestDatabaseUrl('postgres://user:pass@127.0.0.1:5432/bkyexam_test'))
-      .toBe('postgres://user:pass@127.0.0.1:5432/bkyexam_test');
-    expect(validateTestDatabaseUrl('postgres://user:pass@127.0.0.1:5432/test_bkyexam'))
-      .toBe('postgres://user:pass@127.0.0.1:5432/test_bkyexam');
-    expect(() => validateTestDatabaseUrl('postgres://user:pass@127.0.0.1:5432/bkyexam_practice'))
-      .toThrow('Refusing to reset non-test database');
-    expect(() => validateTestDatabaseUrl('postgres://user:pass@127.0.0.1:5432/prod_test_backup'))
-      .toThrow('Refusing to reset non-test database');
-  });
-});
-
-function readSafeTestDatabaseUrl() {
-  return validateTestDatabaseUrl(process.env.TEST_DATABASE_URL);
-}
-
-function validateTestDatabaseUrl(value: string | undefined) {
-  if (!value) {
-    throw new Error(
-      'TEST_DATABASE_URL is required. Use npm run test:integration:db:docker for an isolated local database.',
-    );
-  }
-
-  const parsed = new URL(value);
-  if (parsed.protocol !== 'postgres:' && parsed.protocol !== 'postgresql:') {
-    throw new Error('TEST_DATABASE_URL must use postgres:// or postgresql://.');
-  }
-
-  const databaseName = decodeURIComponent(parsed.pathname.replace(/^\/+/, '')).toLowerCase();
-  const safeName = databaseName === 'test'
-    || databaseName.startsWith('test_')
-    || databaseName.startsWith('test-')
-    || databaseName.endsWith('_test')
-    || databaseName.endsWith('-test');
-  if (!safeName) {
-    throw new Error(`Refusing to reset non-test database "${databaseName}".`);
-  }
-
-  return value;
-}
 
 function extractCookie(header: string | string[] | undefined) {
   const value = Array.isArray(header) ? header[0] : header;

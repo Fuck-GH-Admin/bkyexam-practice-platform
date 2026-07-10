@@ -251,6 +251,14 @@ npm run test:integration:db
 
 integration fixture 会清空目标数据库业务表，因此测试代码只接受名称为 `test`、以 `test_`/`test-` 开头或以 `_test`/`-test` 结尾的数据库。
 
+完整外部题库的双重导入与幂等检查使用同一安全数据库规则：
+
+```powershell
+npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
+```
+
+该命令执行 migration、清空隔离测试库、按固定 corpus baseline 校验解析结果、连续导入两次并核对最终表计数。
+
 ## Post-Import Smoke Check
 
 After importing question-bank data, run the database smoke check to confirm the core import tables are reachable and populated with readable counts:

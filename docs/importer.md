@@ -116,6 +116,28 @@ If any write fails, the importer rolls back the transaction and rethrows the ori
 
 Review smoke parsing against the source corpus succeeded with 89,922 questions and 180,323 options parsed.
 
+## Full Import Slow Smoke
+
+The optional full-corpus profile turns the manual import check into a repeatable isolated run:
+
+```powershell
+npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
+```
+
+It starts the Compose `postgres-test` service, applies all migrations, clears only the guarded `bkyexam_test` database, parses the complete export, and compares the result against `apps/api/src/import/currentCorpusBaseline.ts`. It then imports the same in-memory data twice and verifies that the second upsert leaves all database counts unchanged.
+
+The recorded baseline includes:
+
+- 2,941 classifications.
+- 89,922 questions.
+- 180,323 raw options.
+- 154,899 importable options.
+- 25,424 orphan options skipped by the foreign-key filter.
+- 2,662 generated bank mappings.
+- the complete normalized question-type distribution.
+
+The profile is intentionally not part of every CI run because the source corpus is external to Git and the full double import takes minutes. A legitimate source update should be reviewed before changing the baseline.
+
 ## Import Summary Command
 
 The API package includes a read-only summary command that parses the source export files and prints a pretty JSON summary to stdout:
@@ -166,4 +188,4 @@ npm run import:db -w @bkyexam-practice/api -- <questionbank-dir>
 
 ## Current Boundaries
 
-The parser layer remains side-effect free. The database importer handles transactional, idempotent loading. Progress reporting and detailed import error summaries are still future enhancements.
+The parser layer remains side-effect free. The database importer handles transactional, idempotent loading, and the slow smoke now verifies full-corpus count stability. Progress reporting and detailed import error summaries are still future enhancements.

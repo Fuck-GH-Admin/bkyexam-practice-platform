@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json",
     "import:summary": "tsx src/import/loadQuestionBank.ts",
     "import:db": "tsx src/import/importQuestionBank.ts",
+    "smoke:import:full": "tsx src/import/fullImportSmoke.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:smoke": "tsx src/db/smoke.ts"
   },

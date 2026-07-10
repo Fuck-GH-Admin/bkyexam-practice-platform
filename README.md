@@ -18,7 +18,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 管理平台及管理员权限体系。
 - 学生首页、练习历史、账户与学习统计等完整信息架构。
 - 填空、简答、编程、Office 操作等非客观题流程。
-- 生产级身份策略、CI 真实数据库测试、监控、备份和正式部署验收。
+- 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
 
 当前完整度、验证证据和风险见 [系统状态](docs/status.md)，产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
@@ -140,6 +140,14 @@ npm run dev:web
 ## Source Data
 
 题库导出目录通常位于主仓库的 `Monitor/questionbank/`，也可以通过命令行传入任意绝对路径。导入器只读取源 `.txt` 文件，不会修改原始题库。
+
+可选的全量慢速 smoke 会启动隔离 PostgreSQL、执行 migration、按已记录基线校验 89922 题、连续导入两次验证幂等性，再核对数据库计数：
+
+```powershell
+npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
+```
+
+该 profile 依赖本地完整题库，不进入每次提交的 CI；当前 Docker 环境完整运行约需数分钟。
 
 ## Documentation
 
