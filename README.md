@@ -51,9 +51,25 @@ npm ci
 npm run test
 npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
-根脚本会覆盖 `apps/api`、`apps/web` 和 `packages/shared` 全部 workspace。
+根脚本会覆盖 `apps/api`、`apps/web` 和 `packages/shared` 全部 workspace；Playwright smoke 会启动 Vite，并使用确定性的 mock API 验证桌面与移动端关键练习流程。
+
+Windows 本地默认复用已安装的 Chrome。CI 或未安装 Chrome 的环境先执行：
+
+```sh
+npm run test:e2e:install
+npm run test:e2e
+```
+
+也可以用一条命令执行当前完整仓库质量门：
+
+```sh
+npm run verify
+```
+
+测试分层、覆盖范围与真实数据库验证边界见 [测试策略](docs/testing.md)。
 
 ## Run With PostgreSQL
 
@@ -115,6 +131,7 @@ npm run dev:web
 - [架构](docs/architecture.md)
 - [API](docs/api.md)
 - [数据库](docs/database.md)
+- [测试策略](docs/testing.md)
 - [导入器](docs/importer.md)
 - [题库映射](docs/mapping.md)
 - [部署](docs/deployment.md)

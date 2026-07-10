@@ -29,5 +29,8 @@ exports/
 
 # Tooling output
 coverage/
+playwright-report/
+test-results/
+blob-report/
 *.log
 npm-debug.log*

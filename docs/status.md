@@ -31,6 +31,7 @@
 npm run test       PASS
 npm run typecheck  PASS
 npm run build      PASS
+npm run test:e2e   PASS
 ```
 
 测试结果：
@@ -41,6 +42,15 @@ npm run build      PASS
 | `apps/api` | 29 | 226 |
 | `apps/web` | 1 | 27 |
 | **Total** | **31** | **255** |
+
+仓库内 Playwright smoke：
+
+| Project | Scenario | Result |
+| --- | --- | --- |
+| `desktop-chromium` | 草稿保存、刷新续答、存疑、整卷提交、结果、错题详情 | PASS |
+| `mobile-chromium` | 练习台、提交检查与横向溢出 | PASS |
+
+Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个场景只在目标 viewport 执行一次。
 
 生产构建结果：
 
@@ -149,6 +159,8 @@ npm run build      PASS
 - Mobile submit check。
 - 横向溢出检查。
 
+该 smoke 现已固化为仓库内 `playwright.config.ts` 与 `tests/e2e/`，可通过 `npm run test:e2e` 重复执行。它用于稳定验证浏览器交互和前端状态恢复，不替代 PostgreSQL repository、Fastify route 与真实导入数据的 integration test。
+
 ## Feature Completeness Matrix
 
 | Area | 状态 | 估算 | 已有 | 主要缺口 |
@@ -184,7 +196,6 @@ npm run build      PASS
 ### P2 Quality Debt
 
 - API route test 日志较吵。
-- 缺正式 browser E2E 仓库配置；本轮 smoke 使用临时 Playwright runner。
 - 未系统验证键盘可达性、读屏和完整无障碍。
 - 未对超长题干、富文本、图片题和异常 Unicode 做专项视觉验收。
 

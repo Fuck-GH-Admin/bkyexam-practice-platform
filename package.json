@@ -3,13 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
     "dev": "npm run dev -w @bkyexam-practice/api",
     "dev:web": "npm run dev -w @bkyexam-practice/web",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "test:e2e": "playwright test",
+    "test:e2e:desktop": "playwright test --project=desktop-chromium",
+    "test:e2e:mobile": "playwright test --project=mobile-chromium",
+    "test:e2e:install": "playwright install chromium",
+    "typecheck": "npm run typecheck --workspaces && npm run typecheck:e2e",
+    "typecheck:e2e": "tsc -p tests/e2e/tsconfig.json --noEmit",
+    "verify": "npm run test && npm run typecheck && npm run build && npm run test:e2e"
   },
-  "engines": { "node": ">=24.0.0" }
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
 }

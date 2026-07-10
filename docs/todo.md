@@ -19,7 +19,7 @@
 
 目标：把本轮“临时验证成功”升级成仓库可重复执行的质量门。
 
-- [ ] 在仓库中增加 Playwright E2E 配置，不依赖临时 runner。
+- [x] 在仓库中增加 Playwright E2E 配置，不依赖临时 runner。
 - [ ] 增加 PostgreSQL integration test job。
 - [ ] 为完整导入提供可选的慢速 smoke profile。
 - [ ] 为 API DTO 增加共享 Zod contract，先覆盖 Practice 与 Wrongbook。
