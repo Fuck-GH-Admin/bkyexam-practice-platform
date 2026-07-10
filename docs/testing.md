@@ -1,6 +1,6 @@
 # Testing Strategy
 
-状态日期：**2026-07-10**
+状态日期：**2026-07-11**
 
 测试按失败定位和外部依赖分层。任何一层通过都不能替代其他层。
 
@@ -71,13 +71,16 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 262 个 Vitest 测试覆盖：
+当前 271 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
 - identity、catalog、practice、wrongbook 的 repository 行为。
 - Fastify route 的输入、输出和错误映射。
 - Web 练习 model 与关键状态转换。
+- Practice/Wrongbook v1 schema 的计数不变量、`false`、legacy UUID 和 strict response boundary。
+
+其中 shared 8 项、API 235 项、Web 28 项。Practice/Wrongbook route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
@@ -91,6 +94,7 @@ npm run test:e2e
 - 提交前未答/存疑统计正确。
 - 整卷提交后只读结果数量和正确数正确。
 - 错题列表及详情不泄漏原始 option UUID。
+- Web 对 Practice/Wrongbook mock response 使用与生产相同的 shared Zod runtime parser。
 - 移动 viewport 的练习台与提交弹窗没有横向溢出。
 - 关键流程没有未预期的 console error 或 page error。
 
@@ -123,6 +127,7 @@ npm run test:integration:db:docker
 - 错题归集、详情参考答案规范化、掌握筛选和错题再练。
 - 不同学生之间的 session 与错题所有权隔离。
 - 退出后服务端 session 失效。
+- 真实 PostgreSQL repository 返回值能够通过 Fastify v1 response contract。
 
 如已有外部专用测试数据库，可直接执行：
 

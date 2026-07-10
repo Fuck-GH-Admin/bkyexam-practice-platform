@@ -1,6 +1,6 @@
 # System Status
 
-状态日期：**2026-07-10**
+状态日期：**2026-07-11**
 
 本文记录“已经被代码和真实环境证明的能力”，不是愿望清单。后续每个里程碑完成后应更新本页。
 
@@ -18,32 +18,27 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 80%** | 登录、题库、练习、断点、整卷提交、结果、错题再练均可用；历史、账户、统计和部分 UX 未完成 |
-| 公开生产就绪度 | **约 55%** | 缺正式身份策略、CI 真实 DB、监控、备份、安全与部署验收 |
+| 公开生产就绪度 | **约 55%** | 缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
 | 完整产品愿景 | **约 50–55%** | 分母包含清晰学生层、管理平台、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
 ## Verified Automated Checks
 
-2026-07-10 在 Node.js `24.11.1` 上完成：
+2026-07-11 在 Node.js `24.11.1` 上完成：
 
 ```text
-npm run test       PASS
-npm run typecheck  PASS
-npm run build      PASS
-npm run test:e2e   PASS
-npm run test:integration:db:docker  PASS
-npm run smoke:import:full:docker -- <questionbank-dir>  PASS
+npm run verify:docker  PASS
 ```
 
 测试结果：
 
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
-| `packages/shared` | 1 | 2 |
-| `apps/api` | 31 | 233 |
-| `apps/web` | 1 | 27 |
-| **Total** | **33** | **262** |
+| `packages/shared` | 2 | 8 |
+| `apps/api` | 31 | 235 |
+| `apps/web` | 1 | 28 |
+| **Total** | **34** | **271** |
 
 仓库内 Playwright smoke：
 
@@ -64,6 +59,12 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 
 全量题库慢速 smoke：
 
+最后一次完整运行日期为 2026-07-10：
+
+```text
+npm run smoke:import:full:docker -- <questionbank-dir>  PASS
+```
+
 | Step | Result |
 | --- | ---: |
 | 解析完整源题库 | 2941 classifications / 89922 questions / 180323 raw options |
@@ -79,8 +80,23 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 - shared TypeScript build：通过。
 - API TypeScript build：通过。
 - Web Vite build：通过。
-- Web bundle：约 `219.49 kB` JS（gzip `68.50 kB`）。
+- Web bundle：约 `289.07 kB` JS（gzip `86.66 kB`）。
 - Web CSS：约 `19.24 kB`（gzip `4.79 kB`）。
+
+主 JS 增量主要来自 Web 运行时 Zod response validation。当前内部 MVP 可以接受；进入 URL routing 与 feature splitting 时应评估按页面拆包。
+
+## Verified Contract Boundary
+
+Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
+
+- API repository DTO 直接引用共享类型。
+- Fastify 在发送 Practice/Wrongbook 成功响应前执行共享 schema parse。
+- Web 在把对应响应写入 React state 前执行同一共享 schema parse。
+- route 回归验证 repository 返回不合法计数或 wrongbook 数据时 fail closed 为 `500`。
+- `false` 判断题答案、opaque option ID、legacy 大小写 UUID 和部分作答 completed session 均有 contract 回归。
+- `completedCount` 的 v1 语义固定为 `answered_or_graded_questions`。
+
+详细规则见 [contracts.md](contracts.md)。
 
 ## Verified Corpus And Database
 
@@ -190,8 +206,8 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 | Corpus parser/import | 稳定 | 90% | 全量解析、事务导入、幂等 upsert、smoke | 进度事件、错误报告 UI、增量策略 |
 | Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选 | 管理编辑、审批、审计、质量抽查 |
 | Student identity/session | MVP | 60% | 固定用户名、Cookie session、恢复/退出 | 正式凭据、角色、找回、身份合并、安全策略 |
-| Objective practice | 核心可用 | 85% | 创建、锁题、草稿、断点、存疑、整卷判分、结果 | 历史入口、多会话管理、计时/考试策略、更多异常 UX |
-| Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练 | 错因、学习计划、掌握规则、历史趋势 |
+| Objective practice | 核心可用 | 85% | 创建、锁题、草稿、断点、存疑、整卷判分、结果、v1 runtime contract | 历史入口、多会话管理、计时/考试策略、更多异常 UX |
+| Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Student product shell | 功能性 | 60% | 登录、题库、练习、错题 | 清晰首页、URL routes、历史、档案、统一空/错/加载状态 |
 | Admin console | 未实现 | 5% | 数据字段与自动 mapping 为其提供基础 | 整个管理应用、RBAC、API、工作流、审计 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
@@ -209,14 +225,15 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 ### P1 Before Large Feature Expansion
 
 - `App.tsx`、Practice repository 和 Practice routes 过大。
-- 前后端 DTO 有重复定义。
+- Auth 与 Catalog DTO 仍在各端手写；Practice/Wrongbook 重复 DTO 已迁入 shared v1。
 - 没有 URL routing 和练习历史。
-- `completedCount` 实际语义是 answered/graded count，名称容易误解；当前已在文档固定语义，未来可在版本化 contract 中更名。
+- `completedCount` 已在 v1 contract 固定为 answered/graded count，但字段名称仍容易误解；未来更名必须走显式版本迁移。
 - Wrongbook repository 直接创建 Practice 表记录，长期应改为 service 间协作。
 
 ### P2 Quality Debt
 
 - 新增的 CI workflow 尚待推送后完成首次远端运行确认并设置必要的 branch protection。
+- Web 运行时 contract validation 增加了主 bundle 体积，后续应结合 router/code splitting 优化。
 - 未系统验证键盘可达性、读屏和完整无障碍。
 - 未对超长题干、富文本、图片题和异常 Unicode 做专项视觉验收。
 

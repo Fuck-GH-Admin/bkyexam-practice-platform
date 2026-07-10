@@ -1,4 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import {
+  MarkWrongQuestionMasteredResponseV1Schema,
+  WrongQuestionDetailResponseV1Schema,
+  WrongQuestionListResponseV1Schema,
+  WrongQuestionReviewSessionResponseV1Schema,
+} from '@bkyexam-practice/shared';
 import type { SessionStudent } from '../auth/session.js';
 import type { WrongQuestionRepository } from '../wrongQuestions/repository.js';
 
@@ -30,7 +36,7 @@ export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStud
         includeMastered,
       });
 
-      return { wrongQuestions };
+      return WrongQuestionListResponseV1Schema.parse({ wrongQuestions });
     });
 
     app.post('/api/wrong-questions/review-sessions', async (request, reply) => {
@@ -59,7 +65,9 @@ export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStud
         return reply.status(404).send({ error: 'No wrong questions matched the filters' });
       }
 
-      return { session: { id: session.sessionId, questionCount: session.questionCount } };
+      return WrongQuestionReviewSessionResponseV1Schema.parse({
+        session: { id: session.sessionId, questionCount: session.questionCount },
+      });
     });
 
     app.get('/api/wrong-questions/:id', async (request, reply) => {
@@ -81,7 +89,7 @@ export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStud
         return reply.status(404).send({ error: 'Wrong question not found' });
       }
 
-      return { wrongQuestion };
+      return WrongQuestionDetailResponseV1Schema.parse({ wrongQuestion });
     });
 
     app.post('/api/wrong-questions/:id/mastered', async (request, reply) => {
@@ -103,7 +111,7 @@ export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStud
         return reply.status(404).send({ error: 'Wrong question not found' });
       }
 
-      return { success: true };
+      return MarkWrongQuestionMasteredResponseV1Schema.parse({ success: true });
     });
   };
 }

@@ -299,6 +299,13 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 7. 练习提交保持单数据库事务。
 8. 未答、答错、未判定、自评四种状态必须在 contract 中可区分。
 
+当前落地状态：
+
+- Practice/Wrongbook 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
+- `completedCount` 已固定为 answered/graded questions 语义。
+- Auth、Catalog、通用 error 和 Admin contract 仍待迁移。
+- 详细版本规则见 [contracts.md](contracts.md)。
+
 ## 6. Frontend Timing Decision
 
 结论不是“前端最后做”或“前端现在全部做”，而是：
@@ -318,7 +325,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - 补齐管理工作流。
 - 补齐练习历史、身份策略和数据语义。
-- 拆分大文件并建立共享 contract。
+- 扩展已建立的共享 contract，并继续拆分大文件。
 - 用真实数据 dogfood。
 
 ### Layer C — Later: Final Visual Design

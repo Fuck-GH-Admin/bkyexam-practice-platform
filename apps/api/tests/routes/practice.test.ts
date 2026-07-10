@@ -30,6 +30,7 @@ function sessionPayload(currentSessionId = sessionId) {
       questionCount: 1,
       completedCount: 0,
       correctCount: 0,
+      currentSort: 1,
       status: 'active' as const,
     },
     questions: [
@@ -40,6 +41,7 @@ function sessionPayload(currentSessionId = sessionId) {
         content: 'Question 1',
         options: [{ id: 'option-1', sort: 1, content: 'A' }],
         answered: false,
+        markedForReview: false,
       },
     ],
   };
@@ -199,6 +201,27 @@ describe('practice routes', () => {
         questionTypes: ['single_choice', 'multiple_choice', 'yes_no'],
       },
     ]);
+  });
+
+  it('fails closed when a repository returns a payload outside the v1 practice contract', async () => {
+    const { repository } = fakePracticeRepository();
+    repository.createSession = async () => ({
+      ...sessionPayload(),
+      session: {
+        ...sessionPayload().session,
+        completedCount: 2,
+      },
+    } as never);
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/practice/sessions',
+      headers: { cookie: 'bky_session=token' },
+      payload: { bankId },
+    });
+
+    expect(response.statusCode).toBe(500);
   });
 
   it('returns 400 when creating a practice session with a malformed bankId', async () => {
@@ -519,6 +542,12 @@ describe('practice routes', () => {
       headers: { cookie: 'bky_session=token' },
       payload: { answer: { option: 'option-1' } },
     });
+    const emptyOptionId = await app.inject({
+      method: 'PUT',
+      url: `/api/practice/sessions/${sessionId}/drafts/${questionId}`,
+      headers: { cookie: 'bky_session=token' },
+      payload: { answer: [''] },
+    });
 
     expect(saved.statusCode).toBe(200);
     expect(saved.json()).toEqual({ ...sessionPayload(sessionId).questions[0], draftAnswer: ['option-1'] });
@@ -536,6 +565,7 @@ describe('practice routes', () => {
     expect(uppercaseClearQuestion.statusCode).toBe(400);
     expect(uppercaseClearQuestion.json()).toEqual({ error: 'questionId must be a valid UUID' });
     expect(invalidAnswer.statusCode).toBe(400);
+    expect(emptyOptionId.statusCode).toBe(400);
   });
 
   it('returns draft write errors', async () => {

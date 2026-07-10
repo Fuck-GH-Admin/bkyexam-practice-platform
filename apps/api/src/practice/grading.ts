@@ -1,6 +1,10 @@
 import { normalizeAnswer } from '../import/normalizeAnswer.js';
+import type {
+  CorrectAnswerV1,
+  SubmittedAnswerV1,
+} from '@bkyexam-practice/shared';
 
-export type SubmittedAnswer = string[] | boolean | string;
+export type SubmittedAnswer = SubmittedAnswerV1;
 
 export interface GradableQuestion {
   normalizedType: string;
@@ -9,7 +13,7 @@ export interface GradableQuestion {
 
 export interface GradeResult {
   isCorrect: boolean | null;
-  correctAnswer: string[] | boolean | string;
+  correctAnswer: CorrectAnswerV1;
   needsSelfReview: boolean;
 }
 

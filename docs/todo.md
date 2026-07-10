@@ -2,7 +2,7 @@
 
 路线图按依赖和风险排序，不再继续使用已失真的 Phase 3B/3C/3D 清单。
 
-## Completed Stabilization — 2026-07-10
+## Completed Stabilization — 2026-07-10/11
 
 - [x] 建立独立稳定化 worktree。
 - [x] 保留服务器草稿、存疑和整卷提交语义，迁移 PC 练习台与提交检查交互。
@@ -10,7 +10,7 @@
 - [x] 修复错题参考答案 UUID 泄漏。
 - [x] 修复错题用户答案 UUID 展示。
 - [x] 修复错题再练 session hydration。
-- [x] 全量 255 tests、typecheck、build 通过。
+- [x] 全量 271 Vitest、typecheck、build、Playwright 与 PostgreSQL integration 通过。
 - [x] 完整真实题库导入 PostgreSQL 并 smoke。
 - [x] 真实 API 闭环与真实浏览器闭环通过。
 - [x] 更新当前状态、产品边界、架构和 API 文档。
@@ -22,10 +22,11 @@
 - [x] 在仓库中增加 Playwright E2E 配置，不依赖临时 runner。
 - [x] 增加 PostgreSQL integration test job。
 - [x] 为完整导入提供可选的慢速 smoke profile。
-- [ ] 为 API DTO 增加共享 Zod contract，先覆盖 Practice 与 Wrongbook。
-- [ ] 明确并版本化 `completedCount` 语义；评估后续是否更名为 `answeredCount`。
+- [x] 为 API DTO 增加共享 Zod contract，覆盖 Practice 与 Wrongbook，并在 API/Web 两侧 runtime parse。
+- [x] 明确并版本化 `completedCount` 语义为 answered/graded questions；后续更名必须走显式迁移。
 - [x] 降低测试中的 Fastify request log 噪音。
-- [ ] 增加超长题干、空选项、Boolean false、UUID option answer 等回归 fixture。
+- [x] 增加 Boolean false、opaque/UUID option answer 和不合法 response fail-closed 回归。
+- [ ] 增加超长题干、异常空选项、富文本、图片题和异常 Unicode fixture。
 
 完成标准：
 

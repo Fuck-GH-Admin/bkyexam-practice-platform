@@ -1,4 +1,18 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  MarkWrongQuestionMasteredResponseV1Schema,
+  ObjectivePracticeQuestionTypesV1,
+  PracticePayloadV1Schema,
+  PracticeQuestionV1Schema,
+  PracticeSessionListV1Schema,
+  PracticeSessionV1Schema,
+  PracticeSubmitSessionResponseV1Schema,
+  WrongQuestionDetailResponseV1Schema,
+  WrongQuestionListResponseV1Schema,
+  WrongQuestionReviewSessionResponseV1Schema,
+  type WrongQuestionDetailV1,
+  type WrongQuestionItemV1,
+} from '@bkyexam-practice/shared';
 
 import { PracticeDesk } from './features/practice/PracticeDesk';
 import { SubmitCheckDialog } from './features/practice/SubmitCheckDialog';
@@ -58,29 +72,10 @@ type Bank = {
   description: string;
 };
 
-type WrongQuestion = {
-  id: string;
-  questionId: string;
-  bankId: string;
-  bankName: string;
-  subjectCategory: string;
-  subjectName: string;
-  questionType: string;
-  contentPreview: string;
-  wrongCount: number;
-  lastAnswer: string;
-  mastered: boolean;
-  lastWrongAt: string;
-};
+type WrongQuestion = WrongQuestionItemV1;
+type WrongQuestionDetail = WrongQuestionDetailV1;
 
-type WrongQuestionDetail = WrongQuestion & {
-  content: string;
-  options: PracticeOption[];
-  correctAnswer: string[] | boolean | string;
-  analysis: string;
-};
-
-const objectiveTypes = ['single_choice', 'multiple_choice', 'yes_no'];
+const objectiveTypes = [...ObjectivePracticeQuestionTypesV1];
 
 export function getVisibleChips(subjectName: string, keywords: string[]) {
   return Array.from(new Set([subjectName, ...keywords].filter(Boolean))).slice(0, 4);
@@ -159,7 +154,11 @@ export function buildWrongbookStats(items: Array<{ mastered: boolean; lastWrongA
   };
 }
 
-async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function api<T>(
+  path: string,
+  options: RequestInit = {},
+  parse?: (body: unknown) => T,
+): Promise<T> {
   const response = await fetch(path, {
     ...options,
     credentials: 'include',
@@ -176,7 +175,7 @@ async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new Error(body?.error ?? `请求失败：${response.status}`);
   }
 
-  return body as T;
+  return parse ? parse(body) : body as T;
 }
 
 function isCanonicalUuid(value: string) {
@@ -336,11 +335,19 @@ export function App() {
 
   async function loadActiveSession() {
     try {
-      const activeSessions = await api<PracticeSession[]>('/api/practice/sessions/active');
+      const activeSessions = await api(
+        '/api/practice/sessions/active',
+        {},
+        (body) => PracticeSessionListV1Schema.parse(body),
+      );
       const activeSession = activeSessions[0];
       if (!activeSession) return;
 
-      const result = await api<PracticePayload>(`/api/practice/sessions/${activeSession.id}`);
+      const result = await api(
+        `/api/practice/sessions/${activeSession.id}`,
+        {},
+        (body) => PracticePayloadV1Schema.parse(body),
+      );
       applyPracticePayload(result);
     } catch {
       // Active practice is optional on the home screen.
@@ -366,10 +373,14 @@ export function App() {
     setMessage('');
     setLoading(true);
     try {
-      const result = await api<PracticePayload>('/api/practice/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ bankId: bank.bankId, mode, limit: 70, questionTypes: objectiveTypes }),
-      });
+      const result = await api(
+        '/api/practice/sessions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ bankId: bank.bankId, mode, limit: 70, questionTypes: objectiveTypes }),
+        },
+        (body) => PracticePayloadV1Schema.parse(body),
+      );
       applyPracticePayload(result);
       setView('practice');
     } catch (error) {
@@ -390,10 +401,14 @@ export function App() {
           if (answer === undefined) {
             await api(`/api/practice/sessions/${sessionId}/drafts/${question.id}`, { method: 'DELETE' });
           } else {
-            await api(`/api/practice/sessions/${sessionId}/drafts/${question.id}`, {
-              method: 'PUT',
-              body: JSON.stringify({ answer }),
-            });
+            await api(
+              `/api/practice/sessions/${sessionId}/drafts/${question.id}`,
+              {
+                method: 'PUT',
+                body: JSON.stringify({ answer }),
+              },
+              (body) => PracticeQuestionV1Schema.parse(body),
+            );
           }
           draftSaveFailedRef.current = false;
           setSaveState('saved');
@@ -434,10 +449,14 @@ export function App() {
         setSubmitCheckOpen(false);
         return;
       }
-      const result = await api<{ session: PracticeSession; results: AnswerResult[] }>(`/api/practice/sessions/${session.id}/submit`, {
-        method: 'POST',
-        body: '{}',
-      });
+      const result = await api(
+        `/api/practice/sessions/${session.id}/submit`,
+        {
+          method: 'POST',
+          body: '{}',
+        },
+        (body) => PracticeSubmitSessionResponseV1Schema.parse(body),
+      );
       const nextResults = Object.fromEntries(result.results.map((item) => [item.questionId, item]));
       setSession(result.session);
       setResultsByQuestion(nextResults);
@@ -476,10 +495,14 @@ export function App() {
       const currentSort = nextQuestionItem.sort;
       progressSaveChainRef.current = progressSaveChainRef.current
         .catch(() => undefined)
-        .then(() => api(`/api/practice/sessions/${sessionId}/progress`, {
-          method: 'PATCH',
-          body: JSON.stringify({ currentSort }),
-        }).then(() => undefined, () => undefined));
+        .then(() => api(
+          `/api/practice/sessions/${sessionId}/progress`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({ currentSort }),
+          },
+          (body) => PracticeSessionV1Schema.parse(body),
+        ).then(() => undefined, () => undefined));
     }
   }
 
@@ -509,10 +532,14 @@ export function App() {
     if (!session || !currentQuestion) return;
     const markedForReview = !reviewFlags[currentQuestion.id];
     setReviewFlags((items) => ({ ...items, [currentQuestion.id]: markedForReview }));
-    void api(`/api/practice/sessions/${session.id}/review/${currentQuestion.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ markedForReview }),
-    }).catch(() => setReviewFlags((items) => ({ ...items, [currentQuestion.id]: !markedForReview })));
+    void api(
+      `/api/practice/sessions/${session.id}/review/${currentQuestion.id}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ markedForReview }),
+      },
+      (body) => PracticeQuestionV1Schema.parse(body),
+    ).catch(() => setReviewFlags((items) => ({ ...items, [currentQuestion.id]: !markedForReview })));
   }
 
   function switchSection(type: string) {
@@ -532,7 +559,11 @@ export function App() {
     if (filters.bankId) params.set('bankId', filters.bankId);
     if (filters.includeMastered) params.set('includeMastered', 'true');
     try {
-      const result = await api<{ wrongQuestions: WrongQuestion[] }>(`/api/wrong-questions${params.toString() ? `?${params}` : ''}`);
+      const result = await api(
+        `/api/wrong-questions${params.toString() ? `?${params}` : ''}`,
+        {},
+        (body) => WrongQuestionListResponseV1Schema.parse(body),
+      );
       setWrongQuestions(result.wrongQuestions);
     } catch {
       setWrongQuestions([]);
@@ -544,7 +575,11 @@ export function App() {
     setWrongDetailLoading(true);
     setMessage('');
     try {
-      const result = await api<{ wrongQuestion: WrongQuestionDetail }>(`/api/wrong-questions/${id}`);
+      const result = await api(
+        `/api/wrong-questions/${id}`,
+        {},
+        (body) => WrongQuestionDetailResponseV1Schema.parse(body),
+      );
       setWrongDetail(result.wrongQuestion);
     } catch (error) {
       setWrongDetail(null);
@@ -555,7 +590,11 @@ export function App() {
   }
 
   async function markMastered(id: string) {
-    await api(`/api/wrong-questions/${id}/mastered`, { method: 'POST', body: '{}' });
+    await api(
+      `/api/wrong-questions/${id}/mastered`,
+      { method: 'POST', body: '{}' },
+      (body) => MarkWrongQuestionMasteredResponseV1Schema.parse(body),
+    );
     setWrongDetail((detail) => (detail && detail.id === id ? { ...detail, mastered: true } : detail));
     await loadWrongQuestions({ bankId: wrongBankId, includeMastered });
   }
@@ -564,11 +603,19 @@ export function App() {
     setLoading(true);
     setMessage('');
     try {
-      const result = await api<{ session: { id: string; questionCount: number } }>('/api/wrong-questions/review-sessions', {
-        method: 'POST',
-        body: JSON.stringify({ bankId: wrongBankId || undefined, includeMastered, limit: 20 }),
-      });
-      const payload = await api<PracticePayload>(`/api/practice/sessions/${result.session.id}`);
+      const result = await api(
+        '/api/wrong-questions/review-sessions',
+        {
+          method: 'POST',
+          body: JSON.stringify({ bankId: wrongBankId || undefined, includeMastered, limit: 20 }),
+        },
+        (body) => WrongQuestionReviewSessionResponseV1Schema.parse(body),
+      );
+      const payload = await api(
+        `/api/practice/sessions/${result.session.id}`,
+        {},
+        (body) => PracticePayloadV1Schema.parse(body),
+      );
       applyPracticePayload(payload);
       setView('practice');
     } catch (error) {

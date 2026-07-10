@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import type { PracticeQuestion } from './features/practice/model';
 
 import {
   buildPracticeCheckSummary,
@@ -34,6 +35,11 @@ describe('hasSubmittedAnswer', () => {
   });
   test('treats an empty multiple-choice answer as not submitted', () => {
     expect(hasSubmittedAnswer([])).toBe(false);
+  });
+
+  test('treats blank text as unanswered and non-blank text as submitted', () => {
+    expect(hasSubmittedAnswer('   ')).toBe(false);
+    expect(hasSubmittedAnswer('text answer')).toBe(true);
   });
 });
 
@@ -106,7 +112,7 @@ describe('bank filtering helpers', () => {
   });
 });
 
-const sampleQuestions = [
+const sampleQuestions: PracticeQuestion[] = [
   {
     id: 'single-1',
     sort: 1,
@@ -114,6 +120,7 @@ const sampleQuestions = [
     content: 'Single choice',
     options: [],
     answered: false,
+    markedForReview: false,
   },
   {
     id: 'multiple-1',
@@ -122,6 +129,7 @@ const sampleQuestions = [
     content: 'Multiple choice',
     options: [],
     answered: false,
+    markedForReview: false,
   },
   {
     id: 'yes-no-1',
@@ -130,6 +138,7 @@ const sampleQuestions = [
     content: 'Yes/no',
     options: [],
     answered: false,
+    markedForReview: false,
   },
 ];
 
@@ -221,6 +230,8 @@ describe('practice submit check helpers', () => {
     expect(formatSavedAnswer(['B', 'D'])).toBe('B、D');
     expect(formatSavedAnswer(false)).toBe('错误');
     expect(formatSavedAnswer(undefined)).toBe('未答');
+    expect(formatSavedAnswer('  text answer  ')).toBe('text answer');
+    expect(formatSavedAnswer('   ')).toBe('未答');
     expect(formatSavedAnswer(['option-a'], [
       { id: 'option-a', sort: 1, content: 'First option' },
     ])).toBe('1. First option');

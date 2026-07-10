@@ -1,34 +1,15 @@
 import { randomUUID } from 'node:crypto';
+import type {
+  PracticeOptionV1,
+  WrongQuestionDetailV1,
+  WrongQuestionItemV1,
+} from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
 import { normalizeAnswer } from '../import/normalizeAnswer.js';
 
-export interface WrongQuestionItem {
-  id: string;
-  questionId: string;
-  bankId: string;
-  bankName: string;
-  subjectCategory: string;
-  subjectName: string;
-  questionType: string;
-  contentPreview: string;
-  wrongCount: number;
-  lastAnswer: string;
-  mastered: boolean;
-  lastWrongAt: string;
-}
-
-export interface WrongQuestionOption {
-  id: string;
-  sort: number;
-  content: string;
-}
-
-export interface WrongQuestionDetail extends WrongQuestionItem {
-  content: string;
-  options: WrongQuestionOption[];
-  correctAnswer: string[] | boolean | string;
-  analysis: string;
-}
+export type WrongQuestionItem = WrongQuestionItemV1;
+export type WrongQuestionOption = PracticeOptionV1;
+export type WrongQuestionDetail = WrongQuestionDetailV1;
 
 export interface WrongQuestionRepository {
   list(input: { studentId: string; bankId?: string; includeMastered: boolean }): Promise<WrongQuestionItem[]>;
@@ -57,7 +38,7 @@ interface WrongQuestionRow {
   bank_name: string | null;
   subject_category: string | null;
   subject_name: string | null;
-  normalized_type: string | null;
+  normalized_type: WrongQuestionItem['questionType'] | null;
   content_preview: string | null;
   wrong_count: number | string;
   last_answer: string;
@@ -110,7 +91,7 @@ export function createMemoryWrongQuestionRepository(): WrongQuestionRepository {
         .filter((item) => includeMastered || !item.mastered)
         .slice(0, limit);
       if (selected.length === 0) return null;
-      return { sessionId: 'memory-review-session', questionCount: selected.length };
+      return { sessionId: randomUUID(), questionCount: selected.length };
     },
 
     async markMastered({ studentId, id }) {

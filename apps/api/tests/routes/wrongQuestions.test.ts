@@ -102,6 +102,20 @@ describe('wrong question routes', () => {
     expect(listRequests).toEqual([{ studentId: 'student-1', includeMastered: false }]);
   });
 
+  it('fails closed when a repository returns a payload outside the v1 wrongbook contract', async () => {
+    const { repository } = fakeWrongQuestionRepository();
+    repository.list = async () => [{ ...wrongQuestion, wrongCount: 0 }] as never;
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/wrong-questions',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
   it('passes includeMastered true only when the query param exactly equals true', async () => {
     const { repository, listRequests } = fakeWrongQuestionRepository();
     const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });

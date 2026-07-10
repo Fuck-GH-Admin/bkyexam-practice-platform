@@ -36,6 +36,27 @@ type SubmittedAnswer = string[] | boolean | string;
 - `404`：资源不存在、不属于当前学生，或题目不在该 session。
 - `409`：尝试修改已经 completed 的 practice session。
 
+### Versioned Runtime Contract
+
+Practice 与 Wrongbook 的成功响应使用 `packages/shared/src/contracts/v1` 中的共享 Zod schema：
+
+- Fastify route 在发送响应前校验 repository/业务编排输出。
+- Web 在把响应写入页面状态前再次校验。
+- 不合法的服务端成功 payload 被视为内部 contract bug，并 fail closed 为 `500`。
+
+`v1` 当前是代码 schema 命名空间，不会额外出现在 JSON response 中。请求路由仍保留手写 parser，以保持现有错误文案和 legacy 行为；共享 request schema 已可供后续逐步迁移。
+
+关键语义：
+
+- `markedForReview` 与 `currentSort` 在 Practice response 中是 required。
+- option ID 是 opaque non-empty string，不保证一定为 UUID。
+- `false` 是有效 answer。
+- completed session 允许未答题。
+- `completedCount` 的 v1 语义固定为 answered/graded questions。
+- 旧逐题 submit endpoint 允许并保留大小写 UUID；新 Practice response 使用小写 canonical UUID。
+
+完整 contract、版本规则和已知例外见 [contracts.md](contracts.md)。
+
 ## Health
 
 ### `GET /api/health`
@@ -576,8 +597,9 @@ Response：
 
 ## Current Contract Debt
 
-- 前后端 DTO 尚未全部来自 `packages/shared`。
+- Practice/Wrongbook DTO 已来自 shared v1；Auth、Catalog、通用 error 与 Admin contract 尚未迁移。
+- Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
-- `completedCount` 名称容易被理解为总完成题数；当前固定为 answered/graded count。
+- `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
 - Admin API 尚未定义。

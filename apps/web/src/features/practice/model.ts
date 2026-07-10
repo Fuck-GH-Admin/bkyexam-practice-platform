@@ -1,47 +1,18 @@
-export type PracticeOption = {
-  id: string;
-  sort: number;
-  content: string;
-};
+import type {
+  PracticeAnswerResultV1,
+  PracticeOptionV1,
+  PracticePayloadV1,
+  PracticeQuestionV1,
+  PracticeSessionV1,
+  SubmittedAnswerV1,
+} from '@bkyexam-practice/shared';
 
-export type SavedAnswer = string[] | boolean;
-
-export type PracticeQuestion = {
-  id: string;
-  sort: number;
-  type: string;
-  content: string;
-  options: PracticeOption[];
-  answered: boolean;
-  draftAnswer?: SavedAnswer;
-  markedForReview?: boolean;
-  isCorrect?: boolean | null;
-  correctAnswer?: string[] | boolean | string;
-  needsSelfReview?: boolean;
-};
-
-export type PracticeSession = {
-  id: string;
-  bankId: string;
-  mode: 'random' | 'sequential';
-  questionCount: number;
-  completedCount: number;
-  correctCount: number;
-  status: 'active' | 'completed';
-  currentSort?: number;
-};
-
-export type PracticePayload = {
-  session: PracticeSession;
-  questions: PracticeQuestion[];
-};
-
-export type AnswerResult = {
-  questionId: string;
-  isCorrect: boolean | null;
-  correctAnswer: string[] | boolean | string;
-  needsSelfReview: boolean;
-};
+export type PracticeOption = PracticeOptionV1;
+export type SavedAnswer = SubmittedAnswerV1;
+export type PracticeQuestion = PracticeQuestionV1;
+export type PracticeSession = PracticeSessionV1;
+export type PracticePayload = PracticePayloadV1;
+export type AnswerResult = PracticeAnswerResultV1;
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed';
 
@@ -55,6 +26,7 @@ export const practiceSections = [
 
 export function hasSubmittedAnswer(answer: SavedAnswer | undefined) {
   if (Array.isArray(answer)) return answer.length > 0;
+  if (typeof answer === 'string') return answer.trim().length > 0;
   return answer !== undefined;
 }
 
@@ -175,6 +147,7 @@ export function buildQuestionTypeLabel(type: string) {
 export function formatSavedAnswer(answer: SavedAnswer | undefined, options: PracticeOption[] = []) {
   if (answer === undefined || (Array.isArray(answer) && answer.length === 0)) return '未答';
   if (typeof answer === 'boolean') return answer ? '正确' : '错误';
+  if (typeof answer === 'string') return answer.trim() || '未答';
 
   const optionsById = new Map(options.map((option) => [option.id, option]));
   const labels = answer.map((item) => {

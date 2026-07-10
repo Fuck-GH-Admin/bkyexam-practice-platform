@@ -54,7 +54,20 @@ API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运�
 
 ### `packages/shared`
 
-共享 Zod schema 与 TypeScript 类型。目前主要覆盖题目类型和题库元数据，尚未成为完整的 API contract 包。
+共享 Zod schema、versioned API contract 与 TypeScript 类型。
+
+当前 `contracts/v1` 已覆盖 Practice 与 Wrongbook 的主要 response、请求模型和 answer/UUID primitive。API repository、Fastify route 与 Web state 使用同一套类型；成功响应在服务器发送前和 Web 接收后各执行一次 runtime parse。
+
+```text
+repository
+  -> shared DTO
+  -> API Schema.parse
+  -> HTTP
+  -> Web Schema.parse
+  -> feature state
+```
+
+Auth、Catalog、通用 error 和未来 Admin contract 尚未迁入 shared。详细规则见 [contracts.md](contracts.md)。
 
 ### PostgreSQL
 
@@ -124,6 +137,8 @@ questionbank/*.txt
 - 未答题可以随整卷提交结束会话，但不会产生 `practice_attempts`。
 - `results` 只包含本次产生结果的已答题。
 
+该语义已由 `PRACTICE_COMPLETED_COUNT_SEMANTICS_V1 = "answered_or_graded_questions"` 固定；未来字段更名或语义变化必须显式升级 contract。
+
 旧的逐题提交 endpoint 仍保留兼容，但当前学生端以草稿优先、整卷提交为主路径。
 
 ## Wrongbook Lifecycle
@@ -142,7 +157,7 @@ questionbank/*.txt
 2. `apps/api/src/practice/repository.ts` 同时包含 contract、memory repository、PostgreSQL SQL、事务和部分业务编排。
 3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
-5. API DTO 在前后端重复声明，`packages/shared` 尚未承接完整 contract。
+5. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
 6. 学生端没有 URL routing，刷新后只能依赖服务端恢复，页面本身不可链接。
 7. 管理平台没有独立应用、权限模型和 API namespace。
 

@@ -2,7 +2,7 @@
 
 BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已经形成可真实运行的“学生客观题练习闭环”，不再只是 Phase 1 脚手架。
 
-截至 **2026-07-10**，已实现并验证：
+截至 **2026-07-11**，已实现并验证：
 
 - 将 BKYExam 原始题库导入 PostgreSQL，并自动生成学生可见题库映射。
 - 基于固定用户名的学生身份、服务端 Cookie 会话、退出与会话恢复。
@@ -11,6 +11,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 服务端草稿、断点续答、当前位置、标记存疑。
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
+- Practice/Wrongbook v1 共享 Zod contract，并在 API 输出与 Web 输入两侧运行时校验。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
@@ -29,7 +30,7 @@ apps/
   api/       Fastify API、PostgreSQL repository、导入任务
   web/       React/Vite 学生端
 packages/
-  shared/    跨端共享 schema 与类型
+  shared/    跨端共享 schema、versioned API contract 与类型
 docs/        当前架构、API、数据库、状态与路线图
 ```
 
@@ -55,6 +56,8 @@ npm run test:e2e
 ```
 
 根脚本会覆盖 `apps/api`、`apps/web` 和 `packages/shared` 全部 workspace；Playwright smoke 会启动 Vite，并使用确定性的 mock API 验证桌面与移动端关键练习流程。
+
+shared package 的运行时入口位于构建产物中；`npm ci` 的 `prepare` 以及根级 dev/test/typecheck/build/E2E 脚本都会先执行 `npm run build:shared`。
 
 Windows 本地默认复用已安装的 Chrome。CI 或未安装 Chrome 的环境先执行：
 
@@ -156,6 +159,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [系统状态与完整度](docs/status.md)
 - [产品与模块边界](docs/product-boundaries.md)
 - [架构](docs/architecture.md)
+- [版本化 API Contract](docs/contracts.md)
 - [API](docs/api.md)
 - [数据库](docs/database.md)
 - [测试策略](docs/testing.md)

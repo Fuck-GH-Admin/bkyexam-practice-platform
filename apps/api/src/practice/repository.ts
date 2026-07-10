@@ -1,44 +1,17 @@
 import { randomUUID } from 'node:crypto';
+import type {
+  PracticeAnswerResultV1,
+  PracticeQuestionV1,
+  PracticeSessionSummaryV1,
+  PracticeSessionV1,
+} from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
 import { gradeAnswer, type GradeResult, type SubmittedAnswer } from './grading.js';
 
-export interface PracticeQuestionDto {
-  id: string;
-  sort: number;
-  type: string;
-  content: string;
-  options: { id: string; sort: number; content: string }[];
-  answered: boolean;
-  draftAnswer?: SubmittedAnswer;
-  markedForReview: boolean;
-  isCorrect?: boolean | null;
-  correctAnswer?: string[] | boolean | string;
-  needsSelfReview?: boolean;
-}
-
-export interface PracticeSessionDto {
-  id: string;
-  bankId: string;
-  mode: 'random' | 'sequential';
-  questionCount: number;
-  completedCount: number;
-  correctCount: number;
-  currentSort: number;
-  status: 'active' | 'completed';
-}
-
-export interface PracticeAnswerResultDto {
-  questionId: string;
-  isCorrect: boolean | null;
-  correctAnswer: string[] | boolean | string;
-  needsSelfReview: boolean;
-}
-
-export interface PracticeSessionSummaryDto {
-  completedCount: number;
-  correctCount: number;
-  status: 'active' | 'completed';
-}
+export type PracticeQuestionDto = PracticeQuestionV1;
+export type PracticeSessionDto = PracticeSessionV1;
+export type PracticeAnswerResultDto = PracticeAnswerResultV1;
+export type PracticeSessionSummaryDto = PracticeSessionSummaryV1;
 
 export class CompletedSessionError extends Error {
   constructor() {
@@ -98,7 +71,7 @@ interface ConnectableQueryClient extends QueryClient {
 
 interface QuestionRow {
   id: string;
-  normalized_type: string;
+  normalized_type: PracticeQuestionDto['type'];
   content: string;
 }
 
@@ -123,7 +96,7 @@ interface SessionRow {
 interface SessionQuestionRow extends SessionRow {
   question_id: string;
   sort: number | string;
-  normalized_type: string;
+  normalized_type: PracticeQuestionDto['type'];
   content: string;
   answered: boolean;
   is_correct: boolean | null;
@@ -139,7 +112,7 @@ interface SubmitAnswerRow {
   question_count: number | string;
   session_question_id: string;
   question_id: string;
-  normalized_type: string;
+  normalized_type: PracticeQuestionDto['type'];
   answer_raw: string;
 }
 
@@ -154,7 +127,7 @@ interface SubmitSessionRow {
   question_id: string;
   answered_at: Date | string | null;
   is_correct: boolean | null;
-  normalized_type: string;
+  normalized_type: PracticeQuestionDto['type'];
   answer_raw: string;
   draft_answer: string | null;
 }
