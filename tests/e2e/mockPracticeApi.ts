@@ -56,6 +56,7 @@ export type MockPracticeState = {
 
 export const bankId = '11111111-1111-4111-8111-111111111111';
 export const sessionId = '22222222-2222-4222-8222-222222222222';
+export const alternateSessionId = '66666666-6666-4666-8666-666666666666';
 
 function questionId(index: number) {
   return `33333333-3333-4333-8333-3333333333${String(index).padStart(2, '0')}`;
@@ -181,6 +182,38 @@ export async function installMockPracticeApi(page: Page, state: MockPracticeStat
         }],
       });
     }
+    if (method === 'GET' && pathname === '/api/practice/sessions') {
+      const status = url.searchParams.get('status');
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const primary = buildPrimarySessionCard(state);
+      const alternate = {
+        id: alternateSessionId,
+        bankId,
+        bankName: '错题巩固练习',
+        origin: 'wrongbook',
+        mode: 'sequential',
+        questionCount: 5,
+        answeredCount: 2,
+        correctCount: 0,
+        reviewCount: 1,
+        currentSort: 2,
+        status: 'active',
+        createdAt: '2026-07-11T08:00:00.000Z',
+        updatedAt: '2026-07-11T09:00:00.000Z',
+        completedAt: null,
+      };
+      const sessions = status === 'active'
+        ? [...(state.session.status === 'active' ? [primary] : []), alternate]
+        : status === 'completed' && state.session.status === 'completed'
+          ? [primary]
+          : [];
+      const pageItems = sessions.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        sessions: pageItems.slice(0, limit),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
+    }
     if (method === 'GET' && pathname === '/api/practice/sessions/active') {
       return fulfillJson(route, state.session.status === 'active' ? [state.session] : []);
     }
@@ -237,6 +270,27 @@ export async function installMockPracticeApi(page: Page, state: MockPracticeStat
 
     return fulfillJson(route, { error: `Unhandled mock route: ${method} ${pathname}` }, 500);
   });
+}
+
+function buildPrimarySessionCard(state: MockPracticeState) {
+  return {
+    id: state.session.id,
+    bankId: state.session.bankId,
+    bankName: '信息技术综合练习',
+    origin: 'bank',
+    mode: state.session.mode,
+    questionCount: state.session.questionCount,
+    answeredCount: state.session.status === 'completed'
+      ? state.session.completedCount
+      : state.questions.filter((question) => question.answered || hasAnswer(question.draftAnswer)).length,
+    correctCount: state.session.correctCount,
+    reviewCount: state.questions.filter((question) => question.markedForReview).length,
+    currentSort: state.session.currentSort,
+    status: state.session.status,
+    createdAt: '2026-07-11T09:30:00.000Z',
+    updatedAt: '2026-07-11T10:00:00.000Z',
+    completedAt: state.session.status === 'completed' ? '2026-07-11T10:30:00.000Z' : null,
+  };
 }
 
 function submitPractice(state: MockPracticeState) {

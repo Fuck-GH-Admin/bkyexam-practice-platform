@@ -4,18 +4,22 @@ import {
   ObjectivePracticeQuestionTypesV1,
   PracticePayloadV1Schema,
   PracticeQuestionV1Schema,
-  PracticeSessionListV1Schema,
+  PracticeSessionPageV1Schema,
   PracticeSessionV1Schema,
   PracticeSubmitSessionResponseV1Schema,
   WrongQuestionDetailResponseV1Schema,
   WrongQuestionListResponseV1Schema,
   WrongQuestionReviewSessionResponseV1Schema,
+  type PracticeSessionCardV1,
   type WrongQuestionDetailV1,
   type WrongQuestionItemV1,
 } from '@bkyexam-practice/shared';
 
+import { buildStudentPath, parseStudentRoute, type StudentRoute } from './app/router';
 import { PracticeDesk } from './features/practice/PracticeDesk';
 import { SubmitCheckDialog } from './features/practice/SubmitCheckDialog';
+import { PracticeHistory } from './features/sessions/PracticeHistory';
+import { StudentHome } from './features/sessions/StudentHome';
 import {
   buildResultsFromQuestions,
   buildSectionScores,
@@ -186,6 +190,10 @@ export function App() {
   const [student, setStudent] = useState<Student | null>(null);
   const [loginName, setLoginName] = useState('');
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [activeSessions, setActiveSessions] = useState<PracticeSessionCardV1[]>([]);
+  const [historySessions, setHistorySessions] = useState<PracticeSessionCardV1[]>([]);
+  const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [category, setCategory] = useState('');
   const [keyword, setKeyword] = useState('');
   const [mode, setMode] = useState<'random' | 'sequential'>('random');
@@ -210,11 +218,16 @@ export function App() {
   const [wrongDetail, setWrongDetail] = useState<WrongQuestionDetail | null>(null);
   const [wrongDetailLoading, setWrongDetailLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [practiceLoading, setPracticeLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [view, setView] = useState<'banks' | 'practice' | 'wrong'>('banks');
+  const [route, setRoute] = useState<StudentRoute>(() => parseStudentRoute(
+    typeof window === 'undefined' ? '/' : window.location.pathname,
+  ));
   const draftSaveChainRef = useRef(Promise.resolve());
   const progressSaveChainRef = useRef(Promise.resolve());
   const draftSaveFailedRef = useRef(false);
+  const currentSessionIdRef = useRef('');
+  const practiceRequestRef = useRef(0);
 
   const filterOptions = useMemo(
     () => getFilterOptions(banks),
@@ -239,9 +252,25 @@ export function App() {
     [wrongQuestions, wrongBankId],
   );
   const wrongStats = useMemo(() => buildWrongbookStats(filteredWrongQuestions), [filteredWrongQuestions]);
+  const view = route.view;
 
   useEffect(() => {
     void restoreSession();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const normalizedPath = buildStudentPath(parseStudentRoute(window.location.pathname));
+    if (normalizedPath !== window.location.pathname) {
+      window.history.replaceState({}, '', normalizedPath);
+    }
+
+    const handlePopState = () => {
+      setMessage('');
+      setRoute(parseStudentRoute(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
   useEffect(() => {
@@ -252,12 +281,31 @@ export function App() {
   }, [student, includeMastered]);
 
   useEffect(() => {
-    if (student) void loadActiveSession();
-  }, [student]);
+    if (!student) return;
 
-  useEffect(() => {
-    if (view === 'wrong') void loadWrongQuestions({ includeMastered, bankId: wrongBankId });
-  }, [view, includeMastered, wrongBankId]);
+    if (route.view !== 'practice') {
+      practiceRequestRef.current += 1;
+      setPracticeLoading(false);
+    }
+
+    if (route.view === 'home') {
+      void loadActiveSessions();
+      return;
+    }
+    if (route.view === 'history') {
+      void loadHistorySessions();
+      return;
+    }
+    if (route.view === 'wrong') {
+      void loadWrongQuestions({ includeMastered, bankId: wrongBankId });
+      return;
+    }
+    if (route.view === 'practice') {
+      if (currentSessionIdRef.current === route.sessionId) return;
+      void loadPracticeSession(route.sessionId);
+      return;
+    }
+  }, [student, route, includeMastered, wrongBankId]);
 
   useEffect(() => {
     if (view !== 'wrong') return;
@@ -304,11 +352,30 @@ export function App() {
     setStudent(null);
     setSession(null);
     setQuestions([]);
+    setActiveSessions([]);
+    setHistorySessions([]);
+    setPracticeLoading(false);
     setAnswersByQuestion({});
     setReviewFlags({});
     setSessionResults({});
     setUserMenuOpen(false);
-    setView('banks');
+    practiceRequestRef.current += 1;
+    currentSessionIdRef.current = '';
+    navigateTo({ view: 'home' }, { replace: true });
+  }
+
+  function navigateTo(nextRoute: StudentRoute, options: { replace?: boolean; keepMessage?: boolean } = {}) {
+    if (typeof window !== 'undefined') {
+      const path = buildStudentPath(nextRoute);
+      if (options.replace) {
+        window.history.replaceState({}, '', path);
+      } else if (window.location.pathname !== path) {
+        window.history.pushState({}, '', path);
+      }
+    }
+    if (!options.keepMessage) setMessage('');
+    setUserMenuOpen(false);
+    setRoute(nextRoute);
   }
 
   function applyPracticePayload(payload: PracticePayload) {
@@ -331,26 +398,66 @@ export function App() {
     setSaveState('idle');
     setSubmitCheckOpen(false);
     setSessionResults(results);
+    currentSessionIdRef.current = payload.session.id;
   }
 
-  async function loadActiveSession() {
+  async function loadActiveSessions() {
+    setActiveSessionsLoading(true);
     try {
-      const activeSessions = await api(
-        '/api/practice/sessions/active',
-        {},
-        (body) => PracticeSessionListV1Schema.parse(body),
-      );
-      const activeSession = activeSessions[0];
-      if (!activeSession) return;
-
       const result = await api(
-        `/api/practice/sessions/${activeSession.id}`,
+        '/api/practice/sessions?status=active&limit=20&offset=0',
+        {},
+        (body) => PracticeSessionPageV1Schema.parse(body),
+      );
+      setActiveSessions(result.sessions);
+    } catch (error) {
+      setActiveSessions([]);
+      setMessage(error instanceof Error ? error.message : '进行中练习加载失败');
+    } finally {
+      setActiveSessionsLoading(false);
+    }
+  }
+
+  async function loadHistorySessions() {
+    setHistoryLoading(true);
+    try {
+      const result = await api(
+        '/api/practice/sessions?status=completed&limit=20&offset=0',
+        {},
+        (body) => PracticeSessionPageV1Schema.parse(body),
+      );
+      setHistorySessions(result.sessions);
+    } catch (error) {
+      setHistorySessions([]);
+      setMessage(error instanceof Error ? error.message : '练习历史加载失败');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function loadPracticeSession(sessionId: string) {
+    const requestId = ++practiceRequestRef.current;
+    setPracticeLoading(true);
+    setMessage('');
+    setSession(null);
+    setQuestions([]);
+    currentSessionIdRef.current = '';
+    try {
+      const result = await api(
+        `/api/practice/sessions/${sessionId}`,
         {},
         (body) => PracticePayloadV1Schema.parse(body),
       );
+      if (requestId !== practiceRequestRef.current) return;
       applyPracticePayload(result);
-    } catch {
-      // Active practice is optional on the home screen.
+    } catch (error) {
+      if (requestId !== practiceRequestRef.current) return;
+      setMessage(error instanceof Error ? error.message : '练习加载失败');
+      navigateTo({ view: 'home' }, { replace: true, keepMessage: true });
+    } finally {
+      if (requestId === practiceRequestRef.current) {
+        setPracticeLoading(false);
+      }
     }
   }
 
@@ -382,7 +489,7 @@ export function App() {
         (body) => PracticePayloadV1Schema.parse(body),
       );
       applyPracticePayload(result);
-      setView('practice');
+      navigateTo({ view: 'practice', sessionId: result.session.id });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '创建练习失败');
     } finally {
@@ -617,7 +724,7 @@ export function App() {
         (body) => PracticePayloadV1Schema.parse(body),
       );
       applyPracticePayload(payload);
-      setView('practice');
+      navigateTo({ view: 'practice', sessionId: payload.session.id });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '错题再练创建失败');
     } finally {
@@ -647,11 +754,13 @@ export function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">BKYExam</p>
-          <h1>全题库练习台</h1>
+          <h1>学生练习台</h1>
         </div>
         <div className="topbar-actions">
-          <button className="ghost" onClick={() => setView('banks')}>题库</button>
-          <button className="ghost" onClick={() => setView('wrong')}>错题 {wrongQuestions.length}</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'home' })}>首页</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'banks' })}>题库</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'wrong' })}>错题 {wrongQuestions.length}</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'history' })}>历史</button>
           <div className="user-menu">
             <button className="ghost" onClick={() => setUserMenuOpen((open) => !open)}>{student.displayName || student.loginName}</button>
             {userMenuOpen && (
@@ -665,27 +774,27 @@ export function App() {
 
       {message && <div className="notice">{message}</div>}
 
+      {view === 'home' && (
+        <StudentHome
+          activeSessions={activeSessions}
+          loading={activeSessionsLoading}
+          wrongQuestionCount={wrongQuestions.length}
+          onRefresh={() => void loadActiveSessions()}
+          onOpenSession={(sessionId) => navigateTo({ view: 'practice', sessionId })}
+          onOpenBanks={() => navigateTo({ view: 'banks' })}
+          onOpenWrongbook={() => navigateTo({ view: 'wrong' })}
+          onOpenHistory={() => navigateTo({ view: 'history' })}
+        />
+      )}
+
       {view === 'banks' && (
         <section className="panel">
-          <div className="home-grid">
-            <article>
-              <p className="eyebrow">Continue</p>
-              <h2>继续练习</h2>
-              <p>{session?.status === 'active' ? `已完成草稿 ${answeredCount}/${questions.length}` : '暂无进行中的练习'}</p>
-              <button onClick={() => session && setView('practice')} disabled={!session}>继续练习</button>
-            </article>
-            <article>
-              <p className="eyebrow">Banks</p>
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Question banks</p>
               <h2>选择题库</h2>
-              <p>按科目、分类和关键词筛选，创建随机或顺序练习。</p>
-              <button className="ghost" onClick={() => setView('banks')}>选择题库</button>
-            </article>
-            <article>
-              <p className="eyebrow">Review</p>
-              <h2>错题本</h2>
-              <p>当前收录 {wrongQuestions.length} 道错题，可筛选题库或标记掌握。</p>
-              <button className="ghost" onClick={() => setView('wrong')}>打开错题本</button>
-            </article>
+              <p className="lede">筛选内容后创建一条新的练习会话；已有进行中练习不会被覆盖。</p>
+            </div>
           </div>
 
           <div className="toolbar">
@@ -720,6 +829,24 @@ export function App() {
         </section>
       )}
 
+      {view === 'history' && (
+        <PracticeHistory
+          sessions={historySessions}
+          loading={historyLoading}
+          onRefresh={() => void loadHistorySessions()}
+          onOpenSession={(sessionId) => navigateTo({ view: 'practice', sessionId })}
+        />
+      )}
+
+      {view === 'practice' && (!session || !currentQuestion) && (
+        <section className="panel route-loading">
+          <p className="eyebrow">Practice session</p>
+          <h2>{practiceLoading ? '正在恢复练习...' : '当前练习不可用'}</h2>
+          <p className="lede">可以返回首页选择其他进行中的练习。</p>
+          <button className="ghost" onClick={() => navigateTo({ view: 'home' })}>返回首页</button>
+        </section>
+      )}
+
       {view === 'practice' && session && currentQuestion && (
         <>
           <PracticeDesk
@@ -750,7 +877,7 @@ export function App() {
             onPreviousQuestion={previousQuestion}
             onNextQuestion={nextQuestion}
             onOpenSubmitCheck={() => void submitSession()}
-            onBackToBanks={() => setView('banks')}
+            onBackToBanks={() => navigateTo({ view: 'banks' })}
           />
           {submitCheckOpen && !isCompleted && (
             <SubmitCheckDialog

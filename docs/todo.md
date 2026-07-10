@@ -10,7 +10,7 @@
 - [x] 修复错题参考答案 UUID 泄漏。
 - [x] 修复错题用户答案 UUID 展示。
 - [x] 修复错题再练 session hydration。
-- [x] 全量 271 Vitest、typecheck、build、Playwright 与 PostgreSQL integration 通过。
+- [x] 全量 281 Vitest、typecheck、build、3 条 Playwright 与 PostgreSQL integration 通过。
 - [x] 完整真实题库导入 PostgreSQL 并 smoke。
 - [x] 真实 API 闭环与真实浏览器闭环通过。
 - [x] 更新当前状态、产品边界、架构和 API 文档。
@@ -37,10 +37,10 @@
 
 目标：先让学生层“对象、导航、状态”清楚，再做最终视觉。
 
-- [ ] 确认学生首页结构：继续练习、选择题库、错题本、历史。
-- [ ] 定义多个 active session 的展示与处理规则。
-- [ ] 设计练习历史 API 和结果详情入口。
-- [ ] 增加 URL router 与可链接页面。
+- [x] 确认学生首页结构：继续练习、选择题库、错题本、历史。
+- [x] 定义多个 active session 的展示与处理规则。
+- [x] 设计并实现练习历史 API 和结果详情入口。
+- [x] 增加 URL router 与可链接页面。
 - [ ] 固定登录、无数据、加载、保存失败、提交失败、session 已完成等状态。
 - [ ] 决定正式身份策略：用户名自动创建、密码、学校账号或邀请码。
 - [ ] 对当前练习台做可用性测试，不做大规模视觉换肤。
@@ -57,6 +57,8 @@
 ### Web
 
 - [ ] 创建 `src/app`，迁移 session bootstrap、shell 和 navigation。
+- [x] 创建 `src/app/router.ts`，固定学生端可恢复 URL。
+- [x] 创建 `features/sessions`，提取学生首页、历史和会话卡片。
 - [ ] 创建 `features/auth`。
 - [ ] 创建 `features/catalog`。
 - [ ] 创建 `features/wrongbook`。
@@ -114,7 +116,7 @@
 
 ## P4 — Complete Student Learning Loop
 
-- [ ] 练习历史和历史结果回看。
+- [x] 练习历史和历史结果回看。
 - [ ] 错题掌握规则与再练反馈。
 - [ ] 题目收藏/存疑长期化是否需要独立模型。
 - [ ] 基础学习统计：练习次数、正确率、错题趋势。

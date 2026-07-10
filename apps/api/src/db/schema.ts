@@ -163,6 +163,7 @@ export const practiceSessions = pgTable(
     correctCount: integer('correct_count').notNull().default(0),
     currentSort: integer('current_sort').notNull().default(1),
     status: text('status').notNull().default('active'),
+    origin: text('origin').notNull().default('bank'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -171,7 +172,19 @@ export const practiceSessions = pgTable(
     index('practice_sessions_student_id_idx').on(table.studentId),
     index('practice_sessions_bank_id_idx').on(table.bankId),
     index('practice_sessions_status_idx').on(table.status),
+    index('practice_sessions_student_status_updated_at_idx').on(
+      table.studentId,
+      table.status,
+      table.updatedAt.desc(),
+      table.id.desc(),
+    ),
+    index('practice_sessions_student_completed_at_idx').on(
+      table.studentId,
+      table.completedAt.desc(),
+      table.id.desc(),
+    ).where(sql`${table.status} = 'completed'`),
     check('practice_sessions_current_sort_positive_check', sql`${table.currentSort} > 0`),
+    check('practice_sessions_origin_check', sql`${table.origin} IN ('bank', 'wrongbook')`),
   ],
 );
 

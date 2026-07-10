@@ -25,7 +25,8 @@ test('desktop practice survives reload, submits accurately, and opens readable w
 
   const resumedHeading = await page.locator('.practice-question-card > h2').textContent();
   await page.reload({ waitUntil: 'networkidle' });
-  await continuePractice(page);
+  await expect(page).toHaveURL(new RegExp(`/practice/${state.session.id}$`));
+  await expect(page.locator('.practice-question-card')).toBeVisible();
   await expect(page.locator('.practice-question-card > h2')).toHaveText(resumedHeading ?? '');
   await expect(page.locator('.practice-question-card .answer-grid button').nth(1)).toHaveClass(/selected/);
 
@@ -46,6 +47,14 @@ test('desktop practice survives reload, submits accurately, and opens readable w
   await expect(page.getByText('已生成 5 道题的判分结果，可通过右侧题号逐题回看。', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '本次练习已完成' })).toBeDisabled();
 
+  await page.getByRole('button', { name: '历史', exact: true }).click();
+  await expect(page).toHaveURL(/\/history$/);
+  await expect(page.getByRole('heading', { name: '练习历史' })).toBeVisible();
+  await expect(page.locator('.history-list .session-card')).toHaveCount(1);
+  await page.getByRole('button', { name: '查看结果：信息技术综合练习' }).click();
+  await expect(page).toHaveURL(new RegExp(`/practice/${state.session.id}$`));
+  await expect(page.getByRole('button', { name: '本次练习已完成' })).toBeDisabled();
+
   await page.getByRole('button', { name: /^错题 2$/ }).click();
   await expect(page.getByRole('heading', { name: '错题本' })).toBeVisible();
   await expect(page.locator('.wrong-row')).toHaveCount(2);
@@ -59,6 +68,32 @@ test('desktop practice survives reload, submits accurately, and opens readable w
     status: 'completed',
   });
   expect(state.calls).toContain(`POST /api/practice/sessions/${state.session.id}/submit`);
+  expect(runtimeErrors).toEqual([]);
+});
+
+test('student home exposes multiple sessions and browser history restores the selected practice URL', {
+  tag: '@desktop',
+}, async ({ page }) => {
+  const runtimeErrors = collectRuntimeErrors(page);
+  const state = createMockPracticeState();
+
+  await installMockPracticeApi(page, state);
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: '学生首页' })).toBeVisible();
+  await expect(page.locator('.session-list .session-card')).toHaveCount(2);
+
+  await continuePractice(page);
+  await expect(page).toHaveURL(new RegExp(`/practice/${state.session.id}$`));
+
+  await page.goBack({ waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: '学生首页' })).toBeVisible();
+  await expect(page.locator('.session-list .session-card')).toHaveCount(2);
+
+  await page.goForward({ waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(new RegExp(`/practice/${state.session.id}$`));
+  await expect(page.locator('.practice-question-card')).toBeVisible();
+
   expect(runtimeErrors).toEqual([]);
 });
 
@@ -82,12 +117,13 @@ test('mobile practice and submit inspector have no horizontal overflow', {
 async function openPractice(page: Page, state: MockPracticeState) {
   await installMockPracticeApi(page, state);
   await page.goto('/', { waitUntil: 'networkidle' });
-  await expect(page.getByRole('heading', { name: '全题库练习台' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '学生练习台' })).toBeVisible();
+  await expect(page.locator('.session-list .session-card')).toHaveCount(2);
   await continuePractice(page);
 }
 
 async function continuePractice(page: Page) {
-  const continueButton = page.getByRole('button', { name: '继续练习', exact: true });
+  const continueButton = page.getByRole('button', { name: '继续练习：信息技术综合练习' });
   await expect(continueButton).toBeVisible();
   await expect(continueButton).toBeEnabled();
   await continueButton.click();

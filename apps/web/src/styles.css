@@ -242,6 +242,94 @@ select {
   line-height: 1.55;
 }
 
+.student-section {
+  margin: 24px 0;
+}
+
+.section-head h2,
+.section-title-row h3,
+.session-card h3,
+.route-loading h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.section-title-row,
+.session-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-title-row {
+  margin-bottom: 12px;
+}
+
+.section-title-row span {
+  color: #66778a;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.session-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 14px;
+}
+
+.session-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid #d9e3ed;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 12px 34px rgba(36, 67, 103, 0.08);
+  padding: 18px;
+}
+
+.session-card h3 {
+  line-height: 1.4;
+}
+
+.session-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.session-card-meta span {
+  border-radius: 999px;
+  background: #eef5ff;
+  color: #31527a;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 6px 9px;
+}
+
+.session-time {
+  margin: 0;
+  color: #66778a;
+  font-size: 0.9rem;
+}
+
+.history-list {
+  margin-top: 18px;
+}
+
+.route-loading {
+  display: grid;
+  gap: 12px;
+}
+
+.route-loading .lede {
+  margin: 0;
+}
+
+.route-loading button {
+  justify-self: start;
+}
+
 .bank-card h2,
 .question-card h2 {
   margin: 0;
@@ -1333,7 +1421,8 @@ button.review-active {
   .practice-status-panel .question-map { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .topbar,
   .wrong-row,
-  .section-head { align-items: stretch; flex-direction: column; }
+  .section-head,
+  .session-card-head { align-items: stretch; flex-direction: column; }
   .topbar-actions,
   .review,
   .question-actions { align-items: stretch; }

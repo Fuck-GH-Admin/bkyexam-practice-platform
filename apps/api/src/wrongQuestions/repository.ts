@@ -216,8 +216,8 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
       const sessionId = randomUUID();
       const sessionResult = (await client.query(
         `
-          INSERT INTO practice_sessions (id, student_id, bank_id, mode, question_limit, question_count, completed_count, correct_count, status)
-          VALUES ($1, $2, $3, 'sequential', $4, $4, 0, 0, 'active')
+          INSERT INTO practice_sessions (id, student_id, bank_id, mode, question_limit, question_count, completed_count, correct_count, status, origin)
+          VALUES ($1, $2, $3, 'sequential', $4, $4, 0, 0, 'active', 'wrongbook')
           RETURNING id
         `,
         [sessionId, studentId, selected[0].bank_id, selected.length],

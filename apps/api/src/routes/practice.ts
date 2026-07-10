@@ -1,8 +1,10 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
+  ListPracticeSessionsRequestV1Schema,
   ObjectivePracticeQuestionTypesV1,
   PracticePayloadV1Schema,
   PracticeQuestionV1Schema,
+  PracticeSessionPageV1Schema,
   PracticeSessionListV1Schema,
   PracticeSessionV1Schema,
   PracticeSubmitAnswerResponseV1Schema,
@@ -40,6 +42,24 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
       }
 
       return PracticePayloadV1Schema.parse(result);
+    });
+
+    app.get('/api/practice/sessions', async (request, reply) => {
+      const student = await requireStudent(request);
+      if (!student) {
+        return reply.status(401).send({ error: 'Unauthenticated' });
+      }
+
+      const validation = ListPracticeSessionsRequestV1Schema.safeParse(request.query);
+      if (!validation.success) {
+        return reply.status(400).send({ error: validation.error.issues[0]?.message ?? 'Invalid session list query' });
+      }
+
+      const result = await practiceRepository.listSessions({
+        studentId: student.id,
+        ...validation.data,
+      });
+      return PracticeSessionPageV1Schema.parse(result);
     });
 
     app.get('/api/practice/sessions/active', async (request, reply) => {

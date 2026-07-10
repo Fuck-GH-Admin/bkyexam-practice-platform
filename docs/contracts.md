@@ -33,13 +33,14 @@ PostgreSQL / memory repository
 - API 会把 repository/编排错误作为 `500` 暴露，而不是发送不可信 payload。
 - Web 不会把不符合 contract 的响应直接写入页面状态。
 
-Fastify 请求参数仍保留现有手写 parser，以维持既有错误消息和兼容行为；共享包已经导出对应请求 schema，后续可逐路由迁移。
+大多数 Fastify 请求参数仍保留现有手写 parser，以维持既有错误消息和兼容行为。`GET /api/practice/sessions` 已直接使用 `ListPracticeSessionsRequestV1Schema`；其余共享 request schema 后续逐路由迁移。
 
 ## Covered Contracts
 
 | Context | Main schemas |
 | --- | --- |
 | Practice | `PracticeSessionV1Schema`, `PracticeQuestionV1Schema`, `PracticePayloadV1Schema`, `PracticeSubmitSessionResponseV1Schema` |
+| Practice session collection | `PracticeSessionCardV1Schema`, `PracticeSessionPageV1Schema`, `ListPracticeSessionsRequestV1Schema` |
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
@@ -67,7 +68,7 @@ type SubmittedAnswerV1 = string[] | boolean | string;
 ```
 
 - `false` 是有效且已作答的判断题答案。
-- 空数组和空白文本在当前 Web model 中按“未答”处理。
+- 空数组和空白文本在 Web model、Practice repository 提交及会话卡片计数中都按“未答”处理。
 - `correctAnswer` 使用同一联合类型，支持客观题、判断题和暂时需要自评的其他题型。
 
 ### Practice Question
@@ -92,6 +93,19 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 ```
 
 它表示实际有答案并产生判分/自评结果的题数，不表示 session 总题数。未来如改名为 `answeredCount`，必须通过新 contract 版本或明确的兼容迁移完成，不能静默改变字段含义。
+
+### Practice Session Card And Page
+
+- `origin` 必须是 `bank | wrongbook`。
+- `answeredCount <= questionCount`。
+- `correctCount <= answeredCount`。
+- `reviewCount <= questionCount`。
+- active session 的 `completedAt` 必须为 `null`。
+- completed session 的 `completedAt` 必须是带时区的 ISO timestamp。
+- active `answeredCount` 表示“已有判定或存在非空草稿”的题数；completed `answeredCount` 等于最终 answered/graded count。
+- page 固定返回 `limit`、`offset` 和 `hasMore`，`limit` 范围为 `1..50`。
+
+该 card 是首页/历史的展示 contract，不替代完整 `PracticeSessionV1`。结果详情继续使用 `PracticePayloadV1Schema`，避免维护第二份题目和判分真相。
 
 ### Wrongbook
 

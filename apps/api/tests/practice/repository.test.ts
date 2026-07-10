@@ -783,7 +783,7 @@ describe('createPgPracticeRepository', () => {
     });
   });
 
-  it('ignores empty string and empty array drafts when submitting a session', async () => {
+  it('ignores empty, whitespace-only, and empty-array drafts when submitting a session', async () => {
     const client = new FakeQueryClient([
       [
         ...createSubmitSessionRows(),
@@ -812,6 +812,19 @@ describe('createPgPracticeRepository', () => {
           normalized_type: 'single_choice',
           answer_raw: 'A',
           draft_answer: '[]',
+        },
+        {
+          session_id: 'session-1',
+          bank_id: 'bank-1',
+          mode: 'random',
+          question_count: 5,
+          current_sort: 1,
+          status: 'active',
+          session_question_id: 'session-question-5',
+          question_id: 'question-5',
+          normalized_type: 'single_choice',
+          answer_raw: 'A',
+          draft_answer: '"   "',
         },
       ],
       [],
@@ -1010,6 +1023,8 @@ describe('createPgPracticeRepository', () => {
     expect(client.calls[0].sql).toContain('JOIN practice_session_questions');
     expect(client.calls[0].sql).toContain('practice_sessions.student_id = $1');
     expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].sql).toContain('UPDATE practice_sessions');
+    expect(client.calls[0].sql).toContain('SET updated_at = now()');
     expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1', '["A"]']);
     expect(result).toEqual({
       id: 'question-1',
@@ -1071,6 +1086,8 @@ describe('createPgPracticeRepository', () => {
     expect(client.calls[0].sql).toContain('marked_for_review = true');
     expect(client.calls[0].sql).toContain('DELETE FROM practice_session_drafts');
     expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].sql).toContain('UPDATE practice_sessions');
+    expect(client.calls[0].sql).toContain('SET updated_at = now()');
     expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1']);
     expect(result).toBe(true);
   });
@@ -1094,6 +1111,8 @@ describe('createPgPracticeRepository', () => {
     expect(client.calls[0].sql).toContain('marked_for_review = EXCLUDED.marked_for_review');
     expect(client.calls[0].sql).toContain('COALESCE(practice_session_drafts.draft_answer');
     expect(client.calls[0].sql).toContain("practice_sessions.status = 'active'");
+    expect(client.calls[0].sql).toContain('UPDATE practice_sessions');
+    expect(client.calls[0].sql).toContain('SET updated_at = now()');
     expect(client.calls[0].params).toEqual(['student-1', 'session-1', 'question-1', true]);
     expect(result).toEqual({
       id: 'question-1',
@@ -1182,6 +1201,105 @@ describe('createPgPracticeRepository', () => {
       },
     ]);
   });
+
+  it('lists paged active session cards with draft/review progress and stable ordering', async () => {
+    const client = new FakeQueryClient([[
+      {
+        ...createSessionRow({ id: 'session-2', question_count: 4, completed_count: 1, correct_count: 1, current_sort: 3 }),
+        bank_name: '数据库测试题库',
+        origin: 'bank',
+        answered_count: 3,
+        review_count: 1,
+        created_at: new Date('2026-07-11T08:00:00.000Z'),
+        updated_at: new Date('2026-07-11T08:03:00.000Z'),
+        completed_at: null,
+      },
+      {
+        ...createSessionRow({ id: 'session-1', question_count: 2, completed_count: 0, correct_count: 0, current_sort: 1 }),
+        bank_name: '第二题库',
+        origin: 'wrongbook',
+        answered_count: 0,
+        review_count: 0,
+        created_at: new Date('2026-07-11T07:00:00.000Z'),
+        updated_at: new Date('2026-07-11T07:01:00.000Z'),
+        completed_at: null,
+      },
+    ]]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.listSessions({
+      studentId: 'student-1',
+      status: 'active',
+      limit: 1,
+      offset: 0,
+    });
+
+    expect(client.calls[0].sql).toContain('practice_sessions.status = $2');
+    expect(client.calls[0].sql).toContain('practice_session_questions.answered_at IS NOT NULL');
+    expect(client.calls[0].sql).toContain("practice_session_drafts.draft_answer <> '[]'");
+    expect(client.calls[0].sql).toContain("practice_session_drafts.draft_answer !~ '^\"[[:space:]]*\"$'");
+    expect(client.calls[0].sql).toContain('practice_session_drafts.marked_for_review = true');
+    expect(client.calls[0].sql).toContain('ORDER BY practice_sessions.updated_at DESC');
+    expect(client.calls[0].params).toEqual(['student-1', 'active', 2, 0]);
+    expect(result).toEqual({
+      sessions: [{
+        id: 'session-2',
+        bankId: 'bank-1',
+        bankName: '数据库测试题库',
+        origin: 'bank',
+        mode: 'sequential',
+        questionCount: 4,
+        answeredCount: 3,
+        correctCount: 1,
+        reviewCount: 1,
+        currentSort: 3,
+        status: 'active',
+        createdAt: '2026-07-11T08:00:00.000Z',
+        updatedAt: '2026-07-11T08:03:00.000Z',
+        completedAt: null,
+      }],
+      page: { limit: 1, offset: 0, hasMore: true },
+    });
+  });
+
+  it('uses graded counts and completed-at ordering for completed session history', async () => {
+    const client = new FakeQueryClient([[
+      {
+        ...createSessionRow({
+          status: 'completed',
+          question_count: 4,
+          completed_count: 3,
+          correct_count: 2,
+        }),
+        bank_name: null,
+        origin: 'wrongbook',
+        answered_count: 4,
+        review_count: 1,
+        created_at: '2026-07-11T08:00:00.000Z',
+        updated_at: '2026-07-11T08:03:00.000Z',
+        completed_at: '2026-07-11T08:04:00.000Z',
+      },
+    ]]);
+    const repository = createPgPracticeRepository(client);
+
+    const result = await repository.listSessions({
+      studentId: 'student-1',
+      status: 'completed',
+      limit: 20,
+      offset: 40,
+    });
+
+    expect(client.calls[0].sql).toContain('ORDER BY practice_sessions.completed_at DESC NULLS LAST');
+    expect(client.calls[0].params).toEqual(['student-1', 'completed', 21, 40]);
+    expect(result.sessions[0]).toMatchObject({
+      bankName: 'bank-1',
+      origin: 'wrongbook',
+      answeredCount: 3,
+      correctCount: 2,
+      status: 'completed',
+      completedAt: '2026-07-11T08:04:00.000Z',
+    });
+  });
 });
 
 describe('createMemoryPracticeRepository', () => {
@@ -1238,6 +1356,23 @@ describe('createMemoryPracticeRepository', () => {
       currentSort: 99,
     })).resolves.toBeNull();
     await expect(repository.listActiveSessions({ studentId: 'student-1' })).resolves.toEqual([created!.session]);
+    await expect(repository.listSessions({
+      studentId: 'student-1',
+      status: 'active',
+      limit: 20,
+      offset: 0,
+    })).resolves.toMatchObject({
+      sessions: [{
+        id: created!.session.id,
+        bankName: 'bank-1',
+        origin: 'bank',
+        answeredCount: 0,
+        reviewCount: 1,
+        status: 'active',
+        completedAt: null,
+      }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
 
     expect(created?.questions[0]?.draftAnswer).toBeUndefined();
     expect(created?.questions[0]?.markedForReview).toBe(true);
@@ -1573,7 +1708,7 @@ describe('createMemoryPracticeRepository', () => {
       studentId: 'student-1',
       sessionId: created!.session.id,
       questionId: 'question-2',
-      answer: '',
+      answer: '   ',
     });
     await repository.saveDraft({
       studentId: 'student-1',

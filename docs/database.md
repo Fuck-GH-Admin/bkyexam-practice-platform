@@ -131,10 +131,11 @@ Stores one student's practice run for one bank.
 - `mode`: `random` or `sequential`.
 - `question_limit`: requested question count, default `70`.
 - `question_count`: selected question count.
-- `completed_count`: answered question count.
+- `completed_count`: answered/graded question count.
 - `correct_count`: auto-graded correct answer count.
 - `current_sort`: last saved 1-based question position for resume, default `1`.
 - `status`: `active` or `completed`.
+- `origin`: `bank` for normal bank practice or `wrongbook` for wrong-question review.
 - `created_at`, `updated_at`, `completed_at`: lifecycle timestamps.
 
 Indexes:
@@ -142,6 +143,10 @@ Indexes:
 - `practice_sessions_student_id_idx` on `student_id`.
 - `practice_sessions_bank_id_idx` on `bank_id`.
 - `practice_sessions_status_idx` on `status`.
+- `practice_sessions_student_status_updated_at_idx` on `(student_id, status, updated_at DESC, id DESC)` for stable active-session paging.
+- Partial `practice_sessions_student_completed_at_idx` on `(student_id, completed_at DESC, id DESC)` for completed history.
+
+Saving/clearing a draft, changing a review flag, or saving `current_sort` also updates the parent session's `updated_at`; the student home can therefore order sessions by actual recent activity instead of creation time.
 
 ### `practice_session_questions`
 
@@ -205,7 +210,7 @@ The unique wrong-question index keeps one notebook row per student, question, an
 
 Wrong-question review screens do not duplicate question content into `wrong_questions`. List summaries join `questions` and `bank_mappings` for bank labels, normalized type, and content preview. Detail review joins `questions` and `question_options` on demand to return full content, options, correct answer, and analysis for the selected row.
 
-Wrong-question review sessions reuse the existing practice session tables. Creating a review session inserts an active `practice_sessions` row with `mode = 'sequential'`, locks the selected wrong-question IDs into `practice_session_questions`, and then serves the session through the normal practice retrieval route. No dedicated `wrong_review` mode or migration is required for this phase.
+Wrong-question review sessions reuse the existing practice session tables. Creating a review session inserts an active `practice_sessions` row with `mode = 'sequential'` and `origin = 'wrongbook'`, locks the selected wrong-question IDs into `practice_session_questions`, and then serves the session through the normal practice retrieval route. A separate practice mode is not required; origin records the creation purpose without changing grading behavior.
 
 ## Migrations
 
@@ -214,6 +219,8 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 `apps/api/src/db/migrations/0002_practice_sessions.sql` adds cookie session storage and practice session tables. It creates `student_sessions`, `practice_sessions`, and `practice_session_questions`, plus indexes for student lookup, session expiry, bank/status filtering, and locked session question lookup. It includes check constraints for valid practice modes, positive question limits, nonnegative counters, active/completed status, positive session question order, token hash uniqueness, and uniqueness for each session's question membership and sort order.
 
 `apps/api/src/db/migrations/0003_practice_drafts.sql` adds resumable practice progress. It adds `practice_sessions.current_sort` with a positive-order check and creates `practice_session_drafts` for unsubmitted answers and review flags. The unique `(session_id, question_id)` constraint keeps one draft row per locked session question.
+
+`apps/api/src/db/migrations/0004_practice_session_history.sql` adds `practice_sessions.origin`, backfills existing sessions as `bank`, repairs missing completion timestamps on existing completed rows, adds the origin check, and creates the composite active/history paging indexes.
 
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
@@ -232,7 +239,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 all three migrations were also applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 all four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

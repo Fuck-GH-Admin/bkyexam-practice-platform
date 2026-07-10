@@ -160,6 +160,7 @@ describe('createPgWrongQuestionRepository', () => {
     expect(client.calls[0].sql).toContain('mastered = false');
     expect(client.calls[0].sql).toContain('LIMIT $2');
     expect(client.calls[1].sql).toContain('INSERT INTO practice_sessions');
+    expect(client.calls[1].sql).toContain("'wrongbook'");
     expect(client.calls[2].sql).toContain('INSERT INTO practice_session_questions');
     expect(result).toEqual({ sessionId: 'session-1', questionCount: 2 });
   });

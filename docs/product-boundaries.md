@@ -56,6 +56,9 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 ## 2. Student Information Architecture
 
+学生端 P1 的具体路由、会话列表 contract、多 active-session 策略和验收标准见
+[`student-information-architecture.md`](./student-information-architecture.md)。该文档优先于页面视觉实现。
+
 ### Core Objects
 
 学生端只需要理解五类对象：
@@ -85,19 +88,19 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 当前已实现：
 
 - 登录。
+- 独立学生首页。
 - 题库。
-- 继续最近一个 active session。
+- 多个 active session 的明确列表与选择。
 - 练习与结果。
 - 错题本。
+- 练习历史与历史结果入口。
+- 首页、题库、练习、错题和历史的可恢复 URL。
 
 当前缺失：
 
-- 真正的学生首页/总览。
-- 多个 active session 的明确管理。
-- 练习历史列表和历史结果入口。
 - 账户说明、身份安全和数据归属提示。
 - 学习统计和长期进步反馈。
-- URL routing 与可恢复页面地址。
+- active session 的归档/放弃操作与超过首屏 20 条时的“更多”交互。
 
 ### Student State Machines
 

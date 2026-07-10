@@ -30,14 +30,15 @@ React 19 + Vite 学生端。
 当前可用页面/状态：
 
 - 未登录身份入口。
+- 独立学生首页，显示多个进行中练习。
 - 题库浏览、搜索和筛选。
-- 活跃练习恢复。
+- 按 session URL 恢复活跃练习。
 - 客观题练习台。
 - 提交前检查。
-- 已完成结果回看。
+- 练习历史与已完成结果回看。
 - 错题本、错题详情和错题再练。
 
-当前路由仍由 `App.tsx` 内部状态控制，没有 URL router。练习功能已经提取到 `features/practice`，但 auth、catalog 和 wrongbook 仍集中在 `App.tsx`。
+轻量 History API router 位于 `src/app/router.ts`，固定 `/`、`/banks`、`/practice/:sessionId`、`/wrong-questions` 和 `/history`。练习功能位于 `features/practice`，首页/历史会话展示位于 `features/sessions`；auth、catalog、wrongbook 与大部分 app shell 编排仍集中在 `App.tsx`。
 
 ### `apps/api`
 
@@ -117,7 +118,16 @@ questionbank/*.txt
 - 清空答案时删除草稿；如果该题仍被标记存疑，则保留只有存疑状态的草稿行。
 - 跳题时更新 `practice_sessions.current_sort`。
 - 存疑状态写入服务端，不是浏览器临时状态。
+- 草稿、清空草稿和存疑变更都会刷新父 session 的 `updated_at`。
 - 重新登录或刷新后，GET session 返回草稿、当前位置和存疑状态。
+
+### Session Discovery And History
+
+- `GET /api/practice/sessions?status=active` 返回多个进行中会话，按最近活动时间稳定排序。
+- 首页不再自动恢复第一条；学生明确选择 session 后进入 `/practice/:sessionId`。
+- `GET /api/practice/sessions?status=completed` 返回历史卡片。
+- 历史卡片继续进入同一个 `/practice/:sessionId` 详情，不复制结果模型。
+- session `origin` 区分普通题库练习与错题再练。
 
 ### Whole-Session Submission
 
@@ -153,12 +163,12 @@ questionbank/*.txt
 
 这些问题不会阻止当前闭环运行，但已经影响继续开发：
 
-1. `apps/web/src/App.tsx` 仍同时承担 app shell、API 调用、auth、catalog、wrongbook 和跨页面状态。
+1. `apps/web/src/App.tsx` 已移出 practice UI、router 与 session card/page，但仍承担 app shell、API 调用、auth、catalog、wrongbook 和跨页面状态。
 2. `apps/api/src/practice/repository.ts` 同时包含 contract、memory repository、PostgreSQL SQL、事务和部分业务编排。
 3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
 5. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
-6. 学生端没有 URL routing，刷新后只能依赖服务端恢复，页面本身不可链接。
+6. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
 7. 管理平台没有独立应用、权限模型和 API namespace。
 
 ## Target Physical Structure
@@ -175,7 +185,7 @@ apps/
         catalog/
         practice/
         wrongbook/
-        history/
+        sessions/
       shared/
         api/
         ui/

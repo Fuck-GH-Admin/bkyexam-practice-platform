@@ -44,7 +44,7 @@ Practice 与 Wrongbook 的成功响应使用 `packages/shared/src/contracts/v1` 
 - Web 在把响应写入页面状态前再次校验。
 - 不合法的服务端成功 payload 被视为内部 contract bug，并 fail closed 为 `500`。
 
-`v1` 当前是代码 schema 命名空间，不会额外出现在 JSON response 中。请求路由仍保留手写 parser，以保持现有错误文案和 legacy 行为；共享 request schema 已可供后续逐步迁移。
+`v1` 当前是代码 schema 命名空间，不会额外出现在 JSON response 中。大多数旧请求路由仍保留手写 parser，以保持现有错误文案和 legacy 行为；session 集合查询已经直接使用共享 request schema，其余路由后续逐步迁移。
 
 关键语义：
 
@@ -294,9 +294,63 @@ Errors：
 
 - `404`：题库不存在或不可见。
 
+### `GET /api/practice/sessions`
+
+返回当前学生的 active 或 completed session 卡片。`status` 必填：
+
+```text
+GET /api/practice/sessions?status=active&limit=20&offset=0
+GET /api/practice/sessions?status=completed&limit=20&offset=0
+```
+
+Query：
+
+- `status`：`active | completed`
+- `limit`：整数 `1..50`，默认 `20`
+- `offset`：非负整数，默认 `0`
+
+Response：
+
+```json
+{
+  "sessions": [
+    {
+      "id": "session-uuid",
+      "bankId": "bank-uuid",
+      "bankName": "数据库练习题库",
+      "origin": "bank",
+      "mode": "random",
+      "questionCount": 70,
+      "answeredCount": 12,
+      "correctCount": 0,
+      "reviewCount": 2,
+      "currentSort": 13,
+      "status": "active",
+      "createdAt": "2026-07-11T08:00:00.000Z",
+      "updatedAt": "2026-07-11T08:20:00.000Z",
+      "completedAt": null
+    }
+  ],
+  "page": {
+    "limit": 20,
+    "offset": 0,
+    "hasMore": false
+  }
+}
+```
+
+规则：
+
+- active 按 `updatedAt DESC, id DESC`；completed 按 `completedAt DESC, updatedAt DESC, id DESC`。
+- `answeredCount` 对 active 会话统计已判定题或具有非空草稿的题；completed 会话使用最终 answered/graded count。
+- `origin=bank|wrongbook` 区分普通题库练习和错题再练。
+- 草稿保存、清空草稿、存疑切换和位置保存都会刷新 session `updatedAt`。
+- API 使用 `limit + 1` 判断 `hasMore`，不为列表执行昂贵 total count。
+- response 在 Fastify 和 Web 两侧都由 `PracticeSessionPageV1Schema` 校验。
+
 ### `GET /api/practice/sessions/active`
 
-返回当前学生所有 active session summary，按 repository 顺序排列。
+兼容旧客户端的 active session summary endpoint。
 
 Response：
 
@@ -315,7 +369,7 @@ Response：
 ]
 ```
 
-当前 Web 只自动恢复数组中的第一个 session；多 active session 的产品规则尚待定义。
+新学生端不再使用该接口，也不会自动选择第一条 session；首页改用上面的集合 endpoint 展示多个进行中练习。
 
 ### `GET /api/practice/sessions/:sessionId`
 

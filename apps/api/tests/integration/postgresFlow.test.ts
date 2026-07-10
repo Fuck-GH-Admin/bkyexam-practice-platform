@@ -105,6 +105,19 @@ describe('PostgreSQL-backed API integration', () => {
     ]);
     expect(JSON.stringify(createdBody)).not.toContain('answerRaw');
 
+    const secondaryCreated = await app.inject({
+      method: 'POST',
+      url: '/api/practice/sessions',
+      headers: { cookie: aliceCookie },
+      payload: {
+        bankId: fixtureIds.bank,
+        mode: 'random',
+        limit: 1,
+      },
+    });
+    expect(secondaryCreated.statusCode).toBe(200);
+    const secondarySessionId = secondaryCreated.json().session.id as string;
+
     await expectDraftSave(
       app,
       aliceCookie,
@@ -112,6 +125,29 @@ describe('PostgreSQL-backed API integration', () => {
       fixtureIds.questions.singleCorrect,
       [fixtureIds.options.singleCorrect],
     );
+
+    const activeAfterFirstDraft = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active',
+      headers: { cookie: aliceCookie },
+    });
+    expect(activeAfterFirstDraft.statusCode).toBe(200);
+    expect(activeAfterFirstDraft.json().sessions.map((session: { id: string }) => session.id)).toEqual([
+      sessionId,
+      secondarySessionId,
+    ]);
+    expect(findSession(activeAfterFirstDraft.json(), sessionId)).toMatchObject({
+      bankId: fixtureIds.bank,
+      bankName: '数据库集成测试题库',
+      origin: 'bank',
+      questionCount: 4,
+      answeredCount: 1,
+      correctCount: 0,
+      reviewCount: 0,
+      status: 'active',
+      completedAt: null,
+    });
+
     await expectDraftSave(
       app,
       aliceCookie,
@@ -148,6 +184,20 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(progress.statusCode).toBe(200);
     expect(progress.json().currentSort).toBe(3);
+
+    const activeWithProgress = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active&limit=20&offset=0',
+      headers: { cookie: aliceCookie },
+    });
+    expect(activeWithProgress.statusCode).toBe(200);
+    expect(findSession(activeWithProgress.json(), sessionId)).toMatchObject({
+      answeredCount: 3,
+      correctCount: 0,
+      reviewCount: 1,
+      currentSort: 3,
+      status: 'active',
+    });
 
     const resumed = await app.inject({
       method: 'GET',
@@ -189,6 +239,39 @@ describe('PostgreSQL-backed API integration', () => {
       [fixtureIds.questions.multipleWrong, false],
       [fixtureIds.questions.falseCorrect, true],
     ]);
+
+    const history = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=completed',
+      headers: { cookie: aliceCookie },
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json().sessions).toHaveLength(1);
+    const historySession = findSession<{ id: string; completedAt: unknown }>(history.json(), sessionId);
+    expect(historySession).toMatchObject({
+      bankName: '数据库集成测试题库',
+      origin: 'bank',
+      questionCount: 4,
+      answeredCount: 3,
+      correctCount: 2,
+      reviewCount: 1,
+      currentSort: 3,
+      status: 'completed',
+    });
+    expect(historySession.completedAt).toEqual(expect.any(String));
+
+    const completedDetail = await app.inject({
+      method: 'GET',
+      url: `/api/practice/sessions/${sessionId}`,
+      headers: { cookie: aliceCookie },
+    });
+    expect(completedDetail.statusCode).toBe(200);
+    expect(completedDetail.json().session).toMatchObject({
+      id: sessionId,
+      completedCount: 3,
+      correctCount: 2,
+      status: 'completed',
+    });
 
     const databaseState = await pool.query<{
       attempt_count: string;
@@ -303,6 +386,21 @@ describe('PostgreSQL-backed API integration', () => {
       questions: [{ id: fixtureIds.questions.multipleWrong }],
     });
 
+    const activeWithReviewSession = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active',
+      headers: { cookie: aliceCookie },
+    });
+    expect(activeWithReviewSession.statusCode).toBe(200);
+    expect(findSession(activeWithReviewSession.json(), reviewSessionId)).toMatchObject({
+      origin: 'wrongbook',
+      bankName: '数据库集成测试题库',
+      questionCount: 1,
+      answeredCount: 0,
+      reviewCount: 0,
+      status: 'active',
+    });
+
     const bobLogin = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
@@ -321,6 +419,15 @@ describe('PostgreSQL-backed API integration', () => {
       headers: { cookie: bobCookie },
     });
     expect(bobWrongList.json()).toEqual({ wrongQuestions: [] });
+    const bobHistory = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=completed',
+      headers: { cookie: bobCookie },
+    });
+    expect(bobHistory.json()).toEqual({
+      sessions: [],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
 
     const logout = await app.inject({
       method: 'POST',
@@ -347,6 +454,15 @@ function findQuestion(payload: { questions: Array<{ id: string }> }, questionId:
   const question = payload.questions.find((candidate) => candidate.id === questionId);
   if (!question) throw new Error(`Question not found in payload: ${questionId}`);
   return question;
+}
+
+function findSession<T extends { id: string }>(
+  payload: { sessions: T[] },
+  sessionId: string,
+): T {
+  const session = payload.sessions.find((candidate) => candidate.id === sessionId);
+  if (!session) throw new Error(`Session not found in payload: ${sessionId}`);
+  return session;
 }
 
 async function expectDraftSave(

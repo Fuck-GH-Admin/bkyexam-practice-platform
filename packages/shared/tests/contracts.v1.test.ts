@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePracticeSessionRequestV1Schema,
+  ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
   PracticePayloadV1Schema,
+  PracticeSessionPageV1Schema,
   SavePracticeDraftRequestV1Schema,
   PracticeSessionV1Schema,
   PracticeSubmitAnswerResponseV1Schema,
@@ -116,6 +118,50 @@ describe('v1 practice contracts', () => {
         status: 'active',
       },
     }).result.questionId).toBe(uppercaseQuestionId);
+  });
+
+  it('validates active and completed session cards separately from full session results', () => {
+    const active = PracticeSessionPageV1Schema.parse({
+      sessions: [{
+        id: sessionId,
+        bankId,
+        bankName: '数据库测试题库',
+        origin: 'bank',
+        mode: 'random',
+        questionCount: 4,
+        answeredCount: 2,
+        correctCount: 0,
+        reviewCount: 1,
+        currentSort: 2,
+        status: 'active',
+        createdAt: '2026-07-11T08:00:00.000Z',
+        updatedAt: '2026-07-11T08:02:00.000Z',
+        completedAt: null,
+      }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    expect(active.sessions[0]?.answeredCount).toBe(2);
+    expect(() => PracticeSessionPageV1Schema.parse({
+      ...active,
+      sessions: [{
+        ...active.sessions[0],
+        status: 'completed',
+        completedAt: null,
+      }],
+    })).toThrow('completedAt is required for completed sessions');
+  });
+
+  it('coerces bounded session-list paging query values', () => {
+    expect(ListPracticeSessionsRequestV1Schema.parse({
+      status: 'completed',
+      limit: '10',
+      offset: '20',
+    })).toEqual({ status: 'completed', limit: 10, offset: 20 });
+    expect(() => ListPracticeSessionsRequestV1Schema.parse({
+      status: 'active',
+      limit: '51',
+    })).toThrow();
   });
 });
 

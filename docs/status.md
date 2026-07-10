@@ -17,9 +17,9 @@
 
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
-| 学生客观题核心闭环 | **约 80%** | 登录、题库、练习、断点、整卷提交、结果、错题再练均可用；历史、账户、统计和部分 UX 未完成 |
+| 学生客观题核心闭环 | **约 88%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练均可用；账户、统计、归档和部分 UX 未完成 |
 | 公开生产就绪度 | **约 55%** | 缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
-| 完整产品愿景 | **约 50–55%** | 分母包含清晰学生层、管理平台、全题型、运营与生产能力 |
+| 完整产品愿景 | **约 58%** | 学生信息架构已落地，但分母仍包含管理平台、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -35,19 +35,20 @@ npm run verify:docker  PASS
 
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
-| `packages/shared` | 2 | 8 |
-| `apps/api` | 31 | 235 |
-| `apps/web` | 1 | 28 |
-| **Total** | **34** | **271** |
+| `packages/shared` | 2 | 10 |
+| `apps/api` | 31 | 240 |
+| `apps/web` | 2 | 31 |
+| **Total** | **35** | **281** |
 
 仓库内 Playwright smoke：
 
 | Project | Scenario | Result |
 | --- | --- | --- |
-| `desktop-chromium` | 草稿保存、刷新续答、存疑、整卷提交、结果、错题详情 | PASS |
+| `desktop-chromium` | 草稿、URL 刷新续答、整卷提交、历史结果、错题详情 | PASS |
+| `desktop-chromium` | 多 active session、浏览器 back/forward 与 session URL 恢复 | PASS |
 | `mobile-chromium` | 练习台、提交检查与横向溢出 | PASS |
 
-Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个场景只在目标 viewport 执行一次。
+Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个场景只在目标 viewport 执行一次。
 
 真实 PostgreSQL integration profile：
 
@@ -55,7 +56,7 @@ Playwright 实际报告为 `2 passed`；project 通过 tag 过滤，因此每个
 | --- | ---: | ---: |
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
-该测试从空数据库执行三份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成登录、题库、草稿/断点、整卷提交、错题、再练、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行四份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成登录、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
 
 全量题库慢速 smoke：
 
@@ -80,10 +81,10 @@ npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 - shared TypeScript build：通过。
 - API TypeScript build：通过。
 - Web Vite build：通过。
-- Web bundle：约 `289.07 kB` JS（gzip `86.66 kB`）。
-- Web CSS：约 `19.24 kB`（gzip `4.79 kB`）。
+- Web bundle：约 `297.37 kB` JS（gzip `88.54 kB`）。
+- Web CSS：约 `20.26 kB`（gzip `4.98 kB`）。
 
-主 JS 增量主要来自 Web 运行时 Zod response validation。当前内部 MVP 可以接受；进入 URL routing 与 feature splitting 时应评估按页面拆包。
+主 JS 当前包含 Web 运行时 Zod response validation 和所有学生页面；内部 MVP 可以接受，下一轮 Web modularization 应引入 route-level code splitting。
 
 ## Verified Contract Boundary
 
@@ -95,6 +96,7 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 - route 回归验证 repository 返回不合法计数或 wrongbook 数据时 fail closed 为 `500`。
 - `false` 判断题答案、opaque option ID、legacy 大小写 UUID 和部分作答 completed session 均有 contract 回归。
 - `completedCount` 的 v1 语义固定为 `answered_or_graded_questions`。
+- 会话卡片/page contract 固定 `origin`、active/completed timestamp、answered/review counters 和分页边界。
 
 详细规则见 [contracts.md](contracts.md)。
 
@@ -161,7 +163,10 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 12. 错题详情返回真实题干、选项、规范化参考答案与解析。
 13. 标记掌握和 `includeMastered` 生效。
 14. 从错题集合创建普通再练 session。
-15. 退出后受保护路由返回 `401`。
+15. active/history 集合返回题库名、来源、草稿进度、存疑数与稳定时间排序。
+16. 错题再练 session 记录 `origin=wrongbook`。
+17. 其他学生无法读取 session 列表、详情或错题。
+18. 退出后受保护路由返回 `401`。
 
 验证过程中发现并修复：
 
@@ -190,9 +195,14 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 
 另有 mock API 响应式 smoke 覆盖：
 
+- 独立学生首页和多个 active session。
+- 首页、练习、历史和错题的 URL 导航。
+- 刷新 session URL 直接恢复练习。
+- 浏览器 back/forward 恢复首页和已选 session。
 - Desktop practice。
 - Desktop submit check。
 - Desktop completed result。
+- Desktop history result entry。
 - Mobile practice。
 - Mobile submit check。
 - 横向溢出检查。
@@ -206,9 +216,9 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 | Corpus parser/import | 稳定 | 90% | 全量解析、事务导入、幂等 upsert、smoke | 进度事件、错误报告 UI、增量策略 |
 | Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选 | 管理编辑、审批、审计、质量抽查 |
 | Student identity/session | MVP | 60% | 固定用户名、Cookie session、恢复/退出 | 正式凭据、角色、找回、身份合并、安全策略 |
-| Objective practice | 核心可用 | 85% | 创建、锁题、草稿、断点、存疑、整卷判分、结果、v1 runtime contract | 历史入口、多会话管理、计时/考试策略、更多异常 UX |
+| Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
-| Student product shell | 功能性 | 60% | 登录、题库、练习、错题 | 清晰首页、URL routes、历史、档案、统一空/错/加载状态 |
+| Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
 | Admin console | 未实现 | 5% | 数据字段与自动 mapping 为其提供基础 | 整个管理应用、RBAC、API、工作流、审计 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
 | Operations | 可重复验证 | 70% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
@@ -226,7 +236,8 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 
 - `App.tsx`、Practice repository 和 Practice routes 过大。
 - Auth 与 Catalog DTO 仍在各端手写；Practice/Wrongbook 重复 DTO 已迁入 shared v1。
-- 没有 URL routing 和练习历史。
+- session 集合已有后端分页，但首页/历史尚无“加载更多”、放弃或归档 active session 的交互。
+- 轻量 History API router 尚无 route-level code splitting、navigation guard 与统一错误页。
 - `completedCount` 已在 v1 contract 固定为 answered/graded count，但字段名称仍容易误解；未来更名必须走显式版本迁移。
 - Wrongbook repository 直接创建 Practice 表记录，长期应改为 service 间协作。
 

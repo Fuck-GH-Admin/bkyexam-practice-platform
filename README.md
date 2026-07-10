@@ -11,13 +11,14 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 服务端草稿、断点续答、当前位置、标记存疑。
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
+- 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook v1 共享 Zod contract，并在 API 输出与 Web 输入两侧运行时校验。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
 - 管理平台及管理员权限体系。
-- 学生首页、练习历史、账户与学习统计等完整信息架构。
+- 正式学生账户、档案、学习统计和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
 
@@ -158,6 +159,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 
 - [系统状态与完整度](docs/status.md)
 - [产品与模块边界](docs/product-boundaries.md)
+- [学生信息架构 v1](docs/student-information-architecture.md)
 - [架构](docs/architecture.md)
 - [版本化 API Contract](docs/contracts.md)
 - [API](docs/api.md)
