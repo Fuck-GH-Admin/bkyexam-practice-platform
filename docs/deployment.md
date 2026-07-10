@@ -149,5 +149,5 @@ The deployment shape is documented, but the current codebase is not yet publicly
 - PostgreSQL backup and restore drill;
 - structured logs, metrics, alerts, and database-aware readiness;
 - rate limits, security headers, and CSRF decision;
-- CI PostgreSQL integration and browser E2E;
+- first successful remote run and branch protection for the repository CI workflow;
 - one repeatable deployment/rollback procedure on the target host.

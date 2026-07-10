@@ -19,13 +19,14 @@ interface BuildAppOptions {
   practiceRepository?: PracticeRepository;
   wrongQuestionRepository?: WrongQuestionRepository;
   sessionService?: ReturnType<typeof createSessionService>;
+  logger?: boolean;
   cookieSecret?: string;
   cookieSecure?: boolean;
   sessionTtlDays?: number;
 }
 
 export function buildApp(options: BuildAppOptions = {}) {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: options.logger ?? process.env.NODE_ENV !== 'test' });
   const bankRepository = options.bankRepository ?? createMemoryBankRepository();
   const practiceRepository = options.practiceRepository ?? createMemoryPracticeRepository();
   const wrongQuestionRepository = options.wrongQuestionRepository ?? createMemoryWrongQuestionRepository();

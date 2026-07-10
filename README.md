@@ -63,13 +63,25 @@ npm run test:e2e:install
 npm run test:e2e
 ```
 
-也可以用一条命令执行当前完整仓库质量门：
+也可以用一条命令执行不依赖外部数据库的默认仓库质量门：
 
 ```sh
 npm run verify
 ```
 
-测试分层、覆盖范围与真实数据库验证边界见 [测试策略](docs/testing.md)。
+真实 PostgreSQL integration profile 使用独立临时数据库，不会接触开发数据库。安装 Docker 后执行：
+
+```sh
+npm run test:integration:db:docker
+```
+
+本地安装 Docker 后，一条命令执行默认质量门与隔离数据库 integration：
+
+```sh
+npm run verify:docker
+```
+
+测试分层、覆盖范围、外部数据库模式与 CI 质量门见 [测试策略](docs/testing.md)。
 
 ## Run With PostgreSQL
 
@@ -103,6 +115,13 @@ $env:COOKIE_SECRET="local-development-secret"
 npm run db:migrate -w @bkyexam-practice/api
 npm run import:db -w @bkyexam-practice/api -- <questionbank-dir>
 npm run db:smoke -w @bkyexam-practice/api
+```
+
+如需对一个已经存在的专用测试数据库直接运行 integration profile，数据库名必须为 `test`，或以 `test_`/`test-` 开头，或以 `_test`/`-test` 结尾：
+
+```powershell
+$env:TEST_DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_test"
+npm run test:integration:db
 ```
 
 分别启动 API 和学生端：

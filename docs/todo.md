@@ -20,11 +20,11 @@
 目标：把本轮“临时验证成功”升级成仓库可重复执行的质量门。
 
 - [x] 在仓库中增加 Playwright E2E 配置，不依赖临时 runner。
-- [ ] 增加 PostgreSQL integration test job。
+- [x] 增加 PostgreSQL integration test job。
 - [ ] 为完整导入提供可选的慢速 smoke profile。
 - [ ] 为 API DTO 增加共享 Zod contract，先覆盖 Practice 与 Wrongbook。
 - [ ] 明确并版本化 `completedCount` 语义；评估后续是否更名为 `answeredCount`。
-- [ ] 降低测试中的 Fastify request log 噪音。
+- [x] 降低测试中的 Fastify request log 噪音。
 - [ ] 增加超长题干、空选项、Boolean false、UUID option answer 等回归 fixture。
 
 完成标准：

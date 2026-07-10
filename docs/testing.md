@@ -19,6 +19,20 @@ npm run verify
 3. `npm run build`：全部 workspace 的生产构建。
 4. `npm run test:e2e`：桌面与移动端 Playwright smoke。
 
+`npm run verify` 故意不自动启动数据库，保证日常快速反馈稳定。需要同时验证已有专用测试数据库时：
+
+```sh
+npm run verify:db
+```
+
+其中 `TEST_DATABASE_URL` 必须已经指向名称明确以 `test` 开头或结尾的 PostgreSQL 测试数据库。
+
+本地安装 Docker 后，完整运行默认质量门与隔离 PostgreSQL profile：
+
+```sh
+npm run verify:docker
+```
+
 需要缩短反馈时间时，可以分别执行：
 
 ```sh
@@ -84,7 +98,47 @@ npm run test:e2e
 
 ### Real PostgreSQL Verification
 
-真实数据验证目前包括：
+仓库现在提供独立的 PostgreSQL integration profile：
+
+```sh
+npm run test:integration:db:docker
+```
+
+该命令会：
+
+1. 通过 Compose 在 `127.0.0.1:55432` 启动临时 `postgres:16-alpine`。
+2. 等待数据库 healthcheck。
+3. 对空的 `bkyexam_test` 执行全部 migration。
+4. 装载只含可见/隐藏题库、父子分类和客观题的最小 fixture。
+5. 运行真实 PostgreSQL repository + Fastify API integration test。
+6. 无论成功或失败都停止并删除临时容器。
+
+当前 integration spec 验证：
+
+- PostgreSQL migration 可落到空数据库。
+- 登录、Cookie session、题库可见性和递归客观题计数。
+- 创建练习、题目锁定、草稿、`false`、存疑和当前位置持久化。
+- 整卷提交、部分作答计数、正确/错误判分和未答题不生成 attempt。
+- completed session 写保护。
+- 错题归集、详情参考答案规范化、掌握筛选和错题再练。
+- 不同学生之间的 session 与错题所有权隔离。
+- 退出后服务端 session 失效。
+
+如已有外部专用测试数据库，可直接执行：
+
+```powershell
+$env:TEST_DATABASE_URL="postgres://user:password@127.0.0.1:5432/bkyexam_test"
+npm run test:integration:db
+```
+
+测试启动时会 `TRUNCATE` 目标数据库的业务表。安全门只接受名称为 `test`、以 `test_`/`test-` 开头或以 `_test`/`-test` 结尾的数据库，避免误清理开发或生产数据。
+
+`.github/workflows/quality.yml` 已定义两个并行 job：
+
+- unit/typecheck/build/Playwright quality gate。
+- 带 PostgreSQL 16 service container 的 database integration。
+
+完整真实题库的慢速验证仍包括：
 
 - migration。
 - 完整题库导入。
@@ -92,7 +146,7 @@ npm run test:e2e
 - PostgreSQL repository + Fastify API 全练习闭环。
 - Vite + Fastify + PostgreSQL 的真实 Chrome smoke。
 
-本轮真实闭环已经通过，但尚未固化为 CI 自动 job。下一项 P0 工作是增加可重复启动 PostgreSQL、装载最小 fixture 并执行 integration test 的仓库脚本；它将补足 mock browser smoke 无法发现的 SQL、事务、migration 和 API wiring 回归。
+最小 fixture integration 已固化为每次 CI 可运行的快速门；完整 89922 题导入仍是可选慢速 profile，尚未加入每次提交的 CI。
 
 ## Change Acceptance
 

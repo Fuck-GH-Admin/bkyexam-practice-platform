@@ -234,6 +234,23 @@ npm run db:migrate -w @bkyexam-practice/api
 
 On 2026-07-10 all three migrations were also applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow.
 
+## Isolated Integration Profile
+
+仓库内的最小 PostgreSQL integration profile 会在空数据库上重新执行全部 migration，并验证真实 repository 与 Fastify API wiring：
+
+```sh
+npm run test:integration:db:docker
+```
+
+该命令使用 Compose profile `test` 在本地临时启动 `bkyexam_test`，完成后自动删除容器。若直接连接已有测试数据库：
+
+```powershell
+$env:TEST_DATABASE_URL="postgres://user:password@127.0.0.1:5432/bkyexam_test"
+npm run test:integration:db
+```
+
+integration fixture 会清空目标数据库业务表，因此测试代码只接受名称为 `test`、以 `test_`/`test-` 开头或以 `_test`/`-test` 结尾的数据库。
+
 ## Post-Import Smoke Check
 
 After importing question-bank data, run the database smoke check to confirm the core import tables are reachable and populated with readable counts:
