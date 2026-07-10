@@ -1,14 +1,16 @@
 # Architecture
 
-BKYExam Practice Platform is a lightweight monolith. Phase 1 separates code into npm workspaces, but the deployment shape is intentionally simple:
+## Architectural Position
+
+BKYExam 当前采用 **模块化单体**：
 
 ```text
 Browser
   |
   v
-Nginx
-  |-- static Vite web build
-  `-- reverse proxy /api/*
+Vite dev server / Nginx
+  |-- static React application
+  `-- /api/*
         |
         v
     Fastify API
@@ -17,36 +19,213 @@ Nginx
     PostgreSQL
 ```
 
-## Components
+这个阶段继续保持一个 API 进程和一个 PostgreSQL 数据库。现有规模、团队协作方式和部署目标都不需要微服务；过早拆服务只会增加鉴权、事务、部署和调试成本。
 
-- `apps/web`: Vite + React web shell. Phase 1 renders the landing shell for the practice platform.
-- `apps/api`: Fastify API. Phase 1 exposes `GET /api/health` and contains the importer and database schema foundation. Phase 2 adds the `POST /api/auth/login` contract for student login and the `GET /api/banks` contract for bank explorer lists.
-- `packages/shared`: Shared Zod schemas and TypeScript types for question and bank metadata.
-- PostgreSQL: Runtime storage target for imported question data, mappings, students, practice attempts, and wrong-question rows.
-- Nginx: Linux deployment edge for static assets, TLS termination, and API reverse proxying.
+## Runtime Components
 
-## Runtime Data Access
+### `apps/web`
 
-Runtime requests use PostgreSQL. The web app and API should not scan exported `.txt` files during normal user traffic.
+React 19 + Vite 学生端。
 
-The exported files under `../Monitor/questionbank/` are import inputs. They are parsed into normalized database rows before practice, search, or notebook features serve users.
+当前可用页面/状态：
 
-API routes use repository boundaries so HTTP contracts stay stable while storage evolves. `POST /api/auth/login` is backed by a student-auth repository boundary, `GET /api/banks` returns `{ banks: BankListItem[] }` through a bank repository with `listBanks({ category, keyword })`, and practice session routes use `PracticeRepository` for session creation, retrieval, progress, drafts, review flags, and session-level submission. The app default still uses tiny in-memory bank and practice/session repositories so local route tests and development startup do not require PostgreSQL.
+- 未登录身份入口。
+- 题库浏览、搜索和筛选。
+- 活跃练习恢复。
+- 客观题练习台。
+- 提交前检查。
+- 已完成结果回看。
+- 错题本、错题详情和错题再练。
 
-Set `USE_DATABASE=true` for the API process to wire `GET /api/banks`, student login, cookie sessions, and practice sessions to PostgreSQL. At startup, `apps/api/src/index.ts` reads `DATABASE_URL`, creates a PostgreSQL pool, passes `createPgBankRepository(pool)`, `createPgPracticeRepository(pool)`, `createPgStudentAuthRepository(pool)`, and `createPgStudentSessionRepository(pool)` into `buildApp`, and closes the pool when the Fastify app shuts down. With `USE_DATABASE=false`, the API preserves the in-memory bank, practice, student auth, and session repository behavior.
+当前路由仍由 `App.tsx` 内部状态控制，没有 URL router。练习功能已经提取到 `features/practice`，但 auth、catalog 和 wrongbook 仍集中在 `App.tsx`。
 
-Phase 3C auth uses a server-managed cookie session. On successful `POST /api/auth/login`, the API generates a random 32-byte token, stores only its SHA-256 hash through the session repository, and sends the raw token to the browser in the httpOnly `bky_session` cookie. Authenticated routes read that cookie and resolve the current student through the session repository, which is responsible for ignoring expired or revoked sessions. `POST /api/auth/logout` revokes the token hash when present and clears the browser cookie.
+### `apps/api`
 
-The default app remains database-free for local development and route tests by using in-memory auth and session repositories, so a local login cookie resolves through `GET /api/auth/me`. Production-style `USE_DATABASE=true` startup stores login identities in `students` and persists sessions in `student_sessions`, keeping the session `student_id` foreign key coherent.
+Fastify API，负责：
 
-Practice sessions are persisted in `practice_sessions` and lock their selected question list in `practice_session_questions`. Creating a session first verifies a visible `bank_mappings` row, then selects questions from the bank classification and all descendants with a recursive CTE. Random mode orders by PostgreSQL `random()`, while sequential mode orders deterministically by question id. The API returns question content and options without raw answers, plus student-owned draft answers, review flags, and latest progress position when present.
+- 学生身份和服务端 Cookie 会话。
+- 题库目录读取。
+- 练习会话、题目锁定、进度、草稿和存疑状态。
+- 整卷提交、客观题判分和练习记录。
+- 错题本及错题再练。
+- 题库导入、映射生成、迁移和数据库 smoke。
 
-The web practice flow is draft-first. Answer changes save to `practice_session_drafts`, navigation saves `practice_sessions.current_sort`, and `marked_for_review` lets students flag questions before final grading. The main UI groups objective questions into single-choice, multiple-choice, and yes/no sections and submits the whole session with `POST /api/practice/sessions/:sessionId/submit`.
+API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运行必须使用 PostgreSQL；内存实现主要服务于快速 route 测试。
 
-Session-level submission loads the current student's active session, combines existing submitted answers with non-empty drafts, grades with the shared `gradeAnswer` function, records immutable `practice_attempts` rows, updates the locked session questions' `answered_at` and latest `is_correct`, writes wrong-question rows only for wrong answers, and completes the session. Completed sessions reject later draft, review, progress, and submit mutations with a conflict response.
+### `packages/shared`
 
-## Local And Deployment Targets
+共享 Zod schema 与 TypeScript 类型。目前主要覆盖题目类型和题库元数据，尚未成为完整的 API contract 包。
 
-Local native Windows testing is preferred for Phase 1 because the source corpus and current development environment are Windows-native. The production deployment target is Linux with Nginx, PostgreSQL, and systemd-managed Node processes.
+### PostgreSQL
 
-Docker can be introduced later if it improves repeatability, but native process deployment is the first target.
+运行时唯一持久化数据源。Web 和 API 在正常请求中不会扫描原始 `.txt` 文件。
+
+### Import Pipeline
+
+原始导出文件只作为离线输入：
+
+```text
+questionbank/*.txt
+  -> parser
+  -> normalized in-memory records
+  -> transactional upsert
+  -> classifications/questions/options/bank_mappings
+```
+
+## Current Business Contexts
+
+当前代码已经自然形成六个业务上下文，但物理目录还没有完全对齐：
+
+| Context | 当前职责 | 当前主要位置 |
+| --- | --- | --- |
+| Identity | 学生身份、密码占位、Cookie session | `auth/`, `routes/auth.ts` |
+| Catalog | 学生可见题库、分类与映射 | `repositories/bankRepository.ts`, `routes/banks.ts`, `mapping/` |
+| Practice | 会话、题目锁定、草稿、进度、存疑、提交、判分 | `practice/`, `routes/practice.ts` |
+| Wrongbook | 错题列表、详情、掌握状态、再练会话 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
+| Import | 源文件解析、规范化、批量导入 | `import/` |
+| Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
+
+管理端将成为第七个上下文，但尚未实现。
+
+## Practice Lifecycle
+
+### Create
+
+1. API 验证题库映射存在且 `visible=true`。
+2. 递归读取题库分类及后代分类。
+3. 按题型、模式和数量选择题目。
+4. 创建 `practice_sessions`。
+5. 将题目及顺序锁定到 `practice_session_questions`。
+6. 返回不含原始答案的题目与选项。
+
+### Draft And Resume
+
+- 选择答案后写入 `practice_session_drafts`。
+- 清空答案时删除草稿；如果该题仍被标记存疑，则保留只有存疑状态的草稿行。
+- 跳题时更新 `practice_sessions.current_sort`。
+- 存疑状态写入服务端，不是浏览器临时状态。
+- 重新登录或刷新后，GET session 返回草稿、当前位置和存疑状态。
+
+### Whole-Session Submission
+
+1. 前端等待已排队的草稿保存完成。
+2. API 在事务中锁定当前学生的 active session。
+3. 对存在有效草稿且尚未判分的题目执行 `gradeAnswer`。
+4. 写入 `practice_attempts`。
+5. 更新锁定题目的 `answered_at` 与 `is_correct`。
+6. 错误客观题 upsert 到 `wrong_questions`。
+7. 更新 `completed_count`、`correct_count`，并把 session 标记为 `completed`。
+8. 完成后的草稿、存疑、进度和重复提交修改返回 `409`。
+
+语义约定：
+
+- `questionCount`：本次锁定的总题数。
+- `completedCount`：本次实际有答案并产生判分/自评结果的题数，不是总题数。
+- 未答题可以随整卷提交结束会话，但不会产生 `practice_attempts`。
+- `results` 只包含本次产生结果的已答题。
+
+旧的逐题提交 endpoint 仍保留兼容，但当前学生端以草稿优先、整卷提交为主路径。
+
+## Wrongbook Lifecycle
+
+- 客观题答错时以 `(student_id, question_id, bank_id)` 唯一键 upsert。
+- 重复答错增加 `wrong_count`，更新最近答案，并重新设为未掌握。
+- 列表只返回摘要字段。
+- 详情按需 join 题干、选项、规范化参考答案和解析。
+- “再练本组”复用普通 `practice_sessions`，不另建一套练习引擎。
+
+## Current Structural Debt
+
+这些问题不会阻止当前闭环运行，但已经影响继续开发：
+
+1. `apps/web/src/App.tsx` 仍同时承担 app shell、API 调用、auth、catalog、wrongbook 和跨页面状态。
+2. `apps/api/src/practice/repository.ts` 同时包含 contract、memory repository、PostgreSQL SQL、事务和部分业务编排。
+3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射。
+4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
+5. API DTO 在前后端重复声明，`packages/shared` 尚未承接完整 contract。
+6. 学生端没有 URL routing，刷新后只能依赖服务端恢复，页面本身不可链接。
+7. 管理平台没有独立应用、权限模型和 API namespace。
+
+## Target Physical Structure
+
+目标是渐进迁移到以下结构，而不是一次性搬完：
+
+```text
+apps/
+  web/
+    src/
+      app/                 # 入口、router、shell、session bootstrap
+      features/
+        auth/
+        catalog/
+        practice/
+        wrongbook/
+        history/
+      shared/
+        api/
+        ui/
+        format/
+
+  admin/                   # 独立管理端，后续创建
+    src/
+      app/
+      features/
+        auth/
+        bank-curation/
+        imports/
+        question-review/
+        operations/
+
+  api/
+    src/
+      modules/
+        auth/
+          contracts.ts
+          routes.ts
+          service.ts
+          memoryRepository.ts
+          pgRepository.ts
+        catalog/
+        practice/
+        wrongbook/
+        admin/
+      jobs/
+        import/
+      platform/
+        config/
+        db/
+        http/
+      app.ts
+      index.ts
+
+packages/
+  shared/                  # 稳定的跨应用 schema/DTO
+```
+
+暂不创建共享 UI 包。只有学生端和管理端已经出现真实重复、视觉系统稳定后，才考虑 `packages/ui`。
+
+## Refactor Rules
+
+1. **先写边界与 contract，再移动文件。**
+2. 每次只迁移一个垂直业务切片，并保持 API 与行为不变。
+3. 每次迁移都要通过全量 test、typecheck、build。
+4. PostgreSQL repository 的事务语义不能在纯目录整理中改变。
+5. 不把 SQL、Fastify request/reply 或 React state 泄露进共享 domain contract。
+6. 不为“看起来整洁”引入微服务、事件总线或复杂 DDD 框架。
+7. 管理端单独建 `apps/admin`，不要混进学生端导航和 bundle。
+
+## Deployment Shape
+
+本地和首个生产版本都保持：
+
+```text
+Nginx
+  |-- apps/web/dist
+  |-- future apps/admin/dist under an admin path/host
+  `-- proxy /api/* -> Fastify
+
+Fastify
+  `-- PostgreSQL
+```
+
+生产环境需要 `USE_DATABASE=true`、安全 Cookie、真实密钥、数据库迁移、题库导入、备份和可观测性。详见 [deployment.md](deployment.md)。

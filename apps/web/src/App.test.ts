@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  buildPracticeCheckSummary,
+  buildQuestionStatus,
+  buildQuestionTypeLabel,
   buildSectionScores,
   buildResultsFromQuestions,
   buildWrongbookStats,
   filterBanks,
   formatCorrectAnswer,
+  formatSavedAnswer,
   formatStoredAnswer,
   getAnsweredCount,
   getFilterOptions,
@@ -48,6 +52,11 @@ describe('formatCorrectAnswer', () => {
         { id: 'option-c', sort: 3, content: 'C. Third option' },
       ]),
     ).toBe('A. First option、C. Third option');
+  });
+
+  test('renders yes/no reference answers in Chinese', () => {
+    expect(formatCorrectAnswer(true)).toBe('正确');
+    expect(formatCorrectAnswer(false)).toBe('错误');
   });
 });
 
@@ -200,13 +209,72 @@ describe('sectioned practice helpers', () => {
   });
 });
 
+describe('practice submit check helpers', () => {
+  test('renders known and unknown question type labels', () => {
+    expect(buildQuestionTypeLabel('single_choice')).toEqual({ short: '单选', long: '单选题' });
+    expect(buildQuestionTypeLabel('multiple_choice')).toEqual({ short: '多选', long: '多选题' });
+    expect(buildQuestionTypeLabel('yes_no')).toEqual({ short: '判断', long: '判断题' });
+    expect(buildQuestionTypeLabel('material')).toEqual({ short: 'material', long: 'material' });
+  });
+
+  test('formats saved answers and resolves option ids for the check list', () => {
+    expect(formatSavedAnswer(['B', 'D'])).toBe('B、D');
+    expect(formatSavedAnswer(false)).toBe('错误');
+    expect(formatSavedAnswer(undefined)).toBe('未答');
+    expect(formatSavedAnswer(['option-a'], [
+      { id: 'option-a', sort: 1, content: 'First option' },
+    ])).toBe('1. First option');
+  });
+
+  test('classifies current, answered, unanswered, flagged, and mixed states', () => {
+    expect(buildQuestionStatus({ current: true, answered: true, flagged: true })).toBe('current');
+    expect(buildQuestionStatus({ current: false, answered: true, flagged: true })).toBe('mixed');
+    expect(buildQuestionStatus({ current: false, answered: false, flagged: true })).toBe('flagged');
+    expect(buildQuestionStatus({ current: false, answered: true, flagged: false })).toBe('answered');
+    expect(buildQuestionStatus({ current: false, answered: false, flagged: false })).toBe('unanswered');
+  });
+
+  test('builds ordered unanswered and server-backed review lists', () => {
+    const summary = buildPracticeCheckSummary(
+      sampleQuestions,
+      { 'single-1': ['option-a'], 'yes-no-1': false },
+      { 'single-1': true, 'multiple-1': true },
+    );
+
+    expect(summary).toMatchObject({
+      total: 3,
+      answeredCount: 2,
+      unansweredCount: 1,
+      flaggedCount: 2,
+    });
+    expect(summary.unanswered.map((question) => question.id)).toEqual(['multiple-1']);
+    expect(summary.flagged.map((question) => question.id)).toEqual(['single-1', 'multiple-1']);
+  });
+});
+
 describe('formatStoredAnswer', () => {
   test('formats JSON array answers', () => {
     expect(formatStoredAnswer('["B","D"]')).toBe('B、D');
   });
 
-  test('returns plain stored answers when they are not JSON arrays', () => {
-    expect(formatStoredAnswer('false')).toBe('false');
+  test('renders persisted yes/no answers in Chinese', () => {
+    expect(formatStoredAnswer('true')).toBe('正确');
+    expect(formatStoredAnswer('false')).toBe('错误');
+  });
+
+  test('resolves persisted option ids when detail options are available', () => {
+    expect(formatStoredAnswer(
+      '["2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c"]',
+      [{ id: '2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c', sort: 2, content: '第二个选项' }],
+    )).toBe('第二个选项');
+  });
+
+  test('does not expose raw UUIDs in wrongbook list summaries', () => {
+    expect(formatStoredAnswer('["2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c"]')).toBe('已选择 1 项');
+  });
+
+  test('returns plain legacy answers when they are not JSON', () => {
+    expect(formatStoredAnswer('B')).toBe('B');
   });
 });
 

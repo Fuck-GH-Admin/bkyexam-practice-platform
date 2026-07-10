@@ -1,6 +1,6 @@
 # Database
 
-Phase 1 defines the PostgreSQL schema in `apps/api/src/db/schema.ts` using Drizzle ORM. These definitions are the contract for later migrations and importer loading.
+The PostgreSQL schema is defined in `apps/api/src/db/schema.ts` with Drizzle ORM and materialized through ordered SQL migrations in `apps/api/src/db/migrations`.
 
 ## Core Tables
 
@@ -169,7 +169,7 @@ Stores unsubmitted practice answers and review flags for active sessions. Draft 
 - `student_id`: FK to `students.id`, deleted when the student is deleted.
 - `session_id`: FK to `practice_sessions.id`, deleted when the session is deleted.
 - `question_id`: FK to `questions.id`.
-- `answer`: nullable draft answer payload as text.
+- `draft_answer`: non-null text payload. An empty string means “no answer”; a row may still exist to preserve `marked_for_review=true`.
 - `marked_for_review`: whether the student flagged the question for later review.
 - `updated_at`: last draft/review update timestamp.
 
@@ -209,7 +209,7 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 
 ## Migrations
 
-`apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the Drizzle schema in `apps/api/src/db/schema.ts`. It creates the core tables and indexes needed by Phase 1 while preserving the same defaults, nullable columns, foreign keys, and wrong-question uniqueness constraint.
+`apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the initial Drizzle schema. It creates imported content, mapping, student, attempt, and wrong-question tables.
 
 `apps/api/src/db/migrations/0002_practice_sessions.sql` adds cookie session storage and practice session tables. It creates `student_sessions`, `practice_sessions`, and `practice_session_questions`, plus indexes for student lookup, session expiry, bank/status filtering, and locked session question lookup. It includes check constraints for valid practice modes, positive question limits, nonnegative counters, active/completed status, positive session question order, token hash uniqueness, and uniqueness for each session's question membership and sort order.
 
@@ -232,14 +232,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-Phase 3C live migration check on this workstation could not start PostgreSQL because Docker Desktop's Linux engine was unavailable:
-
-```text
-docker compose up -d postgres
-unable to get image 'postgres:16-alpine': error during connect: ... open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
-```
-
-Because the container could not be started, `npm run db:migrate -w @bkyexam-practice/api` and `npm run db:smoke -w @bkyexam-practice/api` were not run against the requested Docker PostgreSQL database in this check. The automated migration tests still pass and cover applying migrations in filename order.
+On 2026-07-10 all three migrations were also applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow.
 
 ## Post-Import Smoke Check
 
@@ -251,7 +244,7 @@ DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:smoke -w
 
 The command prints pretty JSON with row counts for `classifications`, `questions`, `question_options`, and `bank_mappings`. It exits nonzero when `DATABASE_URL` is missing or the smoke query fails.
 
-Latest local Docker PostgreSQL smoke result after importing the real corpus:
+Latest real PostgreSQL smoke result after importing the full corpus:
 
 ```json
 {

@@ -1,5 +1,7 @@
 # Wrongbook Review Enhancement Implementation Plan
 
+> Historical implementation plan. The core feature is implemented; unchecked boxes below are not the current project tracker. Use `docs/todo.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the enhanced wrong-question review flow: richer wrong-question data, single-question review details, filtered wrong-question review sessions, and a desktop/mobile correction UI.

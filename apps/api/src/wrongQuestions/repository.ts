@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { QueryClient } from '../db/client.js';
+import { normalizeAnswer } from '../import/normalizeAnswer.js';
 
 export interface WrongQuestionItem {
   id: string;
@@ -25,7 +26,7 @@ export interface WrongQuestionOption {
 export interface WrongQuestionDetail extends WrongQuestionItem {
   content: string;
   options: WrongQuestionOption[];
-  correctAnswer: string;
+  correctAnswer: string[] | boolean | string;
   analysis: string;
 }
 
@@ -295,7 +296,24 @@ function mapWrongQuestionDetailRow(row: WrongQuestionDetailRow, options: WrongQu
     }),
     content: row.content ?? '',
     options: options.map((option) => ({ id: option.id, sort: Number(option.sort), content: option.content ?? '' })),
-    correctAnswer: row.answer_raw ?? '',
+    correctAnswer: normalizeCorrectAnswer(row.normalized_type, row.answer_raw),
     analysis: row.analyze_raw ?? '',
   };
+}
+
+function normalizeCorrectAnswer(normalizedType: string | null, answerRaw: string | null) {
+  const raw = answerRaw ?? '';
+  if (normalizedType === 'single_choice') {
+    const answer = normalizeAnswer(1, raw);
+    return answer.kind === 'option_ids' ? answer.value : raw;
+  }
+  if (normalizedType === 'multiple_choice') {
+    const answer = normalizeAnswer(2, raw);
+    return answer.kind === 'option_ids' ? answer.value : raw;
+  }
+  if (normalizedType === 'yes_no') {
+    const answer = normalizeAnswer(3, raw);
+    return answer.kind === 'yes_no' ? answer.value : raw;
+  }
+  return raw;
 }

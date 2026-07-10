@@ -25,7 +25,7 @@ The expected early production size is fewer than 100 users on a 2 core, 2 GB ser
 Native process deployment is preferred first:
 
 1. Install Node matching `package.json` engines, PostgreSQL, and Nginx on Linux.
-2. Run `npm install` from `PracticePlatform`.
+2. Run `npm ci` from the project root.
 3. Run `npm run build --workspaces`.
 4. Configure API runtime environment variables, especially `DATABASE_URL`, `USE_DATABASE=true`, `COOKIE_SECRET`, and `COOKIE_SECURE=true` when behind HTTPS.
 5. Run database migrations with `npm run db:migrate -w @bkyexam-practice/api`.
@@ -58,7 +58,7 @@ server {
 }
 ```
 
-Docker is optional. It may be useful after Phase 1 if deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
+Docker is optional. It may become useful when deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
 
 ## Local PostgreSQL
 
@@ -94,7 +94,11 @@ Run migrations after PostgreSQL is healthy:
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-Migrations run all files in `apps/api/src/db/migrations` in filename order. Phase 3C requires both `0001_initial.sql` and `0002_practice_sessions.sql`; the second migration adds server-side cookie sessions and practice session storage.
+Migrations run all files in `apps/api/src/db/migrations` in filename order. The current runtime requires:
+
+- `0001_initial.sql`
+- `0002_practice_sessions.sql`
+- `0003_practice_drafts.sql`
 
 Then import the source question bank and run a smoke check:
 
@@ -103,7 +107,7 @@ npm run import:db -w @bkyexam-practice/api -- C:\path\to\BKYExam\Monitor\questio
 npm run db:smoke -w @bkyexam-practice/api
 ```
 
-Observed local Docker PostgreSQL result after the real corpus import:
+Observed real PostgreSQL result after the full corpus import on 2026-07-10:
 
 ```json
 {
@@ -119,8 +123,6 @@ Observed local Docker PostgreSQL result after the real corpus import:
 
 This Docker PostgreSQL service is intended for local development only. Production can use native PostgreSQL.
 
-Phase 3C live migration check attempted to start this local Docker PostgreSQL service, but Docker Desktop's Linux engine was not available on the workstation (`//./pipe/dockerDesktopLinuxEngine` was missing). Because PostgreSQL could not be started, the requested live `db:migrate` and `db:smoke` commands were not executed against Docker during that check.
-
 ## Runtime Configuration
 
 The API currently reads configuration from environment variables through `apps/api/src/config.ts`:
@@ -135,4 +137,17 @@ The API currently reads configuration from environment variables through `apps/a
 
 The API currently listens on `127.0.0.1`, which matches the intended Nginx reverse-proxy shape.
 
-With `USE_DATABASE=false`, the API can serve in-memory development data for basic route testing, but authenticated practice sessions and durable wrong-question data require PostgreSQL-backed repositories. Production should run with `USE_DATABASE=true` and a migrated database.
+With `USE_DATABASE=false`, the API can serve in-memory development data for basic route testing, but authenticated practice sessions and durable wrong-question data require PostgreSQL-backed repositories. Production must run with `USE_DATABASE=true` and a migrated database.
+
+## Production Gaps
+
+The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
+
+- real administrator identity and authorization;
+- strong student identity policy;
+- secrets management;
+- PostgreSQL backup and restore drill;
+- structured logs, metrics, alerts, and database-aware readiness;
+- rate limits, security headers, and CSRF decision;
+- CI PostgreSQL integration and browser E2E;
+- one repeatable deployment/rollback procedure on the target host.

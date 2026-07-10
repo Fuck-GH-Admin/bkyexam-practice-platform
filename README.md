@@ -1,82 +1,123 @@
 # BKYExam Practice Platform
 
-BKYExam Practice Platform is the Phase 1 foundation for a web-based practice system backed by the existing BKYExam question bank exports.
+BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已经形成可真实运行的“学生客观题练习闭环”，不再只是 Phase 1 脚手架。
 
-Phase 1 scope covers:
+截至 **2026-07-10**，已实现并验证：
 
-- npm workspace scaffold for the API, web app, and shared package.
-- Shared schemas for question types, objective question detection, bank categories, bank status, and difficulty labels.
-- PostgreSQL schema definitions for classifications, questions, options, bank mappings, students, practice attempts, and wrong-question tracking.
-- Parser foundation for exported classifications, question files, option files, and raw answer normalization.
-- Fastify health API at `GET /api/health`.
-- Handoff documentation for architecture, database, importer, mapping, deployment, and future work.
+- 将 BKYExam 原始题库导入 PostgreSQL，并自动生成学生可见题库映射。
+- 基于固定用户名的学生身份、服务端 Cookie 会话、退出与会话恢复。
+- 题库浏览、搜索、筛选，以及随机/顺序创建练习会话。
+- 单选题、多选题、判断题的分区练习。
+- 服务端草稿、断点续答、当前位置、标记存疑。
+- 提交前检查、整卷提交、服务端判分和只读结果回看。
+- 错题自动归集、错题详情、标记掌握和错题再练。
+- 桌面与移动端的基础响应式练习体验。
 
-Source data is read from `../Monitor/questionbank/`. The source `.txt` export files are inputs only and are not modified by the platform.
+尚未完成的主要产品范围：
 
-## Commands
+- 管理平台及管理员权限体系。
+- 学生首页、练习历史、账户与学习统计等完整信息架构。
+- 填空、简答、编程、Office 操作等非客观题流程。
+- 生产级身份策略、CI 真实数据库测试、监控、备份和正式部署验收。
 
-Run these from `PracticePlatform`:
+当前完整度、验证证据和风险见 [系统状态](docs/status.md)，产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
-```sh
-npm install
-npm run test --workspaces
-npm run typecheck --workspaces
-npm run build --workspaces
+## Workspace
+
+```text
+apps/
+  api/       Fastify API、PostgreSQL repository、导入任务
+  web/       React/Vite 学生端
+packages/
+  shared/    跨端共享 schema 与类型
+docs/        当前架构、API、数据库、状态与路线图
 ```
 
-Start the API during development:
+当前采用 **modular monolith（模块化单体）**，不计划在此阶段拆微服务。现有代码仍有若干大文件，后续按业务垂直切片渐进拆分，禁止一次性“大重构”。
+
+## Requirements
+
+- Node.js `>= 24`
+- npm
+- PostgreSQL（真实数据与持久化练习必需）
+- 可选：Docker Compose，用于本地 PostgreSQL
+
+## Install And Verify
+
+从本目录执行：
 
 ```sh
-npm run dev -w @bkyexam-practice/api
+npm ci
+npm run test
+npm run typecheck
+npm run build
 ```
 
-Start the local PostgreSQL database during development:
+根脚本会覆盖 `apps/api`、`apps/web` 和 `packages/shared` 全部 workspace。
+
+## Run With PostgreSQL
+
+可使用仓库内的本地开发数据库：
 
 ```sh
 docker compose up -d postgres
 ```
 
-Configure the API database connection:
+配置环境变量。`.env.example` 只是模板，应用目前不会自动读取 `.env`：
 
-```sh
+```text
 DATABASE_URL=postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice
+USE_DATABASE=true
+COOKIE_SECRET=replace-with-a-long-random-secret
+COOKIE_SECURE=false
+SESSION_TTL_DAYS=30
 ```
 
-On PowerShell, set it for the current shell session with:
+PowerShell 示例：
 
 ```powershell
 $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
+$env:USE_DATABASE="true"
+$env:COOKIE_SECRET="local-development-secret"
 ```
 
-On cmd.exe, set it for the current shell session with:
-
-```bat
-set DATABASE_URL=postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice
-```
-
-The `.env.example` file is a template for local configuration and is not auto-loaded by the app.
-
-Run database migrations after PostgreSQL is available:
+初始化数据库：
 
 ```sh
 npm run db:migrate -w @bkyexam-practice/api
+npm run import:db -w @bkyexam-practice/api -- <questionbank-dir>
+npm run db:smoke -w @bkyexam-practice/api
 ```
 
-The Docker PostgreSQL service is for local development only. Production can use native PostgreSQL.
-
-Start the web app during development:
+分别启动 API 和学生端：
 
 ```sh
-npm run dev -w @bkyexam-practice/web
+npm run dev
+npm run dev:web
 ```
 
-The root `npm run dev` script also starts the API. The root `npm run dev:web` script starts the web app.
+- API：`http://127.0.0.1:3000`
+- Web：`http://127.0.0.1:5173`
+- Health：`http://127.0.0.1:3000/api/health`
+
+`USE_DATABASE=false` 只适合轻量本地启动和 route 单元测试。真实题库、持久化学生会话、草稿和错题本需要 `USE_DATABASE=true`。
+
+## Source Data
+
+题库导出目录通常位于主仓库的 `Monitor/questionbank/`，也可以通过命令行传入任意绝对路径。导入器只读取源 `.txt` 文件，不会修改原始题库。
 
 ## Documentation
 
-- [Architecture](docs/architecture.md)
-- [Database](docs/database.md)
-- [Importer](docs/importer.md)
-- [Mapping](docs/mapping.md)
-- [Deployment](docs/deployment.md)
-- [Todo](docs/todo.md)
+当前有效文档：
+
+- [系统状态与完整度](docs/status.md)
+- [产品与模块边界](docs/product-boundaries.md)
+- [架构](docs/architecture.md)
+- [API](docs/api.md)
+- [数据库](docs/database.md)
+- [导入器](docs/importer.md)
+- [题库映射](docs/mapping.md)
+- [部署](docs/deployment.md)
+- [路线图](docs/todo.md)
+
+`docs/superpowers/` 与部分 `docs/design/` 文件是历史设计/实施记录，用来解释决策来源；如与上述当前文档或代码冲突，以当前文档和已验证代码为准。

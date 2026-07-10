@@ -58,7 +58,7 @@ function fakeWrongQuestionRepository(
         ...wrongQuestion,
         content: '完整题干',
         options: [{ id: 'option-a', sort: 1, content: 'A. 正确选项' }],
-        correctAnswer: 'A',
+        correctAnswer: ['option-a'],
         analysis: '解析文本',
       };
     },
@@ -181,7 +181,7 @@ describe('wrong question routes', () => {
         ...wrongQuestion,
         content: '完整题干',
         options: [{ id: 'option-a', sort: 1, content: 'A. 正确选项' }],
-        correctAnswer: 'A',
+        correctAnswer: ['option-a'],
         analysis: '解析文本',
       },
     });
