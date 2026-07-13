@@ -1,11 +1,19 @@
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import Fastify from 'fastify';
+import {
+  createAuditService,
+  createMemoryAuditLogRepository,
+  type AuditService,
+} from './admin/audit.js';
+import type { AdminAuthRepository } from './admin/auth.js';
+import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
 import type { StudentAuthRepository } from './auth/studentAuth.js';
 import { createMemoryPracticeSessionService, type PracticeSessionService } from './modules/practice/sessionService.js';
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
+import { registerAdminAuthRoutes } from './routes/adminAuth.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -17,16 +25,20 @@ import { createWrongQuestionService, type WrongQuestionService } from './wrongQu
 
 interface BuildAppOptions {
   authRepository?: StudentAuthRepository;
+  adminAuthRepository?: AdminAuthRepository;
   bankRepository?: BankRepository;
   practiceRepository?: PracticeRepository;
   practiceSessionService?: PracticeSessionService;
   wrongQuestionRepository?: WrongQuestionRepository;
   wrongQuestionService?: WrongQuestionService;
   sessionService?: ReturnType<typeof createSessionService>;
+  adminSessionService?: ReturnType<typeof createAdminSessionService>;
+  auditService?: AuditService;
   logger?: boolean;
   cookieSecret?: string;
   cookieSecure?: boolean;
   sessionTtlDays?: number;
+  adminSessionTtlHours?: number;
 }
 
 export function buildApp(options: BuildAppOptions = {}) {
@@ -41,6 +53,11 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
   const sessionService = options.sessionService
     ?? createSessionService(createMemoryStudentSessionRepository(), { ttlDays: options.sessionTtlDays ?? 30 });
+  const adminSessionService = options.adminSessionService
+    ?? createAdminSessionService(createMemoryAdminSessionRepository(), {
+      ttlHours: options.adminSessionTtlHours ?? 8,
+    });
+  const auditService = options.auditService ?? createAuditService(createMemoryAuditLogRepository());
 
   void app.register(cors, {
     origin: ['http://127.0.0.1:5173', 'http://localhost:5173'],
@@ -51,6 +68,13 @@ export function buildApp(options: BuildAppOptions = {}) {
     repository: options.authRepository,
     sessionService,
     cookieSecure: options.cookieSecure ?? false,
+  });
+  void app.register(registerAdminAuthRoutes, {
+    repository: options.adminAuthRepository,
+    sessionService: adminSessionService,
+    auditService,
+    cookieSecure: options.cookieSecure ?? false,
+    sessionTtlHours: options.adminSessionTtlHours ?? 8,
   });
   void app.register(createBankRoutes(bankRepository));
   void app.register(createPracticeRoutes({

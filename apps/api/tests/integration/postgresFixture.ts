@@ -28,6 +28,9 @@ const falseAnswerId = '22222222-2222-2222-2222-222222222222';
 export async function resetAndSeedPostgresFixture(client: QueryClient) {
   await client.query(`
     TRUNCATE TABLE
+      audit_logs,
+      admin_sessions,
+      admin_user_roles,
       practice_session_drafts,
       practice_session_questions,
       practice_sessions,
@@ -37,6 +40,7 @@ export async function resetAndSeedPostgresFixture(client: QueryClient) {
       question_options,
       questions,
       bank_mappings,
+      admin_users,
       students,
       classifications
     RESTART IDENTITY CASCADE;

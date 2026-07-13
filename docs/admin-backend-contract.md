@@ -8,6 +8,8 @@
 
 本阶段只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration。
 
+> B5.1 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation，包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、shared v1 Admin Auth schema 和 PostgreSQL integration 测试。Bank Mapping、Import Job、Question Review、System Status 仍按本文后续章节实现。
+
 ## 1. 目标与非目标
 
 ### 1.1 目标
@@ -1100,6 +1102,8 @@ Rules：
 ## 12. B5 建议实现顺序
 
 ### B5.1 Admin Identity + RBAC + Audit Foundation
+
+状态：**已完成，2026-07-13。**
 
 交付：
 

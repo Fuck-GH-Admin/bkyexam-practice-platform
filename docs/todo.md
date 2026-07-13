@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.1 — 2026-07-13
+
+- [x] 新增 migration `0005_admin_foundation.sql`，建立 `admin_users`、`admin_sessions`、`admin_user_roles`、`audit_logs`。
+- [x] 为 `bank_mappings` 增加 `version`、`updated_at`、`updated_by_admin_id`，为后续并发控制和审计归属做准备。
+- [x] 实现 Admin Auth repository/service/session，支持 PostgreSQL 与 memory 双路径。
+- [x] 实现独立 `bky_admin_session`，与学生 `bky_session` 隔离。
+- [x] 实现 RBAC helper：`content_editor`、`operator`、`super_admin` 与显式 permission list。
+- [x] 实现 audit service 和 PostgreSQL `audit_logs` writer。
+- [x] 实现 `POST /api/admin/auth/login`、`GET /api/admin/me`、`POST /api/admin/auth/logout`。
+- [x] 新增 shared v1 Admin Auth schema。
+- [x] 覆盖 route/unit/schema/migration/PostgreSQL integration 测试。
+- [x] 不创建默认本地管理员账号。
+
 ## Completed Backend B4 — 2026-07-13
 
 - [x] 新增 [`admin-backend-contract.md`](./admin-backend-contract.md)。
@@ -142,7 +155,7 @@
 
 ### Backend
 
-- [ ] 管理员 identity、session 和 RBAC。
+- [x] 管理员 identity、session 和 RBAC。
 - [ ] `/api/admin/bank-mappings` 列表、详情、更新、批量状态。
 - [ ] mapping 版本/并发控制与 audit log。
 - [ ] import job table、触发、进度、结果和错误摘要。

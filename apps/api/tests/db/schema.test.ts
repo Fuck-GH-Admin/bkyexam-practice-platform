@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { getTableName } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import {
+  adminSessions,
+  adminUserRoles,
+  adminUsers,
+  auditLogs,
   bankMappings,
   classifications,
   practiceAttempts,
@@ -20,6 +24,10 @@ describe('database schema', () => {
     expect(getTableName(classifications)).toBe('classifications');
     expect(getTableName(questions)).toBe('questions');
     expect(getTableName(questionOptions)).toBe('question_options');
+    expect(getTableName(adminUsers)).toBe('admin_users');
+    expect(getTableName(adminSessions)).toBe('admin_sessions');
+    expect(getTableName(adminUserRoles)).toBe('admin_user_roles');
+    expect(getTableName(auditLogs)).toBe('audit_logs');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -34,6 +42,51 @@ describe('database schema', () => {
     expect(studentSessions).toBeDefined();
     expect(practiceSessions).toBeDefined();
     expect(practiceSessionQuestions).toBeDefined();
+  });
+
+  it('defines admin identity, session, RBAC, and audit foundation tables', () => {
+    expect(adminUsers).toBeDefined();
+    expect(adminSessions).toBeDefined();
+    expect(adminUserRoles).toBeDefined();
+    expect(auditLogs).toBeDefined();
+
+    const adminUserColumnNames = getTableConfig(adminUsers).columns.map((column) => column.name);
+    const adminSessionIndexNames = getTableConfig(adminSessions).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+    const auditIndexNames = getTableConfig(auditLogs).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+
+    expect(adminUserColumnNames).toEqual([
+      'id',
+      'login_name',
+      'display_name',
+      'password_hash',
+      'status',
+      'created_at',
+      'updated_at',
+      'last_login_at',
+    ]);
+    expect(adminSessionIndexNames).toEqual(expect.arrayContaining([
+      'admin_sessions_admin_user_id_idx',
+      'admin_sessions_expires_at_idx',
+    ]));
+    expect(auditIndexNames).toEqual(expect.arrayContaining([
+      'audit_logs_actor_created_at_idx',
+      'audit_logs_resource_idx',
+      'audit_logs_action_created_at_idx',
+    ]));
+  });
+
+  it('adds admin ownership and optimistic concurrency fields to bank mappings', () => {
+    const columnNames = getTableConfig(bankMappings).columns.map((column) => column.name);
+
+    expect(columnNames).toEqual(expect.arrayContaining([
+      'version',
+      'updated_at',
+      'updated_by_admin_id',
+    ]));
   });
 
   it('tracks current practice position with a positive sort check', () => {

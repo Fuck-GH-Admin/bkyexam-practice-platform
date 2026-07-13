@@ -8,6 +8,7 @@ const configSchema = z.object({
   COOKIE_SECRET: z.string().default('dev-cookie-secret-change-me'),
   COOKIE_SECURE: z.string().optional().transform((value) => value === 'true'),
   SESSION_TTL_DAYS: z.string().optional().transform((value) => parsePositiveInteger(value, 30)),
+  ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
 });
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {

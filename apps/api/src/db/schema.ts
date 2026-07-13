@@ -7,6 +7,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -66,6 +67,78 @@ export const questionOptions = pgTable(
   (table) => [index('question_options_question_id_idx').on(table.questionId)],
 );
 
+export const adminUsers = pgTable(
+  'admin_users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    loginName: text('login_name').notNull().unique(),
+    displayName: text('display_name').notNull(),
+    passwordHash: text('password_hash').notNull(),
+    status: text('status').notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('admin_users_status_check', sql`${table.status} IN ('active', 'disabled')`),
+  ],
+);
+
+export const adminSessions = pgTable(
+  'admin_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    adminUserId: uuid('admin_user_id')
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('admin_sessions_admin_user_id_idx').on(table.adminUserId),
+    index('admin_sessions_expires_at_idx').on(table.expiresAt),
+  ],
+);
+
+export const adminUserRoles = pgTable(
+  'admin_user_roles',
+  {
+    adminUserId: uuid('admin_user_id')
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: 'cascade' }),
+    role: text('role').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.adminUserId, table.role] }),
+    index('admin_user_roles_role_idx').on(table.role),
+    check('admin_user_roles_role_check', sql`${table.role} IN ('content_editor', 'operator', 'super_admin')`),
+  ],
+);
+
+export const auditLogs = pgTable(
+  'audit_logs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    actorAdminId: uuid('actor_admin_id').references(() => adminUsers.id),
+    action: text('action').notNull(),
+    resourceType: text('resource_type').notNull(),
+    resourceId: text('resource_id').notNull(),
+    before: jsonb('before'),
+    after: jsonb('after'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    result: text('result').notNull().default('success'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('audit_logs_actor_created_at_idx').on(table.actorAdminId, table.createdAt.desc()),
+    index('audit_logs_resource_idx').on(table.resourceType, table.resourceId, table.createdAt.desc()),
+    index('audit_logs_action_created_at_idx').on(table.action, table.createdAt.desc()),
+    check('audit_logs_result_check', sql`${table.result} IN ('success', 'failure')`),
+  ],
+);
+
 export const bankMappings = pgTable(
   'bank_mappings',
   {
@@ -89,6 +162,9 @@ export const bankMappings = pgTable(
     notes: text('notes').notNull().default(''),
     questionCount: integer('question_count').notNull().default(0),
     descendantQuestionCount: integer('descendant_question_count').notNull().default(0),
+    version: integer('version').notNull().default(1),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedByAdminId: uuid('updated_by_admin_id').references(() => adminUsers.id),
   },
   (table) => [
     index('bank_mappings_subject_category_idx').on(table.subjectCategory),

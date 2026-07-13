@@ -161,7 +161,7 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定；Admin 后端 contract 已完成设计，但 route/shared schema 尚未实现；readiness/DB health 尚未定义。**
+当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation 已实现；Admin 业务 API 与 readiness/DB health 尚未完成。**
 
 ### 2.8 Verification
 
@@ -664,10 +664,12 @@ bank_mappings.version / updated_at / updated_by_admin_id
 
 目标：最小可运营闭环。
 
+状态：**进行中。B5.1 已完成，2026-07-13。**
+
 优先实现：
 
-1. admin identity + RBAC
-2. audit log
+1. admin identity + RBAC — **已完成**
+2. audit log foundation — **已完成**
 3. bank mappings list/detail/update
 4. batch visible/status
 5. system status
@@ -685,6 +687,47 @@ bank_mappings.version / updated_at / updated_by_admin_id
 - 学生 API 不暴露 admin 字段。
 - 本阶段不创建正式 Admin 前端；只允许补充功能流程、字段表和静态 wireframe 作为 contract 校验材料。
 - `npm run verify:docker` 通过。
+
+#### B5.1 实际落地
+
+- migration `0005_admin_foundation.sql`：
+  - `admin_users`
+  - `admin_sessions`
+  - `admin_user_roles`
+  - `audit_logs`
+  - `bank_mappings.version / updated_at / updated_by_admin_id`
+- 新增 Admin Auth repository/service/session：
+  - PostgreSQL repository
+  - memory repository
+  - 独立 `bky_admin_session`
+  - 默认 8 小时 TTL，可用 `ADMIN_SESSION_TTL_HOURS` 配置
+- 新增 RBAC helper：
+  - `content_editor`
+  - `operator`
+  - `super_admin`
+  - 显式 permission list
+- 新增 audit service：
+  - memory repository
+  - PostgreSQL `audit_logs` repository
+  - Admin login/logout 写 audit
+- 新增 routes：
+  - `POST /api/admin/auth/login`
+  - `GET /api/admin/me`
+  - `POST /api/admin/auth/logout`
+- 新增 shared v1 Admin Auth schema：
+  - admin role / permission
+  - login request/response
+  - me response
+  - logout response
+- 已验证：
+  - 管理员登录、恢复 session、退出。
+  - 学生 Cookie 和管理员 Cookie 隔离。
+  - 非管理员访问 `/api/admin/me` 返回 `401`。
+  - 缺少 `admin:self:read` 返回 `403`。
+  - PostgreSQL integration 覆盖 admin auth/session/audit。
+  - 不创建默认本地管理员账号。
+
+下一步：**B5.2 Bank Mapping Read APIs**。
 
 ### Phase B6 — Import Jobs And Data Health
 

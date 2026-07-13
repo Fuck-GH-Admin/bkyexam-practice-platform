@@ -1,3 +1,6 @@
+import { createAuditService, createPgAuditLogRepository } from './admin/audit.js';
+import { createPgAdminAuthRepository } from './admin/auth.js';
+import { createAdminSessionService, createPgAdminSessionRepository } from './admin/session.js';
 import { createPgStudentSessionRepository, createSessionService } from './auth/session.js';
 import { createPgStudentAuthRepository } from './auth/studentAuth.js';
 import { buildApp } from './app.js';
@@ -12,6 +15,7 @@ const config = loadConfig();
 const pool = config.USE_DATABASE ? createPgPool(config.DATABASE_URL) : undefined;
 const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
+  adminAuthRepository: pool ? createPgAdminAuthRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,
   practiceSessionService: pool ? createPgPracticeSessionService(pool) : undefined,
@@ -19,9 +23,14 @@ const app = buildApp({
   sessionService: pool
     ? createSessionService(createPgStudentSessionRepository(pool), { ttlDays: config.SESSION_TTL_DAYS })
     : undefined,
+  adminSessionService: pool
+    ? createAdminSessionService(createPgAdminSessionRepository(pool), { ttlHours: config.ADMIN_SESSION_TTL_HOURS })
+    : undefined,
+  auditService: pool ? createAuditService(createPgAuditLogRepository(pool)) : undefined,
   cookieSecret: config.COOKIE_SECRET,
   cookieSecure: config.COOKIE_SECURE,
   sessionTtlDays: config.SESSION_TTL_DAYS,
+  adminSessionTtlHours: config.ADMIN_SESSION_TTL_HOURS,
 });
 
 if (pool) {

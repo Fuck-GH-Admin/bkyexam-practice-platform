@@ -39,4 +39,22 @@ describe('initial database migration', () => {
     expect(sql).toContain('practice_session_drafts_student_id_idx');
     expect(sql).toContain('practice_session_drafts_question_id_idx');
   });
+
+  it('creates the admin foundation migration with RBAC, audit, and bank mapping metadata', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0005_admin_foundation.sql'), 'utf8');
+
+    for (const tableName of [
+      'admin_users',
+      'admin_sessions',
+      'admin_user_roles',
+      'audit_logs',
+    ]) {
+      expect(sql).toContain(`CREATE TABLE IF NOT EXISTS ${tableName}`);
+    }
+
+    expect(sql).toContain("CHECK (role IN ('content_editor', 'operator', 'super_admin'))");
+    expect(sql).toContain('audit_logs_actor_created_at_idx');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS updated_by_admin_id uuid REFERENCES admin_users(id)');
+  });
 });

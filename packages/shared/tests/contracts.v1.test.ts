@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   ApiErrorResponseV1Schema,
+  AdminLoginRequestV1Schema,
+  AdminLoginResponseV1Schema,
+  AdminLogoutResponseV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
@@ -36,6 +39,31 @@ describe('v1 auth/catalog/error/health contracts', () => {
 
     expect(AuthLogoutResponseV1Schema.parse({ success: true })).toEqual({ success: true });
     expect(() => AuthLogoutResponseV1Schema.parse({ success: false })).toThrow();
+  });
+
+  it('parses admin auth contracts with explicit roles and permissions', () => {
+    expect(AdminLoginRequestV1Schema.parse({
+      loginName: 'operator@example.com',
+      password: 'secret',
+    })).toEqual({
+      loginName: 'operator@example.com',
+      password: 'secret',
+    });
+
+    const response = AdminLoginResponseV1Schema.parse({
+      admin: {
+        id: 'admin-1',
+        loginName: 'operator@example.com',
+        displayName: 'Operator',
+        roles: ['operator'],
+        permissions: ['admin:self:read', 'bank_mapping:read', 'import_job:read'],
+      },
+      expiresAt: '2026-07-13T18:00:00.000Z',
+    });
+
+    expect(response.admin.roles).toEqual(['operator']);
+    expect(AdminLogoutResponseV1Schema.parse({ success: true })).toEqual({ success: true });
+    expect(() => AdminLoginRequestV1Schema.parse({ loginName: 'operator@example.com' })).toThrow();
   });
 
   it('requires student catalog banks to be visible and counter-safe', () => {

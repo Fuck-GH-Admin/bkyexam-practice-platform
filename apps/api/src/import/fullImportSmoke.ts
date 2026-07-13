@@ -106,6 +106,9 @@ export function assertCurrentCorpusImportCounts(counts: ImportQuestionBankCounts
 async function resetFullImportDatabase(client: QueryClient) {
   await client.query(`
     TRUNCATE TABLE
+      audit_logs,
+      admin_sessions,
+      admin_user_roles,
       practice_session_drafts,
       practice_session_questions,
       practice_sessions,
@@ -115,6 +118,7 @@ async function resetFullImportDatabase(client: QueryClient) {
       question_options,
       questions,
       bank_mappings,
+      admin_users,
       students,
       classifications
     RESTART IDENTITY CASCADE

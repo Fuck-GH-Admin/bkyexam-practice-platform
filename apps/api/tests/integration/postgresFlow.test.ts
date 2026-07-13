@@ -1,5 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createAuditService, createPgAuditLogRepository } from '../../src/admin/audit.js';
+import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
+import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
+import { hashPassword } from '../../src/auth/password.js';
 import { createPgStudentSessionRepository, createSessionService } from '../../src/auth/session.js';
 import { createPgStudentAuthRepository } from '../../src/auth/studentAuth.js';
 import { buildApp } from '../../src/app.js';
@@ -19,11 +23,14 @@ describe('PostgreSQL-backed API integration', () => {
   const pool = createPgPool(databaseUrl);
   const app = buildApp({
     authRepository: createPgStudentAuthRepository(pool),
+    adminAuthRepository: createPgAdminAuthRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
     practiceSessionService: createPgPracticeSessionService(pool),
     wrongQuestionRepository: createPgWrongQuestionRepository(pool),
     sessionService: createSessionService(createPgStudentSessionRepository(pool), { ttlDays: 1 }),
+    adminSessionService: createAdminSessionService(createPgAdminSessionRepository(pool), { ttlHours: 8 }),
+    auditService: createAuditService(createPgAuditLogRepository(pool)),
     cookieSecret: 'postgres-integration-cookie-secret',
     logger: false,
   });
@@ -33,6 +40,7 @@ describe('PostgreSQL-backed API integration', () => {
     try {
       await runMigrations(client, migrationsDir);
       await resetAndSeedPostgresFixture(client);
+      await seedIntegrationAdmin(client);
     } finally {
       client.release();
     }
@@ -52,6 +60,57 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(login.statusCode).toBe(200);
     const aliceCookie = extractCookie(login.headers['set-cookie']);
+
+    const adminLogin = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/login',
+      payload: { loginName: 'integration-operator@example.com', password: 'secret' },
+    });
+    expect(adminLogin.statusCode).toBe(200);
+    expect(adminLogin.json()).toMatchObject({
+      admin: {
+        id: '50000000-0000-4000-8000-000000000001',
+        loginName: 'integration-operator@example.com',
+        displayName: 'Integration Operator',
+        roles: ['operator'],
+        permissions: expect.arrayContaining(['admin:self:read', 'import_job:create']),
+      },
+      expiresAt: expect.any(String),
+    });
+    const adminCookie = extractCookie(adminLogin.headers['set-cookie']);
+    expect(adminCookie).toContain('bky_admin_session=');
+    expect(adminCookie).not.toContain('bky_session=');
+
+    const adminMe = await app.inject({
+      method: 'GET',
+      url: '/api/admin/me',
+      headers: { cookie: adminCookie },
+    });
+    expect(adminMe.statusCode).toBe(200);
+    expect(adminMe.json().admin.loginName).toBe('integration-operator@example.com');
+
+    const adminAuditState = await pool.query<{ audit_count: string }>(`
+      SELECT COUNT(*) AS audit_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND action = 'admin.auth.login'
+        AND result = 'success'
+    `, ['50000000-0000-4000-8000-000000000001']);
+    expect(adminAuditState.rows[0]).toEqual({ audit_count: '1' });
+
+    const studentMeWithAdminCookie = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: adminCookie },
+    });
+    expect(studentMeWithAdminCookie.statusCode).toBe(401);
+
+    const adminMeWithStudentCookie = await app.inject({
+      method: 'GET',
+      url: '/api/admin/me',
+      headers: { cookie: aliceCookie },
+    });
+    expect(adminMeWithStudentCookie.statusCode).toBe(401);
 
     const me = await app.inject({
       method: 'GET',
@@ -445,6 +504,29 @@ describe('PostgreSQL-backed API integration', () => {
     expect(afterLogout.statusCode).toBe(401);
   });
 });
+
+async function seedIntegrationAdmin(client: { query: (sql: string, params?: readonly unknown[]) => Promise<unknown> }) {
+  const passwordHash = await hashPassword('secret');
+  await client.query(
+    `
+      INSERT INTO admin_users (id, login_name, display_name, password_hash, status)
+      VALUES ($1, $2, $3, $4, 'active')
+    `,
+    [
+      '50000000-0000-4000-8000-000000000001',
+      'integration-operator@example.com',
+      'Integration Operator',
+      passwordHash,
+    ],
+  );
+  await client.query(
+    `
+      INSERT INTO admin_user_roles (admin_user_id, role)
+      VALUES ($1, 'operator')
+    `,
+    ['50000000-0000-4000-8000-000000000001'],
+  );
+}
 
 function extractCookie(header: string | string[] | undefined) {
   const value = Array.isArray(header) ? header[0] : header;

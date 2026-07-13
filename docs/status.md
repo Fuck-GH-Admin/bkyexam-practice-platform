@@ -11,7 +11,7 @@
 - **学生客观题 MVP：可内部试用。**
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
-- **管理平台：后端 contract 已完成设计，尚未开始实现。**
+- **管理平台：Admin Auth/RBAC/Audit foundation 已实现，尚未开始前端。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -20,7 +20,7 @@
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 88%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练均可用；账户、统计、归档和部分 UX 未完成 |
 | 公开生产就绪度 | **约 55%** | 缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
-| 完整产品愿景 | **约 59%** | 学生信息架构与管理端后端 contract 已落地，但分母仍包含管理平台实现、全题型、运营与生产能力 |
+| 完整产品愿景 | **约 60%** | 学生信息架构、管理端后端 contract 与 Admin Auth/RBAC/Audit foundation 已落地，但分母仍包含管理业务 API、前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -36,10 +36,10 @@ npm run verify:docker  PASS
 
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
-| `packages/shared` | 2 | 13 |
-| `apps/api` | 33 | 246 |
+| `packages/shared` | 2 | 14 |
+| `apps/api` | 38 | 273 |
 | `apps/web` | 2 | 31 |
-| **Total** | **37** | **290** |
+| **Total** | **42** | **318** |
 
 仓库内 Playwright smoke：
 
@@ -57,7 +57,7 @@ Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个
 | --- | ---: | ---: |
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
-该测试从空数据库执行四份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成登录、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行五份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成学生登录、Admin Auth/RBAC/audit、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
 
 全量题库慢速 smoke：
 
@@ -278,7 +278,7 @@ PracticeSessionService
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
-| Admin console | 已完成后端 contract 设计，未实现 | 8% | 数据字段、自动 mapping、角色/权限/API/migration 设计 | 管理应用、RBAC/API/migration/审计实现、工作流 UI |
+| Admin console | 后端基础进行中，前端未实现 | 12% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*` | 管理业务 API、题库整理 command、管理应用、工作流 UI |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
 | Operations | 可重复验证 | 70% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
 
@@ -287,7 +287,7 @@ PracticeSessionService
 ### P0 Before Public Production
 
 - 当前登录策略接近“用户名即身份”，不适合公开环境。
-- 没有已实现的管理员认证与权限；后端 contract 已完成设计。
+- 已有 Admin Auth/RBAC/session/audit foundation，但没有完整管理业务 API、管理员账号管理 UI 和正式运营流程。
 - 没有备份/恢复演练、监控和告警。
 - 没有对正式域名部署进行本轮验收。
 

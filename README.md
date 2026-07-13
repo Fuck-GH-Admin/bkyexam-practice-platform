@@ -2,7 +2,7 @@
 
 BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已经形成可真实运行的“学生客观题练习闭环”，不再只是 Phase 1 脚手架。
 
-截至 **2026-07-11**，已实现并验证：
+截至 **2026-07-13**，已实现并验证：
 
 - 将 BKYExam 原始题库导入 PostgreSQL，并自动生成学生可见题库映射。
 - 基于固定用户名的学生身份、服务端 Cookie 会话、退出与会话恢复。
@@ -12,12 +12,13 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
-- Practice/Wrongbook v1 共享 Zod contract，并在 API 输出与 Web 输入两侧运行时校验。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session` 和 `/api/admin/auth/*`。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
-- 管理平台及管理员权限体系。
+- 完整管理平台、题库整理业务 API 和管理端 UI。
 - 正式学生账户、档案、学习统计和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。

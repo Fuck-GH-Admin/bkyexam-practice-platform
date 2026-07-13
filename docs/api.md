@@ -2,7 +2,7 @@
 
 Base path：`/api`
 
-除 health、login 和当前的 bank list 外，学生业务路由均依赖 `bky_session` Cookie。
+除 health、login 和当前的 bank list 外，学生业务路由均依赖 `bky_session` Cookie；管理端路由依赖独立的 `bky_admin_session` Cookie。
 
 ## Common Conventions
 
@@ -138,6 +138,65 @@ Errors：
 ### `POST /api/auth/logout`
 
 撤销当前服务端 session 并清除 Cookie。没有当前 session 时仍返回成功。
+
+Response：
+
+```json
+{
+  "success": true
+}
+```
+
+## Admin Auth
+
+Admin Auth 是 B5.1 已实现的第一组 `/api/admin/*` route。管理员 session 与学生 session 完全隔离：学生 Cookie 不能访问 Admin API，Admin Cookie 不能访问学生 `/api/auth/me`。
+
+### `POST /api/admin/auth/login`
+
+验证管理员凭据，创建 `bky_admin_session`，并写入 `admin.auth.login` audit log。
+
+Request：
+
+```json
+{
+  "loginName": "operator@example.com",
+  "password": "secret"
+}
+```
+
+Response：
+
+```json
+{
+  "admin": {
+    "id": "admin-user-uuid",
+    "loginName": "operator@example.com",
+    "displayName": "Operator",
+    "roles": ["operator"],
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"]
+  },
+  "expiresAt": "2026-07-13T18:00:00.000Z"
+}
+```
+
+Errors：
+
+- `400`：请求体无效，或缺少 password。
+- `401`：凭据错误。
+- `403`：管理员账号已禁用。
+
+### `GET /api/admin/me`
+
+返回当前管理员和权限。需要 `bky_admin_session` 和 `admin:self:read`。
+
+Errors：
+
+- `401`：Cookie 缺失、过期、无效或已撤销。
+- `403`：管理员 session 有效但缺少权限。
+
+### `POST /api/admin/auth/logout`
+
+撤销当前管理员 session、清除 `bky_admin_session`，并在有当前管理员时写入 `admin.auth.logout` audit log。没有当前 session 时仍返回成功。
 
 Response：
 
@@ -652,9 +711,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/通用 error/health DTO 已来自 shared v1；Admin 后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin API 已在 [admin-backend-contract.md](admin-backend-contract.md) 完成后端 contract 设计，但 route/shared schema 尚未实现。
+- Admin Auth route/shared schema 已实现；Admin Bank Mapping、Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

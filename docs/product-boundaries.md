@@ -306,7 +306,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、通用 error 已迁入 shared v1；Admin 后端 contract 已完成设计，但 shared schema/route 尚未实现。
+- Auth、Catalog、Admin Auth、通用 error 已迁入 shared v1；Admin 其余后端 contract 已完成设计，但 shared schema/route 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision
