@@ -1,5 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ApiErrorResponseV1Schema,
+  AuthLoginResponseV1Schema,
+  AuthLogoutResponseV1Schema,
+  AuthMeResponseV1Schema,
+  CatalogBankListResponseV1Schema,
   MarkWrongQuestionMasteredResponseV1Schema,
   ObjectivePracticeQuestionTypesV1,
   PracticePayloadV1Schema,
@@ -10,6 +15,8 @@ import {
   WrongQuestionDetailResponseV1Schema,
   WrongQuestionListResponseV1Schema,
   WrongQuestionReviewSessionResponseV1Schema,
+  type AuthStudentV1,
+  type CatalogBankV1,
   type PracticeSessionCardV1,
   type WrongQuestionDetailV1,
   type WrongQuestionItemV1,
@@ -60,22 +67,8 @@ export {
   hydrateReviewFlagsFromQuestions,
 } from './features/practice/model';
 
-type Student = {
-  id?: string;
-  loginName: string;
-  displayName: string;
-};
-
-type Bank = {
-  bankId: string;
-  bankName: string;
-  subjectCategory: string;
-  subjectName: string;
-  keywords: string[];
-  questionCount: number;
-  description: string;
-};
-
+type Student = AuthStudentV1;
+type Bank = CatalogBankV1;
 type WrongQuestion = WrongQuestionItemV1;
 type WrongQuestionDetail = WrongQuestionDetailV1;
 
@@ -176,7 +169,8 @@ async function api<T>(
   const body = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    throw new Error(body?.error ?? `请求失败：${response.status}`);
+    const error = ApiErrorResponseV1Schema.safeParse(body);
+    throw new Error(error.success ? error.data.error : `请求失败：${response.status}`);
   }
 
   return parse ? parse(body) : body as T;
@@ -322,7 +316,7 @@ export function App() {
 
   async function restoreSession() {
     try {
-      const result = await api<{ student: Student }>('/api/auth/me');
+      const result = await api('/api/auth/me', {}, (body) => AuthMeResponseV1Schema.parse(body));
       setStudent(result.student);
     } catch {
       setStudent(null);
@@ -334,10 +328,14 @@ export function App() {
     setMessage('');
     setLoading(true);
     try {
-      const result = await api<{ student: Student }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ loginName }),
-      });
+      const result = await api(
+        '/api/auth/login',
+        {
+          method: 'POST',
+          body: JSON.stringify({ loginName }),
+        },
+        (body) => AuthLoginResponseV1Schema.parse(body),
+      );
       setStudent(result.student);
       setLoginName('');
     } catch (error) {
@@ -348,7 +346,7 @@ export function App() {
   }
 
   async function logout() {
-    await api('/api/auth/logout', { method: 'POST', body: '{}' });
+    await api('/api/auth/logout', { method: 'POST', body: '{}' }, (body) => AuthLogoutResponseV1Schema.parse(body));
     setStudent(null);
     setSession(null);
     setQuestions([]);
@@ -464,7 +462,7 @@ export function App() {
   async function loadBanks() {
     setMessage('');
     try {
-      const result = await api<{ banks: Bank[] }>('/api/banks');
+      const result = await api('/api/banks', {}, (body) => CatalogBankListResponseV1Schema.parse(body));
       setBanks(result.banks);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '题库加载失败');

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../../src/app';
+import type { BankRepository } from '../../src/routes/banks';
 
 describe('bank explorer route', () => {
   it('returns visible bank list', async () => {
@@ -75,5 +76,28 @@ describe('bank explorer route', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ banks: [] });
+  });
+
+  it('fails closed when a repository returns a hidden student catalog item', async () => {
+    const bankRepository: BankRepository = {
+      async listBanks() {
+        return [{
+          bankId: 'hidden-bank',
+          bankName: '隐藏题库',
+          subjectCategory: '信息技术',
+          subjectName: '安全边界',
+          visible: false,
+          status: 'hidden',
+          keywords: [],
+          questionCount: 1,
+          description: 'Should not be returned from the student catalog.',
+        }];
+      },
+    };
+    const app = buildApp({ bankRepository });
+
+    const response = await app.inject({ method: 'GET', url: '/api/banks' });
+
+    expect(response.statusCode).toBe(500);
   });
 });

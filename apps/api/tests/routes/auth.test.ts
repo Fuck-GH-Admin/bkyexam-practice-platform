@@ -103,6 +103,26 @@ describe('auth route', () => {
     expect(response.statusCode).toBe(400);
   });
 
+  it('fails closed when the auth repository returns an invalid student payload', async () => {
+    const repository: StudentAuthRepository = {
+      async findByLoginName(loginName) {
+        return { loginName, displayName: '' };
+      },
+      async createStudent(student) {
+        return student;
+      },
+    };
+    const app = buildApp({ authRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { loginName: 'alice' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
   it('sets a httpOnly session cookie on login and returns /api/auth/me', async () => {
     const { service, createdSessionStudentIds } = fakeSessionService();
     const app = buildApp({ authRepository: fakeStudentAuthRepository(), sessionService: service });

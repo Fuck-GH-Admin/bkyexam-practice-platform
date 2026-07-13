@@ -65,7 +65,8 @@ Response：
 
 ```json
 {
-  "status": "ok"
+  "ok": true,
+  "service": "bkyexam-practice-api"
 }
 ```
 
@@ -651,7 +652,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook DTO 已来自 shared v1；Auth、Catalog、通用 error 与 Admin contract 尚未迁移。
+- Practice/Wrongbook/Auth/Catalog/通用 error/health DTO 已来自 shared v1；Admin contract 尚未迁移。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

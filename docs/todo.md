@@ -5,6 +5,18 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B3 — 2026-07-13
+
+- [x] 新增 shared v1 `auth.ts`，覆盖 login/me/logout response 和学生 DTO。
+- [x] 新增 shared v1 `catalog.ts`，覆盖学生端 bank list response。
+- [x] 新增 shared v1 `error.ts`，固定 `{ error: string }` 通用错误形状。
+- [x] 新增 shared v1 `health.ts`，覆盖 `/api/health` response。
+- [x] Auth、Catalog、Health API 成功响应执行 shared schema parse。
+- [x] Web 登录、恢复登录、退出和题库列表执行 shared schema parse。
+- [x] Web API helper 对非 2xx response 使用 `ApiErrorResponseV1Schema`。
+- [x] 增加 Auth/Catalog fail-closed route 回归。
+- [x] `npm run verify:docker` 通过。
+
 ## Completed Backend B2 — 2026-07-13
 
 - [x] 新增 `WrongQuestionService`，由 service 编排错题再练创建。
@@ -46,7 +58,7 @@
 - [x] 在仓库中增加 Playwright E2E 配置，不依赖临时 runner。
 - [x] 增加 PostgreSQL integration test job。
 - [x] 为完整导入提供可选的慢速 smoke profile。
-- [x] 为 API DTO 增加共享 Zod contract，覆盖 Practice 与 Wrongbook，并在 API/Web 两侧 runtime parse。
+- [x] 为 API DTO 增加共享 Zod contract，覆盖 Practice、Wrongbook、Auth、Catalog、Error、Health，并在 API/Web 两侧 runtime parse。
 - [x] 明确并版本化 `completedCount` 语义为 answered/graded questions；后续更名必须走显式迁移。
 - [x] 降低测试中的 Fastify request log 噪音。
 - [x] 增加 Boolean false、opaque/UUID option answer 和不合法 response fail-closed 回归。

@@ -1,3 +1,7 @@
+export * from './auth.js';
+export * from './catalog.js';
 export * from './common.js';
+export * from './error.js';
+export * from './health.js';
 export * from './practice.js';
 export * from './wrongbook.js';

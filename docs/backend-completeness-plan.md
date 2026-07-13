@@ -149,6 +149,10 @@
 - Practice response schema
 - Practice session card/page schema
 - Wrongbook response schema
+- Auth response schema
+- Catalog bank list schema
+- Common error schema
+- Health response schema
 - submitted answer primitive
 - UUID / opaque option ID primitive
 - `completedCount` 语义常量：
@@ -157,17 +161,17 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**Practice/Wrongbook contract 稳定，Auth/Catalog/Admin 尚未迁入 shared**。
+当前定位：**学生端主要 runtime contract 已稳定，Admin/Import/readiness 尚未定义**。
 
 ### 2.8 Verification
 
 已完成质量门：
 
 - `npm run verify:docker`
-- 285 Vitest
-- 244 API tests
+- 290 Vitest
+- 246 API tests
 - 31 Web tests
-- 10 Shared tests
+- 13 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -356,14 +360,15 @@
 - Practice
 - Practice session page/card
 - Wrongbook
+- Auth
+- Catalog
+- 通用 error
+- Health
 
 未覆盖：
 
-- Auth
-- Catalog
 - Admin
-- 通用 error
-- Health/readiness
+- Readiness/DB health
 - Import job
 - 部分 request schema 在 route 中仍手写
 
@@ -544,6 +549,8 @@ POST /api/wrong-questions/review-sessions
 
 ### Phase B3 — Shared Contract Expansion
 
+状态：**已完成，2026-07-13。**
+
 目标：把 Auth、Catalog、Error 的 contract 补齐。
 
 新增 shared schema：
@@ -552,6 +559,7 @@ POST /api/wrong-questions/review-sessions
 contracts/v1/auth.ts
 contracts/v1/catalog.ts
 contracts/v1/error.ts
+contracts/v1/health.ts
 ```
 
 覆盖：
@@ -561,7 +569,7 @@ contracts/v1/error.ts
 - logout response
 - bank list response
 - common error shape
-- health response 或 readiness response
+- health response
 
 迁移方式：
 
@@ -574,8 +582,17 @@ contracts/v1/error.ts
 
 - Auth/Catalog 错误 payload 不会被当成成功数据。
 - API/Web 两侧统一类型。
-- `npm run verify:docker` 通过。
+- `npm run verify:docker` 已通过。
 - commit 一次。
+
+实际落地：
+
+- Auth login/me/logout success response 由 API 与 Web 双侧 parse。
+- Catalog bank list response 由 API 与 Web 双侧 parse。
+- Web API helper 对非 2xx response 使用 `ApiErrorResponseV1Schema`。
+- `/api/health` response 使用 `HealthResponseV1Schema`。
+- route 回归覆盖 Auth/Catalog 不合法 repository payload fail-closed。
+- readiness/DB health 不在本阶段完成，后续放到 Production Backend Readiness。
 
 ### Phase B4 — Admin Backend Contract Design
 

@@ -57,7 +57,7 @@ API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运�
 
 共享 Zod schema、versioned API contract 与 TypeScript 类型。
 
-当前 `contracts/v1` 已覆盖 Practice 与 Wrongbook 的主要 response、请求模型和 answer/UUID primitive。API repository、Fastify route 与 Web state 使用同一套类型；成功响应在服务器发送前和 Web 接收后各执行一次 runtime parse。
+当前 `contracts/v1` 已覆盖 Practice、Wrongbook、Auth、Catalog、通用 Error 与 Health 的主要 response，以及 Practice/Wrongbook 请求模型和 answer/UUID primitive。API repository、Fastify route 与 Web state 使用同一套类型；成功响应在服务器发送前和 Web 接收后各执行一次 runtime parse。
 
 ```text
 repository
@@ -68,7 +68,7 @@ repository
   -> feature state
 ```
 
-Auth、Catalog、通用 error 和未来 Admin contract 尚未迁入 shared。详细规则见 [contracts.md](contracts.md)。
+Admin、Import Job 和 readiness/DB health contract 尚未迁入 shared。详细规则见 [contracts.md](contracts.md)。
 
 ### PostgreSQL
 
@@ -169,7 +169,7 @@ questionbank/*.txt
 3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射和 request validation。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
 5. Wrongbook 已通过 service 调 Practice 创建再练 session，但目录尚未迁入 `modules/wrongbook`。
-6. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
+6. 学生端主要 response DTO 已共享，但 request parser、Auth/Catalog module 目录和通用 API helper 仍未完全收敛。
 7. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
 8. 管理平台没有独立应用、权限模型和 API namespace。
 

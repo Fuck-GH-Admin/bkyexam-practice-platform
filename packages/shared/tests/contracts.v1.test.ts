@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ApiErrorResponseV1Schema,
+  AuthLoginResponseV1Schema,
+  AuthLogoutResponseV1Schema,
+  CatalogBankListResponseV1Schema,
+  HealthResponseV1Schema,
   CreatePracticeSessionRequestV1Schema,
   ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
@@ -16,6 +21,56 @@ const bankId = '10000000-0000-4000-8000-000000000001';
 const sessionId = '20000000-0000-4000-8000-000000000001';
 const questionId = '30000000-0000-4000-8000-000000000001';
 const wrongQuestionId = '40000000-0000-4000-8000-000000000001';
+
+describe('v1 auth/catalog/error/health contracts', () => {
+  it('parses auth responses with optional student ids and strict logout success', () => {
+    expect(AuthLoginResponseV1Schema.parse({
+      student: { loginName: 'alice', displayName: 'Alice' },
+    })).toEqual({
+      student: { loginName: 'alice', displayName: 'Alice' },
+    });
+
+    expect(AuthLoginResponseV1Schema.parse({
+      student: { id: 'student-1', loginName: 'alice', displayName: 'Alice' },
+    }).student.id).toBe('student-1');
+
+    expect(AuthLogoutResponseV1Schema.parse({ success: true })).toEqual({ success: true });
+    expect(() => AuthLogoutResponseV1Schema.parse({ success: false })).toThrow();
+  });
+
+  it('requires student catalog banks to be visible and counter-safe', () => {
+    const response = CatalogBankListResponseV1Schema.parse({
+      banks: [{
+        bankId: 'english-basic',
+        bankName: '考研英语基础题库',
+        subjectCategory: '英语',
+        subjectName: '考研英语',
+        visible: true,
+        status: 'published',
+        keywords: ['英语', '阅读'],
+        questionCount: 120,
+        description: 'Phase 2 seed bank for English practice.',
+      }],
+    });
+
+    expect(response.banks[0]?.bankId).toBe('english-basic');
+    expect(() => CatalogBankListResponseV1Schema.parse({
+      banks: [{ ...response.banks[0], visible: false }],
+    })).toThrow('student catalog bank must be visible');
+    expect(() => CatalogBankListResponseV1Schema.parse({
+      banks: [{ ...response.banks[0], questionCount: -1 }],
+    })).toThrow();
+  });
+
+  it('parses common error and health responses', () => {
+    expect(ApiErrorResponseV1Schema.parse({ error: 'Unauthenticated' })).toEqual({ error: 'Unauthenticated' });
+    expect(() => ApiErrorResponseV1Schema.parse({ error: '' })).toThrow();
+    expect(HealthResponseV1Schema.parse({ ok: true, service: 'bkyexam-practice-api' })).toEqual({
+      ok: true,
+      service: 'bkyexam-practice-api',
+    });
+  });
+});
 
 describe('v1 practice contracts', () => {
   it('accepts a partial completed session and fixes completedCount semantics', () => {

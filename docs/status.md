@@ -36,10 +36,10 @@ npm run verify:docker  PASS
 
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
-| `packages/shared` | 2 | 10 |
-| `apps/api` | 33 | 244 |
+| `packages/shared` | 2 | 13 |
+| `apps/api` | 33 | 246 |
 | `apps/web` | 2 | 31 |
-| **Total** | **37** | **285** |
+| **Total** | **37** | **290** |
 
 仓库内 Playwright smoke：
 
@@ -82,22 +82,24 @@ npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 - shared TypeScript build：通过。
 - API TypeScript build：通过。
 - Web Vite build：通过。
-- Web bundle：约 `297.37 kB` JS（gzip `88.54 kB`）。
+- Web bundle：约 `298.20 kB` JS（gzip `88.74 kB`）。
 - Web CSS：约 `20.26 kB`（gzip `4.98 kB`）。
 
 主 JS 当前包含 Web 运行时 Zod response validation 和所有学生页面；内部 MVP 可以接受，下一轮 Web modularization 应引入 route-level code splitting。
 
 ## Verified Contract Boundary
 
-Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
+Practice/Wrongbook/Auth/Catalog/Error/Health v1 contract 已落到 `packages/shared/src/contracts/v1`：
 
 - API repository DTO 直接引用共享类型。
-- Fastify 在发送 Practice/Wrongbook 成功响应前执行共享 schema parse。
+- Fastify 在发送 Practice/Wrongbook/Auth/Catalog/Health 成功响应前执行共享 schema parse。
 - Web 在把对应响应写入 React state 前执行同一共享 schema parse。
-- route 回归验证 repository 返回不合法计数或 wrongbook 数据时 fail closed 为 `500`。
+- Web 对非 2xx 响应按 `ApiErrorResponseV1Schema` 读取错误消息。
+- route 回归验证 repository 返回不合法 Practice/Wrongbook/Auth/Catalog 数据时 fail closed 为 `500`。
 - `false` 判断题答案、opaque option ID、legacy 大小写 UUID 和部分作答 completed session 均有 contract 回归。
 - `completedCount` 的 v1 语义固定为 `answered_or_graded_questions`。
 - 会话卡片/page contract 固定 `origin`、active/completed timestamp、answered/review counters 和分页边界。
+- 学生 catalog contract 固定 `visible=true` 和非负 `questionCount`。
 
 详细规则见 [contracts.md](contracts.md)。
 
@@ -271,8 +273,8 @@ PracticeSessionService
 | Area | 状态 | 估算 | 已有 | 主要缺口 |
 | --- | --- | ---: | --- | --- |
 | Corpus parser/import | 稳定 | 90% | 全量解析、事务导入、幂等 upsert、smoke | 进度事件、错误报告 UI、增量策略 |
-| Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选 | 管理编辑、审批、审计、质量抽查 |
-| Student identity/session | MVP | 60% | 固定用户名、Cookie session、恢复/退出 | 正式凭据、角色、找回、身份合并、安全策略 |
+| Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选、v1 runtime contract | 管理编辑、审批、审计、质量抽查 |
+| Student identity/session | MVP | 60% | 固定用户名、Cookie session、恢复/退出、v1 runtime contract | 正式凭据、角色、找回、身份合并、安全策略 |
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
@@ -292,7 +294,7 @@ PracticeSessionService
 ### P1 Before Large Feature Expansion
 
 - `App.tsx` 和 Practice routes 仍偏大；Practice repository 已拆成模块，但 submit service、route validation 与错误映射仍待后续分离。
-- Auth 与 Catalog DTO 仍在各端手写；Practice/Wrongbook 重复 DTO 已迁入 shared v1。
+- Auth、Catalog、Practice、Wrongbook、Error 与 Health DTO 已迁入 shared v1；request parser 仍未统一。
 - session 集合已有后端分页，但首页/历史尚无“加载更多”、放弃或归档 active session 的交互。
 - 轻量 History API router 尚无 route-level code splitting、navigation guard 与统一错误页。
 - `completedCount` 已在 v1 contract 固定为 answered/graded count，但字段名称仍容易误解；未来更名必须走显式版本迁移。

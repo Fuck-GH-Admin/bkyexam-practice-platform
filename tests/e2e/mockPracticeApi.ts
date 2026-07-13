@@ -176,6 +176,8 @@ export async function installMockPracticeApi(page: Page, state: MockPracticeStat
           bankName: '信息技术综合练习',
           subjectCategory: '信息技术',
           subjectName: '计算机基础',
+          visible: true,
+          status: 'active',
           keywords: ['操作系统', '数据库', '网络'],
           questionCount: state.questions.length,
           description: '浏览器稳定性测试题库',

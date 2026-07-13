@@ -1,16 +1,20 @@
 # Versioned API Contracts
 
-状态日期：**2026-07-11**
+状态日期：**2026-07-13**
 
 本页描述跨 API、学生端和 repository 使用的稳定数据边界。当前版本号是代码命名空间中的 `v1`，不会额外写入每个 HTTP response。
 
 ## Source Of Truth
 
-Practice 与 Wrongbook 的共享 contract 位于：
+共享 contract 位于：
 
 ```text
 packages/shared/src/contracts/v1/
+  auth.ts
+  catalog.ts
   common.ts
+  error.ts
+  health.ts
   practice.ts
   wrongbook.ts
 ```
@@ -28,10 +32,11 @@ PostgreSQL / memory repository
   -> React state
 ```
 
-因此 Practice/Wrongbook 的成功响应如果偏离 v1：
+因此已接入的成功响应如果偏离 v1：
 
 - API 会把 repository/编排错误作为 `500` 暴露，而不是发送不可信 payload。
 - Web 不会把不符合 contract 的响应直接写入页面状态。
+- Web 会按 `ApiErrorResponseV1Schema` 读取非 2xx error payload，避免把错误响应当成功数据使用。
 
 大多数 Fastify 请求参数仍保留现有手写 parser，以维持既有错误消息和兼容行为。`GET /api/practice/sessions` 已直接使用 `ListPracticeSessionsRequestV1Schema`；其余共享 request schema 后续逐路由迁移。
 
@@ -43,14 +48,16 @@ PostgreSQL / memory repository
 | Practice session collection | `PracticeSessionCardV1Schema`, `PracticeSessionPageV1Schema`, `ListPracticeSessionsRequestV1Schema` |
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
+| Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
+| Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
+| Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未覆盖：
 
-- Auth response。
-- Bank/Catalog response。
 - Admin API。
-- 通用 error response 的版本化 schema。
+- Import job API。
+- Readiness/DB health。
 
 ## Frozen V1 Semantics
 
@@ -115,6 +122,25 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 - 详情的 `correctAnswer` 已规范化为 typed answer。
 - review session response 必须返回 canonical session UUID 与正数题量。
 
+### Auth
+
+- `student.loginName` 与 `student.displayName` 必须是非空字符串。
+- `student.id` 当前可选：默认内存登录 response 仍不返回 id，`/api/auth/me` 和 PostgreSQL session 路径会返回 id。
+- logout response 固定为 `{ "success": true }`。
+
+### Catalog
+
+- 学生端 catalog item 必须是 `visible=true`。
+- `questionCount` 必须是非负整数。
+- `bankId` 在 catalog v1 中是非空 opaque string：本地 seed bank 仍使用稳定 slug；创建练习时仍要求 PostgreSQL canonical UUID。
+- `status` 当前是非空字符串，用于兼容本地 seed 的 `published` 与 PostgreSQL mapping 的 `active`。
+
+### Error And Health
+
+- 通用 error response 固定为 `{ "error": "non-empty message" }`。
+- `/api/health` 当前 response 固定为 `{ "ok": true, "service": "bkyexam-practice-api" }`。
+- 当前 health 只代表 Fastify 进程可响应，不代表 PostgreSQL readiness。
+
 ## Versioning Rules
 
 以下变化可以在评审后保留 v1：
@@ -145,17 +171,17 @@ npm run build:shared
 
 当前回归包括：
 
-- shared schema 的边界、`false`、计数不变量和 legacy UUID 测试。
-- Fastify route 对不合法 repository payload fail-closed 的测试。
-- Web model 对空白文本、`false` 和 option answer 的测试。
+- shared schema 的边界、Auth/Catalog/Error/Health、`false`、计数不变量和 legacy UUID 测试。
+- Fastify route 对不合法 Practice/Wrongbook/Auth/Catalog payload fail-closed 的测试。
+- Web model 对空白文本、`false`、option answer 和 catalog item 类型的测试。
 - Playwright mock API 通过同一 Web runtime parser。
 - 真实 PostgreSQL integration 通过 API route runtime parser。
 
 ## Remaining Contract Debt
 
-- Auth 与 Catalog DTO 仍由各端手写。
 - 请求 parser 尚未统一到共享 Zod schema。
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
 - Admin contract 尚未定义。
+- Readiness/DB health 和 Import Job contract 尚未定义。
