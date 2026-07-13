@@ -32,6 +32,8 @@ import {
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
   HealthResponseV1Schema,
+  GetLearningDashboardRequestV1Schema,
+  LearningDashboardResponseV1Schema,
   CreatePracticeSessionRequestV1Schema,
   ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
@@ -494,6 +496,63 @@ describe('v1 auth/catalog/error/health contracts', () => {
       ok: true,
       service: 'bkyexam-practice-api',
     });
+  });
+
+  it('parses learning dashboard contracts and counter boundaries', () => {
+    expect(GetLearningDashboardRequestV1Schema.parse({ recentLimit: '3' })).toEqual({ recentLimit: 3 });
+    expect(GetLearningDashboardRequestV1Schema.parse({})).toEqual({ recentLimit: 5 });
+
+    const dashboard = LearningDashboardResponseV1Schema.parse({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      summary: {
+        activeSessions: 2,
+        completedSessions: 1,
+        reviewSessions: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestions: 1,
+        masteredWrongQuestions: 1,
+        pendingWrongQuestions: 0,
+        lastPracticedAt: '2026-07-14T09:00:00.000Z',
+      },
+      recentBanks: [{
+        bankId,
+        bankName: '数据库测试题库',
+        subjectCategory: '质量保障',
+        subjectName: 'PostgreSQL',
+        lastPracticedAt: '2026-07-14T09:00:00.000Z',
+        sessions: 3,
+        completedSessions: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestions: 1,
+      }],
+      questionTypes: [{
+        questionType: 'single_choice',
+        attempts: 1,
+        gradedAttempts: 1,
+        correctAttempts: 1,
+        accuracy: 1,
+        wrongQuestions: 0,
+      }],
+      wrongbook: {
+        total: 1,
+        mastered: 1,
+        pending: 0,
+        lastWrongAt: '2026-07-14T08:30:00.000Z',
+      },
+    });
+
+    expect(dashboard.summary.accuracy).toBe(0.6667);
+    expect(() => LearningDashboardResponseV1Schema.parse({
+      ...dashboard,
+      summary: { ...dashboard.summary, correctAttempts: 4 },
+    })).toThrow('correctAttempts cannot exceed gradedAttempts');
+    expect(() => GetLearningDashboardRequestV1Schema.parse({ recentLimit: '11' })).toThrow();
   });
 });
 

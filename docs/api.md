@@ -38,7 +38,7 @@ type SubmittedAnswer = string[] | boolean | string;
 
 ### Versioned Runtime Contract
 
-Practice 与 Wrongbook 的成功响应使用 `packages/shared/src/contracts/v1` 中的共享 Zod schema：
+Practice、Wrongbook、Learning 的成功响应使用 `packages/shared/src/contracts/v1` 中的共享 Zod schema：
 
 - Fastify route 在发送响应前校验 repository/业务编排输出。
 - Web 在把响应写入页面状态前再次校验。
@@ -1258,6 +1258,85 @@ Response：
 
 该接口会立即写 attempt、更新错题和进度。未来若没有外部调用方，应经过版本化废弃流程移除，避免同时维护两种主语义。
 
+## Learning
+
+所有 Learning 路由需要认证。第一版不新增统计表，直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合，作为学生首页/档案页后续可用的数据 contract。
+
+### `GET /api/learning/dashboard`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `recentLimit` | integer 1..10 | 5 |
+
+Response：
+
+```json
+{
+  "generatedAt": "2026-07-14T10:00:00.000Z",
+  "summary": {
+    "activeSessions": 3,
+    "completedSessions": 1,
+    "reviewSessions": 1,
+    "attempts": 3,
+    "gradedAttempts": 3,
+    "correctAttempts": 2,
+    "accuracy": 0.6667,
+    "wrongQuestions": 1,
+    "masteredWrongQuestions": 1,
+    "pendingWrongQuestions": 0,
+    "lastPracticedAt": "2026-07-14T09:00:00.000Z"
+  },
+  "recentBanks": [
+    {
+      "bankId": "bank-uuid",
+      "bankName": "数据库集成测试题库",
+      "subjectCategory": "质量保障",
+      "subjectName": "PostgreSQL",
+      "lastPracticedAt": "2026-07-14T09:00:00.000Z",
+      "sessions": 4,
+      "completedSessions": 1,
+      "attempts": 3,
+      "gradedAttempts": 3,
+      "correctAttempts": 2,
+      "accuracy": 0.6667,
+      "wrongQuestions": 1
+    }
+  ],
+  "questionTypes": [
+    {
+      "questionType": "single_choice",
+      "attempts": 1,
+      "gradedAttempts": 1,
+      "correctAttempts": 1,
+      "accuracy": 1,
+      "wrongQuestions": 0
+    }
+  ],
+  "wrongbook": {
+    "total": 1,
+    "mastered": 1,
+    "pending": 0,
+    "lastWrongAt": "2026-07-14T08:30:00.000Z"
+  }
+}
+```
+
+Rules：
+
+- `attempts` 来自 `practice_attempts`，表示提交后产生的答题记录数。
+- `gradedAttempts` 只统计 `is_correct IS NOT NULL` 的记录。
+- `accuracy = correctAttempts / gradedAttempts`，无 graded attempt 时为 `null`。
+- `reviewSessions` 统计 `origin=wrongbook` 的 practice session。
+- `recentBanks` 只返回当前学生创建过 session 的题库，按最近 `practice_sessions.updated_at DESC` 排序。
+- `questionTypes` 同时合并 attempt 统计和 wrongbook 统计。
+
+Errors：
+
+- `400`：query 无效。
+- `401`：缺少有效 `bky_session`。
+
 ## Wrongbook
 
 所有 Wrongbook 路由需要认证。
@@ -1387,7 +1466,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

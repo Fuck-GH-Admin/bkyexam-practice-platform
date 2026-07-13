@@ -71,18 +71,18 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 399 个 Vitest 测试覆盖：
+当前 405 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
-- identity、catalog、practice、wrongbook 的 repository 行为。
+- identity、catalog、practice、wrongbook、learning dashboard 的 repository 行为。
 - Fastify route 的输入、输出和错误映射。
 - Web 练习 model 与关键状态转换。
 - 学生端 URL parser/builder。
-- Practice/Wrongbook/Admin Auth/Admin User/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
+- Practice/Wrongbook/Learning/Admin Auth/Admin User/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 21 项、API 347 项、Web 31 项。Practice/Wrongbook/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 22 项、API 352 项、Web 31 项。Practice/Wrongbook/Learning/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
@@ -135,6 +135,7 @@ npm run test:integration:db:docker
 - completed 历史列表与既有结果详情复用。
 - completed session 写保护。
 - 错题归集、详情参考答案规范化、掌握筛选和 `origin=wrongbook` 再练。
+- 学习概览 dashboard：active/completed/review session 数、attempt 正确率、最近题库、题型统计和错题掌握摘要。
 - 不同学生之间的 session 与错题所有权隔离。
 - 退出后服务端 session 失效。
 - 真实 PostgreSQL repository 返回值能够通过 Fastify v1 response contract。

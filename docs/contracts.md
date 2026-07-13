@@ -16,6 +16,7 @@ packages/shared/src/contracts/v1/
   common.ts
   error.ts
   health.ts
+  learning.ts
   practice.ts
   wrongbook.ts
 ```
@@ -49,6 +50,7 @@ PostgreSQL / memory repository
 | Practice session collection | `PracticeSessionCardV1Schema`, `PracticeSessionPageV1Schema`, `ListPracticeSessionsRequestV1Schema` |
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
+| Learning | `LearningDashboardResponseV1Schema`, summary/recent-bank/question-type/wrongbook stat schemas |
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
@@ -122,6 +124,15 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 - 详情的 `correctAnswer` 已规范化为 typed answer。
 - review session response 必须返回 canonical session UUID 与正数题量。
 
+### Learning
+
+- `attempts` 表示提交后产生的 `practice_attempts` 记录数，不是题库总题数。
+- `gradedAttempts` 只统计 `isCorrect !== null` 的 attempt。
+- `correctAttempts <= gradedAttempts <= attempts`。
+- `accuracy = correctAttempts / gradedAttempts`，无 graded attempt 时为 `null`。
+- `recentBanks` 按该学生最近练习时间排序，最多由 request `recentLimit` 控制为 10。
+- `questionTypes` 合并 attempt 统计与 wrongbook 统计，便于后续学生档案和学习概览 UI 使用。
+
 ### Auth
 
 - `student.loginName` 与 `student.displayName` 必须是非空字符串。
@@ -172,7 +183,7 @@ npm run build:shared
 当前回归包括：
 
 - shared schema 的边界、Auth/Catalog/Error/Health、`false`、计数不变量和 legacy UUID 测试。
-- Fastify route 对不合法 Practice/Wrongbook/Auth/Catalog payload fail-closed 的测试。
+- Fastify route 对不合法 Practice/Wrongbook/Learning/Auth/Catalog payload fail-closed 的测试。
 - Web model 对空白文本、`false`、option answer 和 catalog item 类型的测试。
 - Playwright mock API 通过同一 Web runtime parser。
 - 真实 PostgreSQL integration 通过 API route runtime parser。
@@ -183,5 +194,5 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
+- Learning Dashboard、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
 - Readiness/DB health 尚未定义。

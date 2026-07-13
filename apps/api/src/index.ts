@@ -11,6 +11,7 @@ import { createPgStudentAuthRepository } from './auth/studentAuth.js';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPgPool } from './db/client.js';
+import { createPgLearningDashboardRepository } from './learning/repository.js';
 import { createPgPracticeSessionService } from './modules/practice/sessionService.js';
 import { createPgPracticeRepository } from './practice/repository.js';
 import { createPgBankRepository } from './repositories/bankRepository.js';
@@ -31,6 +32,7 @@ const app = buildApp({
   adminSystemStatusRepository: pool ? createPgAdminSystemStatusRepository(pool) : undefined,
   adminUserRepository: pool ? createPgAdminUserRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
+  learningRepository: pool ? createPgLearningDashboardRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,
   practiceSessionService: pool ? createPgPracticeSessionService(pool) : undefined,
   wrongQuestionRepository: pool ? createPgWrongQuestionRepository(pool) : undefined,

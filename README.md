@@ -11,15 +11,16 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 服务端草稿、断点续答、当前位置、标记存疑。
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
+- 学习概览 API：练习次数、正确率、最近题库、题型统计和错题掌握摘要。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
-- Practice/Wrongbook/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
 - Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
 - 完整管理平台、管理端 UI，以及 import reset/异步队列/取消重试等完整导入运营能力。
-- 正式学生账户、档案、学习统计和 active session 归档。
+- 正式学生账户、档案、学习目标/推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
 

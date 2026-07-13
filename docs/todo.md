@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B7.1 — 2026-07-14
+
+- [x] 新增 shared v1 Learning Dashboard schema。
+- [x] 实现 `GET /api/learning/dashboard`。
+- [x] 返回 active/completed/review session 数、attempt 数、graded/correct attempt 和 accuracy。
+- [x] 返回最近题库 recentBanks。
+- [x] 返回按题型统计的 attempts/correct/accuracy/wrongQuestions。
+- [x] 返回 wrongbook total/mastered/pending/lastWrongAt 摘要。
+- [x] 实现 memory/PostgreSQL LearningDashboardRepository。
+- [x] route fail-closed 覆盖不合法 learning payload。
+- [x] PostgreSQL integration 覆盖真实学习概览聚合。
+- [x] 不新增前端页面，不提前做最终视觉。
+
 ## Completed Backend B5.9 — 2026-07-14
 
 - [x] 新增 `ADMIN_IMPORT_ENABLE_WRITE`，默认关闭 true import 写入。
@@ -292,8 +305,10 @@
 - [x] 练习历史和历史结果回看。
 - [ ] 错题掌握规则与再练反馈。
 - [ ] 题目收藏/存疑长期化是否需要独立模型。
-- [ ] 基础学习统计：练习次数、正确率、错题趋势。
-- [ ] 题库推荐/最近使用，不先做复杂算法。
+- [x] 基础学习统计后端：练习次数、正确率、错题摘要。
+- [x] 最近使用题库后端，不先做复杂算法。
+- [ ] 学习统计前端展示。
+- [ ] 周期趋势、学习目标和 streak。
 - [ ] 主观题自评流程。
 - [ ] 填空题判分。
 - [ ] 编程与 Office 操作题采用独立执行/评测设计，不塞进现有 objective grader。

@@ -49,6 +49,7 @@ Fastify API，负责：
 - 练习会话、题目锁定、进度、草稿和存疑状态。
 - 整卷提交、客观题判分和练习记录。
 - 错题本及错题再练。
+- 学习概览统计聚合。
 - 题库导入、映射生成、迁移和数据库 smoke。
 
 API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运行必须使用 PostgreSQL；内存实现主要服务于快速 route 测试。
@@ -57,7 +58,7 @@ API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运�
 
 共享 Zod schema、versioned API contract 与 TypeScript 类型。
 
-当前 `contracts/v1` 已覆盖 Practice、Wrongbook、Auth、Catalog、通用 Error 与 Health 的主要 response，以及 Practice/Wrongbook 请求模型和 answer/UUID primitive。API repository、Fastify route 与 Web state 使用同一套类型；成功响应在服务器发送前和 Web 接收后各执行一次 runtime parse。
+当前 `contracts/v1` 已覆盖 Practice、Wrongbook、Learning、Auth、Catalog、通用 Error 与 Health 的主要 response，以及 Practice/Wrongbook/Learning 请求模型和 answer/UUID primitive。API repository、Fastify route 与 Web state 使用同一套类型；成功响应在服务器发送前和 Web 接收后各执行一次 runtime parse。
 
 ```text
 repository
@@ -96,6 +97,7 @@ questionbank/*.txt
 | Catalog | 学生可见题库、分类与映射 | `repositories/bankRepository.ts`, `routes/banks.ts`, `mapping/` |
 | Practice | 会话、题目锁定、草稿、进度、存疑、提交、判分 | `practice/`, `routes/practice.ts` |
 | Wrongbook | 错题列表、详情、掌握状态、再练编排 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
+| Learning | 学习概览、最近题库、题型正确率、错题掌握摘要 | `learning/`, `routes/learning.ts` |
 | Import | 源文件解析、规范化、批量导入 | `import/` |
 | Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
 
@@ -160,6 +162,14 @@ questionbank/*.txt
 - “再练本组”由 `WrongQuestionService` 选出错题候选，再调用 `PracticeSessionService.createSessionFromQuestionIds` 创建普通 `practice_sessions`，不另建一套练习引擎。
 - Wrongbook repository 只读/更新 wrongbook 所属数据，不直接写 `practice_sessions` 或 `practice_session_questions`。
 
+## Learning Dashboard
+
+- `GET /api/learning/dashboard` 从现有事实表聚合，不新增派生统计表。
+- 来源表包括 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings`。
+- 第一版返回 summary、recentBanks、questionTypes 与 wrongbook 四组数据。
+- `accuracy` 只用已判定 attempt 计算；无 graded attempt 时为 `null`。
+- 该接口是学生档案/首页统计的后端 contract，暂不引入推荐算法或长期日报表。
+
 ## Current Structural Debt
 
 这些问题不会阻止当前闭环运行，但已经影响继续开发：
@@ -169,7 +179,7 @@ questionbank/*.txt
 3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射和 request validation。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
 5. Wrongbook 已通过 service 调 Practice 创建再练 session，但目录尚未迁入 `modules/wrongbook`。
-6. 学生端主要 response DTO 已共享，但 request parser、Auth/Catalog module 目录和通用 API helper 仍未完全收敛。
+6. 学生端主要 response DTO 已共享，但 request parser、Auth/Catalog/Learning module 目录和通用 API helper 仍未完全收敛。
 7. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
 8. 管理平台已有后端 contract、Admin Auth/RBAC/Audit foundation、`/api/admin/auth/*`、题库 mapping read/write API、System Status API、Import Jobs dry-run/Error Report/True Import Gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI，但还没有独立管理应用、import reset/队列化或正式运营 UI。
 

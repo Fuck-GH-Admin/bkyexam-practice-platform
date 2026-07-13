@@ -17,6 +17,7 @@ import { buildApp } from '../../src/app.js';
 import { createPgPool } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { requireDedicatedTestDatabaseUrl } from '../../src/db/testDatabaseSafety.js';
+import { createPgLearningDashboardRepository } from '../../src/learning/repository.js';
 import { createPgPracticeSessionService } from '../../src/modules/practice/sessionService.js';
 import { createPgPracticeRepository } from '../../src/practice/repository.js';
 import { createPgBankRepository } from '../../src/repositories/bankRepository.js';
@@ -46,6 +47,7 @@ describe('PostgreSQL-backed API integration', () => {
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     adminUserRepository: createPgAdminUserRepository(pool),
     bankRepository: createPgBankRepository(pool),
+    learningRepository: createPgLearningDashboardRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
     practiceSessionService: createPgPracticeSessionService(pool),
     wrongQuestionRepository: createPgWrongQuestionRepository(pool),
@@ -1148,6 +1150,73 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(importResetGate.statusCode).toBe(422);
     expect(importResetGate.json()).toEqual({ error: 'resetBeforeImport is not enabled for import mode yet' });
+
+    const learningDashboard = await app.inject({
+      method: 'GET',
+      url: '/api/learning/dashboard?recentLimit=1',
+      headers: { cookie: aliceCookie },
+    });
+    expect(learningDashboard.statusCode).toBe(200);
+    expect(learningDashboard.json()).toMatchObject({
+      generatedAt: expect.any(String),
+      summary: {
+        activeSessions: 3,
+        completedSessions: 1,
+        reviewSessions: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestions: 1,
+        masteredWrongQuestions: 1,
+        pendingWrongQuestions: 0,
+        lastPracticedAt: expect.any(String),
+      },
+      recentBanks: [{
+        bankId: fixtureIds.bank,
+        bankName: '数据库集成测试题库',
+        sessions: 4,
+        completedSessions: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestions: 1,
+      }],
+      questionTypes: expect.arrayContaining([
+        expect.objectContaining({
+          questionType: 'single_choice',
+          attempts: 1,
+          gradedAttempts: 1,
+          correctAttempts: 1,
+          accuracy: 1,
+          wrongQuestions: 0,
+        }),
+        expect.objectContaining({
+          questionType: 'multiple_choice',
+          attempts: 1,
+          gradedAttempts: 1,
+          correctAttempts: 0,
+          accuracy: 0,
+          wrongQuestions: 1,
+        }),
+        expect.objectContaining({
+          questionType: 'yes_no',
+          attempts: 1,
+          gradedAttempts: 1,
+          correctAttempts: 1,
+          accuracy: 1,
+          wrongQuestions: 0,
+        }),
+      ]),
+      wrongbook: {
+        total: 1,
+        mastered: 1,
+        pending: 0,
+        lastWrongAt: expect.any(String),
+      },
+    });
+    expect(learningDashboard.json().recentBanks).toHaveLength(1);
 
     const logout = await app.inject({
       method: 'POST',

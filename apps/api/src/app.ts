@@ -17,6 +17,7 @@ import { createAdminSessionService, createMemoryAdminSessionRepository } from '.
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
 import type { StudentAuthRepository } from './auth/studentAuth.js';
+import { createMemoryLearningDashboardRepository, type LearningDashboardRepository } from './learning/repository.js';
 import { createMemoryPracticeSessionService, type PracticeSessionService } from './modules/practice/sessionService.js';
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
@@ -30,6 +31,7 @@ import { createAdminUserRoutes } from './routes/adminUsers.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
 import { registerHealthRoutes } from './routes/health.js';
+import { createLearningRoutes } from './routes/learning.js';
 import { createPracticeRoutes } from './routes/practice.js';
 import { createWrongQuestionRoutes } from './routes/wrongQuestions.js';
 import type { WrongQuestionRepository } from './wrongQuestions/repository.js';
@@ -48,6 +50,7 @@ interface BuildAppOptions {
   adminSystemStatusRepository?: AdminSystemStatusRepository;
   adminUserRepository?: AdminUserRepository;
   bankRepository?: BankRepository;
+  learningRepository?: LearningDashboardRepository;
   practiceRepository?: PracticeRepository;
   practiceSessionService?: PracticeSessionService;
   wrongQuestionRepository?: WrongQuestionRepository;
@@ -66,6 +69,7 @@ interface BuildAppOptions {
 export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? process.env.NODE_ENV !== 'test' });
   const bankRepository = options.bankRepository ?? createMemoryBankRepository();
+  const learningRepository = options.learningRepository ?? createMemoryLearningDashboardRepository();
   const practiceRepository = options.practiceRepository ?? createMemoryPracticeRepository();
   const practiceSessionService = options.practiceSessionService ?? createMemoryPracticeSessionService();
   const wrongQuestionRepository = options.wrongQuestionRepository ?? createMemoryWrongQuestionRepository();
@@ -131,6 +135,10 @@ export function buildApp(options: BuildAppOptions = {}) {
     sessionService: adminSessionService,
   }));
   void app.register(createBankRoutes(bankRepository));
+  void app.register(createLearningRoutes({
+    repository: learningRepository,
+    requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
+  }));
   void app.register(createPracticeRoutes({
     practiceRepository,
     requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
