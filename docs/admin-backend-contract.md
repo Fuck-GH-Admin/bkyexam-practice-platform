@@ -8,7 +8,7 @@
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation 与 Bank Mapping read APIs。包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、shared v1 Admin Auth/Bank Mapping schema 和 PostgreSQL integration 测试。Bank Mapping write、Import Job、Question Review、System Status 仍按本文后续章节实现。
+> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation 与 Bank Mapping read/write APIs。包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、shared v1 Admin Auth/Bank Mapping schema、optimistic concurrency、audit log 和 PostgreSQL integration 测试。Import Job、Question Review、System Status 仍按本文后续章节实现。
 
 ## 1. 目标与非目标
 
@@ -1129,6 +1129,8 @@ Rules：
 
 ### B5.3 Bank Mapping Write APIs
 
+状态：**已完成，2026-07-13。**
+
 交付：
 
 - `PATCH /api/admin/bank-mappings/:bankId`
@@ -1200,8 +1202,8 @@ B5 实现前需要做最终确认：
 
 ## 15. One-line Decision
 
-下一阶段不应先做 Admin UI。应先实现：
+当前仍不应先做 Admin UI。Admin identity/RBAC/audit 与 bank mapping read/write 已完成，下一步应补：
 
-> **Admin identity + RBAC + audit + bank mapping read/write API**
+> **System Status + Import Jobs + Question Review backend APIs**
 
-这会形成最小可运营闭环，并为导入任务和题目质检提供安全基础。
+这会把最小可运营闭环继续向导入任务和题目质检推进，同时保持前端最后设计。

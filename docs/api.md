@@ -208,7 +208,7 @@ Response：
 
 ## Admin Bank Mappings
 
-Admin Bank Mapping read APIs 是 B5.2 已实现的管理端读模型。它们只读 `bank_mappings` 与统计数据，不修改题库；写入、发布、批量状态变更放到 B5.3。
+Admin Bank Mapping APIs 是 B5.2/B5.3 已实现的管理端题库整理模型。读接口查看 `bank_mappings` 与统计数据；写接口覆盖运营字段、发布/隐藏状态、乐观并发控制和 audit log。
 
 ### `GET /api/admin/bank-mappings`
 
@@ -293,6 +293,101 @@ Errors：
 - `401`：缺少有效 `bky_admin_session`。
 - `403`：管理员缺少 `bank_mapping:read`。
 - `404`：mapping 不存在。
+
+### `PATCH /api/admin/bank-mappings/:bankId`
+
+Permission：
+
+- `bank_mapping:write`：修改 metadata 字段。
+- `bank_mapping:publish`：请求包含 `visible` 或 `status` 时必须具备。
+
+Request：
+
+```json
+{
+  "expectedVersion": 1,
+  "changes": {
+    "bankName": "C++ 程序设计题库",
+    "subjectCategory": "信息技术",
+    "subjectName": "C++",
+    "visible": true,
+    "status": "active",
+    "difficulty": "mixed",
+    "examPurpose": "exam",
+    "audience": "beginner",
+    "keywords": ["C++", "机考"],
+    "description": "面向 C++ 程序设计课程的客观题练习。",
+    "notes": "人工确认"
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "bankMapping": {
+    "...": "same shape as detail",
+    "version": 2,
+    "updatedBy": {
+      "id": "admin-user-uuid",
+      "displayName": "内容编辑"
+    }
+  }
+}
+```
+
+Errors：
+
+- `400`：bank id 或 request body 无效；`changes` 不能为空。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：缺少 `bank_mapping:write` 或发布相关的 `bank_mapping:publish`。
+- `404`：mapping 不存在。
+- `409`：`expectedVersion` 与当前版本不一致。
+- `422`：试图让无客观题题库变为 `visible=true` 且 `status=active`。
+
+成功写入会将 `version` 加一、刷新 `updatedAt/updatedBy`，并写入 `bank_mapping.update` audit log。
+
+### `POST /api/admin/bank-mappings/bulk-status`
+
+Permission：`bank_mapping:publish`
+
+Request：
+
+```json
+{
+  "items": [
+    { "bankId": "10000000-0000-4000-8000-000000000001", "expectedVersion": 1 }
+  ],
+  "changes": {
+    "visible": false,
+    "status": "hidden"
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "updated": [
+    { "bankId": "10000000-0000-4000-8000-000000000001", "version": 2 }
+  ],
+  "failed": [
+    {
+      "bankId": "10000000-0000-4000-8000-000000000002",
+      "error": "Bank mapping version conflict"
+    }
+  ]
+}
+```
+
+Rules：
+
+- 单次最多 100 个 bank。
+- 支持部分成功。
+- 每个成功项独立写 `bank_mapping.update` audit log。
+- 单项失败会进入 `failed`，不影响其他项。
 
 ## Banks
 
@@ -799,9 +894,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth 与 Admin Bank Mapping read route/shared schema 已实现；Admin Bank Mapping write、Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth 与 Admin Bank Mapping read/write route/shared schema 已实现；Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

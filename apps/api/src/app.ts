@@ -82,6 +82,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   void app.register(createAdminBankMappingRoutes({
     repository: options.adminBankMappingRepository,
     sessionService: adminSessionService,
+    auditService,
   }));
   void app.register(createBankRoutes(bankRepository));
   void app.register(createPracticeRoutes({

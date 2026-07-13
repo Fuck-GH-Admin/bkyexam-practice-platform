@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.3 — 2026-07-13
+
+- [x] 新增 shared v1 Admin Bank Mapping write/bulk-status schema。
+- [x] 实现 `PATCH /api/admin/bank-mappings/:bankId`。
+- [x] 实现 `POST /api/admin/bank-mappings/bulk-status`。
+- [x] `PATCH` 支持 metadata 字段、`visible/status`、`expectedVersion` optimistic concurrency。
+- [x] 批量状态更新支持部分成功，并限制单次最多 100 个 bank。
+- [x] 写操作刷新 `version`、`updated_at`、`updated_by_admin_id`。
+- [x] 写操作写 `bank_mapping.update` audit log。
+- [x] 覆盖 `401/403/400/404/409/422` 与批量部分失败。
+- [x] PostgreSQL integration 覆盖 PATCH、bulk-status、version conflict、audit 与学生题库隐藏过滤。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B5.1 — 2026-07-13
 
 - [x] 新增 migration `0005_admin_foundation.sql`，建立 `admin_users`、`admin_sessions`、`admin_user_roles`、`audit_logs`。

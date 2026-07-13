@@ -6,7 +6,10 @@ import {
   AdminLogoutResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  BulkUpdateAdminBankMappingStatusRequestV1Schema,
+  BulkUpdateAdminBankMappingStatusResponseV1Schema,
   ListAdminBankMappingsRequestV1Schema,
+  UpdateAdminBankMappingRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
@@ -133,6 +136,37 @@ describe('v1 auth/catalog/error/health contracts', () => {
       bankMappings: [{ ...listItem, status: 'published' }],
       page: { limit: 20, offset: 0, hasMore: false },
     })).toThrow();
+  });
+
+  it('parses admin bank mapping write and bulk status contracts', () => {
+    expect(UpdateAdminBankMappingRequestV1Schema.parse({
+      expectedVersion: 3,
+      changes: {
+        bankName: 'C++ 程序设计题库',
+        visible: true,
+        status: 'active',
+        keywords: ['C++', '机考'],
+        notes: '',
+      },
+    })).toMatchObject({
+      expectedVersion: 3,
+      changes: { status: 'active', visible: true },
+    });
+
+    expect(() => UpdateAdminBankMappingRequestV1Schema.parse({
+      expectedVersion: 3,
+      changes: {},
+    })).toThrow();
+
+    expect(BulkUpdateAdminBankMappingStatusRequestV1Schema.parse({
+      items: [{ bankId: bankId.toUpperCase(), expectedVersion: 1 }],
+      changes: { visible: false, status: 'hidden' },
+    }).items[0]?.bankId).toBe(bankId);
+
+    expect(BulkUpdateAdminBankMappingStatusResponseV1Schema.parse({
+      updated: [{ bankId, version: 2 }],
+      failed: [{ bankId: '10000000-0000-4000-8000-000000000002', error: 'Bank mapping version conflict' }],
+    }).updated[0]?.version).toBe(2);
   });
 
   it('requires student catalog banks to be visible and counter-safe', () => {

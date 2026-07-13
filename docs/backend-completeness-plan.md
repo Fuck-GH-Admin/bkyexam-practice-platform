@@ -161,17 +161,17 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation 已实现；Admin 业务 API 与 readiness/DB health 尚未完成。**
+当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation 与 Bank Mapping read/write API 已实现；Import Job、Question Review、System Status 与 readiness/DB health 尚未完成。**
 
 ### 2.8 Verification
 
 已完成质量门：
 
 - `npm run verify:docker`
-- 290 Vitest
-- 246 API tests
+- 337 Vitest
+- 290 API tests
 - 31 Web tests
-- 13 Shared tests
+- 16 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -406,14 +406,15 @@
 
 ## 4. 后端下一步规划
 
-建议下一步不要直接开管理端大工程，也不要先做最终视觉。
-建议先做 **Backend P2A：无行为变化的模块化整理**，再做管理端后端 contract。
+本路线中 B1 到 B5.3 已按顺序执行完毕。当前下一步仍然不要直接开管理端大工程，也不要先做最终视觉；应继续完成管理端后端最小闭环。
+
+当前建议先做 **B5.4 System Status**，再做 Import Jobs 和 Question Review。
 
 原因：
 
-1. 学生客观题主链路已经稳定，适合在稳定测试保护下拆边界。
-2. 管理端会引入大量新 API，如果现在直接往现有目录里堆，会继续放大混乱。
-3. 后端边界清楚后，Admin、Import Jobs、Stats、Non-objective 会更好接。
+1. 学生客观题主链路已经稳定，适合继续在稳定测试保护下补管理端能力。
+2. Bank Mapping read/write 已有 Auth/RBAC/Audit 基础，System Status 是最小管理平台下一块低风险能力。
+3. System Status 稳定后，Import Jobs 与 Question Review 会更容易接入统一权限、审计和健康检查边界。
 
 ## 5. 推荐执行路线
 
@@ -664,14 +665,14 @@ bank_mappings.version / updated_at / updated_by_admin_id
 
 目标：最小可运营闭环。
 
-状态：**进行中。B5.1/B5.2 已完成，2026-07-13。**
+状态：**进行中。B5.1/B5.2/B5.3 已完成，2026-07-13。**
 
 优先实现：
 
 1. admin identity + RBAC — **已完成**
 2. audit log foundation — **已完成**
 3. bank mappings list/detail — **已完成**
-4. bank mappings update + batch visible/status
+4. bank mappings update + batch visible/status — **已完成**
 5. system status
 
 后实现：
@@ -751,7 +752,30 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - PostgreSQL integration 覆盖 list/detail。
   - repository payload 使用 shared schema fail closed。
 
-下一步：**B5.3 Bank Mapping Write APIs**。
+#### B5.3 实际落地
+
+- 新增 shared v1 Admin Bank Mapping write schema：
+  - `PATCH /api/admin/bank-mappings/:bankId` request。
+  - `POST /api/admin/bank-mappings/bulk-status` request/response。
+  - `expectedVersion`、空 `changes`、单次最多 100 个 bank 的 contract 边界。
+- 扩展 Admin Bank Mapping repository：
+  - memory/PostgreSQL update 双路径。
+  - PostgreSQL `BEGIN`/`COMMIT` transaction。
+  - `FOR UPDATE` + `expectedVersion` optimistic concurrency。
+  - 写入 `version = version + 1`、`updated_at`、`updated_by_admin_id`。
+  - 批量状态更新按 item 独立处理，支持部分成功。
+- 新增 routes：
+  - `PATCH /api/admin/bank-mappings/:bankId`
+  - `POST /api/admin/bank-mappings/bulk-status`
+- 已验证：
+  - metadata 写操作需要 `bank_mapping:write`。
+  - `visible/status` 写操作需要 `bank_mapping:publish`。
+  - stale version 返回 `409`。
+  - 无客观题题库不能发布为 `visible=true` + `active`，返回 `422`。
+  - 成功写操作写 `bank_mapping.update` audit log。
+  - PostgreSQL integration 覆盖 PATCH、bulk-status、version conflict、audit 和学生 `/api/banks` 隐藏过滤。
+
+下一步：**B5.4 System Status**。
 
 ### Phase B6 — Import Jobs And Data Health
 
@@ -840,31 +864,32 @@ review_items
 
 ## 6. 推荐下一步具体执行
 
-如果本规划认可，下一步建议执行：
+如果继续本规划，下一步建议执行：
 
-> **Phase B1：Practice 后端无行为变化拆分。**
+> **B5.4 System Status。**
 
 具体第一阶段 commit 目标：
 
 ```text
-feat/refactor: split practice backend repository boundaries
+feat: add admin system status api
 ```
 
 范围只包含：
 
-- answer codec 提取
-- PracticeRepository interface/types 提取
-- memory repository 提取
-- pg repository 提取
-- 保持 route 和 HTTP 行为不变
-- 更新 architecture/todo
+- shared v1 system status schema
+- `GET /api/admin/system/status`
+- `system_status:read` 权限守卫
+- corpus counts、visible bank count、DB readiness
+- route/unit/PostgreSQL integration 覆盖
+- 更新 architecture/todo/status/api docs
 - 全量 verify:docker
 
 不做：
 
 - 不改 UI
-- 不改 API response
-- 不做 Admin
+- 不创建 `apps/admin`
+- 不做 Import Job 执行器
+- 不做 Question Review 写流程
 - 不改业务语义
 - 不引入微服务
 - 不引入队列
@@ -886,6 +911,6 @@ feat/refactor: split practice backend repository boundaries
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计；完整平台后端还缺管理实现、正式身份、模块化、非客观题、运营导入和生产运维。**
+> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit 与题库整理 read/write 已落地；完整平台后端还缺 System Status、Import Jobs、Question Review、正式身份、模块化、非客观题和生产运维。**
 
-最合理的下一步是进入 Admin 后端 MVP：先实现 admin identity/RBAC/audit foundation，再实现题库 mapping read/write API。
+最合理的下一步是继续 Admin 后端 MVP：先补 System Status，再进入 Import Jobs 和 Question Review。

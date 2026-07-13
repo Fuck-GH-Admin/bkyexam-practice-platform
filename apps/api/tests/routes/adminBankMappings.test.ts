@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AdminBankMappingRepository } from '../../src/admin/bankMappings';
 import { createMemoryAdminBankMappingRepository } from '../../src/admin/bankMappings';
+import { createAuditService, createMemoryAuditLogRepository } from '../../src/admin/audit';
 import { createMemoryAdminAuthRepository } from '../../src/admin/auth';
 import { createAdminSessionService } from '../../src/admin/session';
 import { hashPassword } from '../../src/auth/password';
@@ -42,14 +43,14 @@ const mapping: AdminBankMappingDetailV1 = {
   updatedBy: null,
 };
 
-async function adminAuthRepository() {
+async function adminAuthRepository(roles: Array<'content_editor' | 'operator' | 'super_admin'> = ['operator']) {
   return createMemoryAdminAuthRepository([{
     id: '50000000-0000-4000-8000-000000000001',
     loginName: 'operator@example.com',
     displayName: 'Operator',
     passwordHash: await hashPassword('secret'),
     status: 'active',
-    roles: ['operator'],
+    roles,
   }]);
 }
 
@@ -110,6 +111,12 @@ describe('admin bank mapping routes', () => {
       },
       async findBankMappingById() {
         return null;
+      },
+      async updateBankMapping() {
+        return { status: 'not_found' };
+      },
+      async bulkUpdateBankMappingStatus() {
+        return { updated: [], failed: [] };
       },
     };
     const app = buildApp({
@@ -250,6 +257,177 @@ describe('admin bank mapping routes', () => {
     expect(response.json()).toEqual({ error: 'Forbidden' });
   });
 
+  it('updates bank mapping metadata with version checks and audit log', async () => {
+    const auditLogRepository = createMemoryAuditLogRepository();
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminBankMappingRepository: createMemoryAdminBankMappingRepository([mapping]),
+      auditService: createAuditService(auditLogRepository),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${bankId}`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 1,
+        changes: {
+          bankName: '更新后的题库名',
+          keywords: ['integration', 'postgres', 'admin'],
+          notes: '人工确认',
+        },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      bankMapping: {
+        bankId,
+        bankName: '更新后的题库名',
+        keywords: ['integration', 'postgres', 'admin'],
+        notes: '人工确认',
+        version: 2,
+        updatedBy: {
+          id: '50000000-0000-4000-8000-000000000001',
+          displayName: 'Operator',
+        },
+      },
+    });
+    expect(auditLogRepository.entries).toHaveLength(2);
+    expect(auditLogRepository.entries[1]).toMatchObject({
+      actorAdminId: '50000000-0000-4000-8000-000000000001',
+      action: 'bank_mapping.update',
+      resourceType: 'bank_mapping',
+      resourceId: bankId,
+      before: {
+        bankName: '数据库集成测试题库',
+        keywords: ['integration', 'postgres'],
+        notes: '',
+      },
+      after: {
+        bankName: '更新后的题库名',
+        keywords: ['integration', 'postgres', 'admin'],
+        notes: '人工确认',
+      },
+      metadata: {
+        changedFields: ['bankName', 'keywords', 'notes'],
+        beforeVersion: 1,
+        afterVersion: 2,
+      },
+      result: 'success',
+    });
+  });
+
+  it('returns 409 for stale bank mapping versions', async () => {
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminBankMappingRepository: createMemoryAdminBankMappingRepository([mapping]),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${bankId}`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 99,
+        changes: { notes: 'stale' },
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toEqual({ error: 'Bank mapping version conflict' });
+  });
+
+  it('returns 422 when publishing a visible active bank with no objective questions', async () => {
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminBankMappingRepository: createMemoryAdminBankMappingRepository([{
+        ...mapping,
+        visible: false,
+        status: 'review',
+        objectiveQuestionCount: 0,
+        studentPreview: { visibleInStudentCatalog: false, reason: 'bank hidden' },
+      }]),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${bankId}`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 1,
+        changes: { visible: true, status: 'active' },
+      },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({ error: 'Cannot publish bank mapping without objective questions' });
+  });
+
+  it('returns 403 when updating with a session that lacks bank_mapping:write', async () => {
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminBankMappingRepository: createMemoryAdminBankMappingRepository([mapping]),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${bankId}`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 1,
+        changes: { notes: 'operator should not write' },
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: 'Forbidden' });
+  });
+
+  it('bulk-updates bank mapping status with partial failures and per-item audit logs', async () => {
+    const secondBankId = '10000000-0000-4000-8000-000000000002';
+    const auditLogRepository = createMemoryAuditLogRepository();
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminBankMappingRepository: createMemoryAdminBankMappingRepository([
+        mapping,
+        { ...mapping, bankId: secondBankId, bankName: '第二题库', version: 3 },
+      ]),
+      auditService: createAuditService(auditLogRepository),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/admin/bank-mappings/bulk-status',
+      headers: { cookie },
+      payload: {
+        items: [
+          { bankId, expectedVersion: 1 },
+          { bankId: secondBankId, expectedVersion: 99 },
+        ],
+        changes: { visible: false, status: 'hidden' },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      updated: [{ bankId, version: 2 }],
+      failed: [{ bankId: secondBankId, error: 'Bank mapping version conflict' }],
+    });
+    expect(auditLogRepository.entries.filter((entry) => entry.action === 'bank_mapping.update')).toHaveLength(1);
+    expect(auditLogRepository.entries.at(-1)).toMatchObject({
+      resourceId: bankId,
+      before: { visible: true, status: 'active' },
+      after: { visible: false, status: 'hidden' },
+      metadata: { bulk: true, beforeVersion: 1, afterVersion: 2 },
+    });
+  });
+
   it('fails closed when a repository returns an invalid admin mapping payload', async () => {
     const repository: AdminBankMappingRepository = {
       async listBankMappings() {
@@ -260,6 +438,12 @@ describe('admin bank mapping routes', () => {
       },
       async findBankMappingById() {
         return null;
+      },
+      async updateBankMapping() {
+        return { status: 'not_found' };
+      },
+      async bulkUpdateBankMappingStatus() {
+        return { updated: [], failed: [] };
       },
     };
     const app = buildApp({

@@ -22,6 +22,17 @@ class FakeQueryClient implements QueryClient {
   }
 }
 
+class SequenceQueryClient implements QueryClient {
+  queries: RecordedQuery[] = [];
+
+  constructor(private readonly rowBatches: unknown[][]) {}
+
+  async query(sql: string, params?: readonly unknown[]) {
+    this.queries.push({ sql, params });
+    return { rows: this.rowBatches.shift() ?? [] };
+  }
+}
+
 const bankId = '10000000-0000-4000-8000-000000000001';
 const parentId = '10000000-0000-4000-8000-000000000002';
 
@@ -194,6 +205,60 @@ describe('PostgreSQL admin bank mapping repository', () => {
     expect(client.queries[0].sql).toContain('WITH RECURSIVE bank_tree AS');
     expect(client.queries[0].sql).toContain('jsonb_object_agg');
     expect(client.queries[0].params).toEqual([bankId]);
+  });
+
+  it('updates bank mapping fields inside a transaction with optimistic version checks', async () => {
+    const actorId = '50000000-0000-4000-8000-000000000001';
+    const client = new SequenceQueryClient([
+      [],
+      [{ bank_id: bankId }],
+      [createPgRow()],
+      [{ bank_id: bankId }],
+      [createPgRow({
+        notes: 'updated by admin',
+        keywords: ['integration', 'admin'],
+        version: 2,
+        updated_by_admin_id: actorId,
+        updated_by_display_name: 'Operator',
+      })],
+      [],
+    ]);
+    const repository = createPgAdminBankMappingRepository(client);
+
+    await expect(repository.updateBankMapping({
+      bankId,
+      expectedVersion: 1,
+      changes: {
+        notes: 'updated by admin',
+        keywords: ['integration', 'admin'],
+      },
+      actor: { id: actorId, displayName: 'Operator' },
+    })).resolves.toMatchObject({
+      status: 'updated',
+      before: { version: 1, notes: '' },
+      after: {
+        version: 2,
+        notes: 'updated by admin',
+        keywords: ['integration', 'admin'],
+        updatedBy: { id: actorId, displayName: 'Operator' },
+      },
+    });
+
+    expect(client.queries.map((query) => query.sql.trim())).toContain('BEGIN');
+    expect(client.queries.map((query) => query.sql.trim())).toContain('COMMIT');
+    const updateQuery = client.queries.find((query) => query.sql.includes('UPDATE bank_mappings'));
+    expect(updateQuery?.sql).toContain('notes = $1');
+    expect(updateQuery?.sql).toContain('keywords = $2::jsonb');
+    expect(updateQuery?.sql).toContain('updated_by_admin_id = $3');
+    expect(updateQuery?.sql).toContain('WHERE bank_id = $4');
+    expect(updateQuery?.sql).toContain('AND version = $5');
+    expect(updateQuery?.params).toEqual([
+      'updated by admin',
+      '["integration","admin"]',
+      actorId,
+      bankId,
+      1,
+    ]);
   });
 });
 

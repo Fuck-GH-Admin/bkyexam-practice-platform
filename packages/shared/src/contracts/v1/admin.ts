@@ -126,3 +126,64 @@ export const AdminBankMappingDetailResponseV1Schema = z.object({
   bankMapping: AdminBankMappingDetailV1Schema,
 }).strict();
 export type AdminBankMappingDetailResponseV1 = z.infer<typeof AdminBankMappingDetailResponseV1Schema>;
+
+export const UpdateAdminBankMappingChangesV1Schema = z.object({
+  bankName: z.string().min(1).optional(),
+  subjectCategory: z.string().min(1).optional(),
+  subjectName: z.string().min(1).optional(),
+  visible: z.boolean().optional(),
+  status: AdminBankMappingStatusV1Schema.optional(),
+  difficulty: z.string().min(1).optional(),
+  examPurpose: z.string().min(1).optional(),
+  audience: z.string().min(1).optional(),
+  keywords: z.array(z.string().min(1)).optional(),
+  description: z.string().optional(),
+  notes: z.string().optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, {
+  message: 'At least one bank mapping change is required',
+});
+export type UpdateAdminBankMappingChangesV1 = z.infer<typeof UpdateAdminBankMappingChangesV1Schema>;
+
+export const UpdateAdminBankMappingRequestV1Schema = z.object({
+  expectedVersion: z.number().int().positive(),
+  changes: UpdateAdminBankMappingChangesV1Schema,
+}).strict();
+export type UpdateAdminBankMappingRequestV1 = z.infer<typeof UpdateAdminBankMappingRequestV1Schema>;
+
+export const BulkUpdateAdminBankMappingStatusItemV1Schema = z.object({
+  bankId: CaseInsensitiveUuidV1Schema,
+  expectedVersion: z.number().int().positive(),
+}).strict();
+export type BulkUpdateAdminBankMappingStatusItemV1 = z.infer<typeof BulkUpdateAdminBankMappingStatusItemV1Schema>;
+
+export const BulkUpdateAdminBankMappingStatusChangesV1Schema = z.object({
+  visible: z.boolean().optional(),
+  status: AdminBankMappingStatusV1Schema.optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, {
+  message: 'At least one bank mapping status change is required',
+});
+export type BulkUpdateAdminBankMappingStatusChangesV1 = z.infer<
+  typeof BulkUpdateAdminBankMappingStatusChangesV1Schema
+>;
+
+export const BulkUpdateAdminBankMappingStatusRequestV1Schema = z.object({
+  items: z.array(BulkUpdateAdminBankMappingStatusItemV1Schema).min(1).max(100),
+  changes: BulkUpdateAdminBankMappingStatusChangesV1Schema,
+}).strict();
+export type BulkUpdateAdminBankMappingStatusRequestV1 = z.infer<
+  typeof BulkUpdateAdminBankMappingStatusRequestV1Schema
+>;
+
+export const BulkUpdateAdminBankMappingStatusResponseV1Schema = z.object({
+  updated: z.array(z.object({
+    bankId: CanonicalUuidV1Schema,
+    version: z.number().int().positive(),
+  }).strict()),
+  failed: z.array(z.object({
+    bankId: CanonicalUuidV1Schema,
+    error: z.string().min(1),
+  }).strict()),
+}).strict();
+export type BulkUpdateAdminBankMappingStatusResponseV1 = z.infer<
+  typeof BulkUpdateAdminBankMappingStatusResponseV1Schema
+>;

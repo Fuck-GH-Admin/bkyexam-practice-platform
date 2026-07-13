@@ -155,6 +155,82 @@ describe('PostgreSQL-backed API integration', () => {
       },
     });
 
+    const editorLogin = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/login',
+      payload: { loginName: 'integration-editor@example.com', password: 'secret' },
+    });
+    expect(editorLogin.statusCode).toBe(200);
+    expect(editorLogin.json().admin.permissions).toEqual(expect.arrayContaining([
+      'bank_mapping:write',
+      'bank_mapping:publish',
+    ]));
+    const editorCookie = extractCookie(editorLogin.headers['set-cookie']);
+
+    const updatedBankMapping = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${fixtureIds.bank}`,
+      headers: { cookie: editorCookie },
+      payload: {
+        expectedVersion: 1,
+        changes: {
+          notes: 'Integration editor reviewed the mapping.',
+        },
+      },
+    });
+    expect(updatedBankMapping.statusCode).toBe(200);
+    expect(updatedBankMapping.json()).toMatchObject({
+      bankMapping: {
+        bankId: fixtureIds.bank,
+        notes: 'Integration editor reviewed the mapping.',
+        version: 2,
+        updatedBy: {
+          id: '50000000-0000-4000-8000-000000000002',
+          displayName: 'Integration Editor',
+        },
+      },
+    });
+
+    const staleBankMappingUpdate = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/bank-mappings/${fixtureIds.bank}`,
+      headers: { cookie: editorCookie },
+      payload: {
+        expectedVersion: 1,
+        changes: { notes: 'stale update' },
+      },
+    });
+    expect(staleBankMappingUpdate.statusCode).toBe(409);
+    expect(staleBankMappingUpdate.json()).toEqual({ error: 'Bank mapping version conflict' });
+
+    const bulkStatus = await app.inject({
+      method: 'POST',
+      url: '/api/admin/bank-mappings/bulk-status',
+      headers: { cookie: editorCookie },
+      payload: {
+        items: [
+          { bankId: fixtureIds.hiddenBank, expectedVersion: 1 },
+          { bankId: fixtureIds.bank, expectedVersion: 1 },
+        ],
+        changes: { visible: false, status: 'hidden' },
+      },
+    });
+    expect(bulkStatus.statusCode).toBe(200);
+    expect(bulkStatus.json()).toEqual({
+      updated: [{ bankId: fixtureIds.hiddenBank, version: 2 }],
+      failed: [{ bankId: fixtureIds.bank, error: 'Bank mapping version conflict' }],
+    });
+
+    const bankMappingAuditState = await pool.query<{ audit_count: string }>(`
+      SELECT COUNT(*) AS audit_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND action = 'bank_mapping.update'
+        AND resource_type = 'bank_mapping'
+        AND result = 'success'
+    `, ['50000000-0000-4000-8000-000000000002']);
+    expect(bankMappingAuditState.rows[0]).toEqual({ audit_count: '2' });
+
     const studentMeWithAdminCookie = await app.inject({
       method: 'GET',
       url: '/api/auth/me',
@@ -567,21 +643,32 @@ async function seedIntegrationAdmin(client: { query: (sql: string, params?: read
   await client.query(
     `
       INSERT INTO admin_users (id, login_name, display_name, password_hash, status)
-      VALUES ($1, $2, $3, $4, 'active')
+      VALUES
+        ($1, $2, $3, $4, 'active'),
+        ($5, $6, $7, $8, 'active')
     `,
     [
       '50000000-0000-4000-8000-000000000001',
       'integration-operator@example.com',
       'Integration Operator',
       passwordHash,
+      '50000000-0000-4000-8000-000000000002',
+      'integration-editor@example.com',
+      'Integration Editor',
+      passwordHash,
     ],
   );
   await client.query(
     `
       INSERT INTO admin_user_roles (admin_user_id, role)
-      VALUES ($1, 'operator')
+      VALUES
+        ($1, 'operator'),
+        ($2, 'content_editor')
     `,
-    ['50000000-0000-4000-8000-000000000001'],
+    [
+      '50000000-0000-4000-8000-000000000001',
+      '50000000-0000-4000-8000-000000000002',
+    ],
   );
 }
 
