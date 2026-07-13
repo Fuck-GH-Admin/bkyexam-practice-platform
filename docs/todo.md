@@ -5,6 +5,18 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.4 — 2026-07-13
+
+- [x] 新增 shared v1 Admin System Status schema。
+- [x] 实现 `GET /api/admin/system/status`。
+- [x] 复用 `system_status:read` 权限守卫，覆盖 `401/403`。
+- [x] 返回 API version、DB readiness、migration 文件摘要。
+- [x] 返回 corpus counts 与学生可见题库数量。
+- [x] 在 `import_jobs` 表存在时返回 running/latest job 摘要；表不存在时安全返回 `tableExists=false`。
+- [x] 在 `question_quality_flags` 表存在时返回质量摘要；表不存在时安全返回 `tableExists=false`。
+- [x] PostgreSQL integration 覆盖 Admin System Status。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B5.3 — 2026-07-13
 
 - [x] 新增 shared v1 Admin Bank Mapping write/bulk-status schema。

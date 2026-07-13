@@ -6,6 +6,7 @@ import {
   AdminLogoutResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  AdminSystemStatusResponseV1Schema,
   BulkUpdateAdminBankMappingStatusRequestV1Schema,
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
   ListAdminBankMappingsRequestV1Schema,
@@ -167,6 +168,37 @@ describe('v1 auth/catalog/error/health contracts', () => {
       updated: [{ bankId, version: 2 }],
       failed: [{ bankId: '10000000-0000-4000-8000-000000000002', error: 'Bank mapping version conflict' }],
     }).updated[0]?.version).toBe(2);
+  });
+
+  it('parses admin system status contracts', () => {
+    const status = AdminSystemStatusResponseV1Schema.parse({
+      api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
+      database: { ok: true, migrationCount: 5, currentMigration: '0005_admin_foundation.sql' },
+      corpus: {
+        classifications: 2941,
+        questions: 89922,
+        questionOptions: 154899,
+        bankMappings: 2662,
+        visibleBanks: 473,
+      },
+      imports: {
+        tableExists: false,
+        runningJobId: null,
+        lastJob: null,
+      },
+      quality: {
+        tableExists: false,
+        openFlags: 0,
+        blockingFlags: 0,
+        excludedQuestions: 0,
+      },
+    });
+
+    expect(status.database.currentMigration).toBe('0005_admin_foundation.sql');
+    expect(() => AdminSystemStatusResponseV1Schema.parse({
+      ...status,
+      corpus: { ...status.corpus, questions: -1 },
+    })).toThrow();
   });
 
   it('requires student catalog banks to be visible and counter-safe', () => {

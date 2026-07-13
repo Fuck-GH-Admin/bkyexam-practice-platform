@@ -8,7 +8,7 @@
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation 与 Bank Mapping read/write APIs。包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、shared v1 Admin Auth/Bank Mapping schema、optimistic concurrency、audit log 和 PostgreSQL integration 测试。Import Job、Question Review、System Status 仍按本文后续章节实现。
+> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs 与 System Status API。包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、shared v1 Admin Auth/Bank Mapping/System Status schema、optimistic concurrency、audit log 和 PostgreSQL integration 测试。Import Job、Question Review 仍按本文后续章节实现。
 
 ## 1. 目标与非目标
 
@@ -835,17 +835,15 @@ Response：
     "visibleBanks": 473
   },
   "imports": {
+    "tableExists": false,
     "runningJobId": null,
-    "lastJob": {
-      "id": "job-uuid",
-      "status": "succeeded",
-      "finishedAt": "2026-07-13T09:02:27.000Z"
-    }
+    "lastJob": null
   },
   "quality": {
-    "openFlags": 12,
-    "blockingFlags": 2,
-    "excludedQuestions": 2
+    "tableExists": false,
+    "openFlags": 0,
+    "blockingFlags": 0,
+    "excludedQuestions": 0
   }
 }
 ```
@@ -1140,6 +1138,8 @@ Rules：
 - student `/api/banks` 不暴露 hidden/review 回归
 
 ### B5.4 System Status
+
+状态：**已完成，2026-07-13。**
 
 交付：
 

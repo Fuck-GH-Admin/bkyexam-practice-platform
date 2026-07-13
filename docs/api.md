@@ -389,6 +389,60 @@ Rules：
 - 每个成功项独立写 `bank_mapping.update` audit log。
 - 单项失败会进入 `failed`，不影响其他项。
 
+## Admin System Status
+
+### `GET /api/admin/system/status`
+
+Permission：`system_status:read`
+
+这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量，以及未来 Import Job / Question Review 表存在时的简要状态。
+
+Response：
+
+```json
+{
+  "api": {
+    "ok": true,
+    "service": "bkyexam-practice-api",
+    "version": "0.1.0"
+  },
+  "database": {
+    "ok": true,
+    "migrationCount": 5,
+    "currentMigration": "0005_admin_foundation.sql"
+  },
+  "corpus": {
+    "classifications": 2941,
+    "questions": 89922,
+    "questionOptions": 154899,
+    "bankMappings": 2662,
+    "visibleBanks": 473
+  },
+  "imports": {
+    "tableExists": false,
+    "runningJobId": null,
+    "lastJob": null
+  },
+  "quality": {
+    "tableExists": false,
+    "openFlags": 0,
+    "blockingFlags": 0,
+    "excludedQuestions": 0
+  }
+}
+```
+
+Notes：
+
+- `visibleBanks` 与学生 `/api/banks` 口径一致：`visible=true`、`status=active` 且含客观题。
+- `imports.tableExists=false` 表示 Import Jobs migration 尚未落地。
+- `quality.tableExists=false` 表示 Question Review flags migration 尚未落地。
+
+Errors：
+
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：管理员缺少 `system_status:read`。
+
 ## Banks
 
 ### `GET /api/banks`
@@ -894,9 +948,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth 与 Admin Bank Mapping read/write route/shared schema 已实现；Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth、Admin Bank Mapping read/write 与 Admin System Status route/shared schema 已实现；Import Job、Question Review 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

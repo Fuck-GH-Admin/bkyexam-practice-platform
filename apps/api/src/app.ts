@@ -9,6 +9,7 @@ import {
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
+import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
 import type { StudentAuthRepository } from './auth/studentAuth.js';
 import { createMemoryPracticeSessionService, type PracticeSessionService } from './modules/practice/sessionService.js';
@@ -16,6 +17,7 @@ import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
 import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
+import { createAdminSystemStatusRoutes } from './routes/adminSystemStatus.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -29,6 +31,7 @@ interface BuildAppOptions {
   authRepository?: StudentAuthRepository;
   adminAuthRepository?: AdminAuthRepository;
   adminBankMappingRepository?: AdminBankMappingRepository;
+  adminSystemStatusRepository?: AdminSystemStatusRepository;
   bankRepository?: BankRepository;
   practiceRepository?: PracticeRepository;
   practiceSessionService?: PracticeSessionService;
@@ -83,6 +86,10 @@ export function buildApp(options: BuildAppOptions = {}) {
     repository: options.adminBankMappingRepository,
     sessionService: adminSessionService,
     auditService,
+  }));
+  void app.register(createAdminSystemStatusRoutes({
+    repository: options.adminSystemStatusRepository,
+    sessionService: adminSessionService,
   }));
   void app.register(createBankRoutes(bankRepository));
   void app.register(createPracticeRoutes({

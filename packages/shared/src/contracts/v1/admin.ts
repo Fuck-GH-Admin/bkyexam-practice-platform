@@ -187,3 +187,39 @@ export const BulkUpdateAdminBankMappingStatusResponseV1Schema = z.object({
 export type BulkUpdateAdminBankMappingStatusResponseV1 = z.infer<
   typeof BulkUpdateAdminBankMappingStatusResponseV1Schema
 >;
+
+export const AdminSystemStatusResponseV1Schema = z.object({
+  api: z.object({
+    ok: z.literal(true),
+    service: z.string().min(1),
+    version: z.string().min(1),
+  }).strict(),
+  database: z.object({
+    ok: z.boolean(),
+    migrationCount: z.number().int().nonnegative(),
+    currentMigration: z.string().min(1).nullable(),
+  }).strict(),
+  corpus: z.object({
+    classifications: z.number().int().nonnegative(),
+    questions: z.number().int().nonnegative(),
+    questionOptions: z.number().int().nonnegative(),
+    bankMappings: z.number().int().nonnegative(),
+    visibleBanks: z.number().int().nonnegative(),
+  }).strict(),
+  imports: z.object({
+    tableExists: z.boolean(),
+    runningJobId: CanonicalUuidV1Schema.nullable(),
+    lastJob: z.object({
+      id: CanonicalUuidV1Schema,
+      status: z.string().min(1),
+      finishedAt: z.string().datetime().nullable(),
+    }).strict().nullable(),
+  }).strict(),
+  quality: z.object({
+    tableExists: z.boolean(),
+    openFlags: z.number().int().nonnegative(),
+    blockingFlags: z.number().int().nonnegative(),
+    excludedQuestions: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+export type AdminSystemStatusResponseV1 = z.infer<typeof AdminSystemStatusResponseV1Schema>;

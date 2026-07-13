@@ -4,6 +4,7 @@ import { createAuditService, createPgAuditLogRepository } from '../../src/admin/
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
 import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
+import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
 import { hashPassword } from '../../src/auth/password.js';
 import { createPgStudentSessionRepository, createSessionService } from '../../src/auth/session.js';
 import { createPgStudentAuthRepository } from '../../src/auth/studentAuth.js';
@@ -26,6 +27,7 @@ describe('PostgreSQL-backed API integration', () => {
     authRepository: createPgStudentAuthRepository(pool),
     adminAuthRepository: createPgAdminAuthRepository(pool),
     adminBankMappingRepository: createPgAdminBankMappingRepository(pool),
+    adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
     practiceSessionService: createPgPracticeSessionService(pool),
@@ -90,6 +92,26 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(adminMe.statusCode).toBe(200);
     expect(adminMe.json().admin.loginName).toBe('integration-operator@example.com');
+
+    const adminSystemStatus = await app.inject({
+      method: 'GET',
+      url: '/api/admin/system/status',
+      headers: { cookie: adminCookie },
+    });
+    expect(adminSystemStatus.statusCode).toBe(200);
+    expect(adminSystemStatus.json()).toMatchObject({
+      api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
+      database: { ok: true, migrationCount: 5, currentMigration: '0005_admin_foundation.sql' },
+      corpus: {
+        classifications: 3,
+        questions: 5,
+        questionOptions: 8,
+        bankMappings: 2,
+        visibleBanks: 1,
+      },
+      imports: { tableExists: false, runningJobId: null, lastJob: null },
+      quality: { tableExists: false, openFlags: 0, blockingFlags: 0, excludedQuestions: 0 },
+    });
 
     const adminAuditState = await pool.query<{ audit_count: string }>(`
       SELECT COUNT(*) AS audit_count
