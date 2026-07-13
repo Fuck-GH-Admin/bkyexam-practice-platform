@@ -8,13 +8,17 @@ import {
   AdminImportJobListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  AdminQuestionReviewDetailResponseV1Schema,
+  AdminQuestionReviewListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
   BulkUpdateAdminBankMappingStatusRequestV1Schema,
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
+  ListAdminQuestionReviewsRequestV1Schema,
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
+  UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
@@ -268,6 +272,71 @@ describe('v1 auth/catalog/error/health contracts', () => {
     expect(() => CreateAdminImportJobRequestV1Schema.parse({
       ...request,
       options: { ...request.options, batchSize: 0 },
+    })).toThrow();
+  });
+
+  it('parses admin question review contracts and update actions', () => {
+    const flagId = '70000000-0000-4000-8000-000000000001';
+    expect(ListAdminQuestionReviewsRequestV1Schema.parse({
+      bankId: bankId.toUpperCase(),
+      flagType: 'bad_answer',
+      severity: 'blocking',
+      limit: '10',
+      offset: '5',
+    })).toMatchObject({
+      bankId,
+      flagType: 'bad_answer',
+      status: 'open',
+      severity: 'blocking',
+      limit: 10,
+      offset: 5,
+    });
+
+    expect(UpdateAdminQuestionReviewRequestV1Schema.parse({
+      addFlags: [{ type: 'bad_answer', severity: 'high', note: '答案与解析不一致' }],
+      resolveFlagIds: [flagId.toUpperCase()],
+      excludedFromPractice: true,
+    })).toMatchObject({
+      addFlags: [{ type: 'bad_answer', severity: 'high', note: '答案与解析不一致' }],
+      resolveFlagIds: [flagId],
+      ignoredFlagIds: [],
+      excludedFromPractice: true,
+    });
+    expect(() => UpdateAdminQuestionReviewRequestV1Schema.parse({})).toThrow();
+    expect(() => UpdateAdminQuestionReviewRequestV1Schema.parse({
+      resolveFlagIds: [flagId],
+      ignoredFlagIds: [flagId],
+    })).toThrow();
+
+    const question = {
+      questionId,
+      bankId,
+      bankName: '数据库集成测试题库',
+      questionType: 'single_choice',
+      contentPreview: 'PostgreSQL 中哪个命令用于提交当前事务？',
+      optionCount: 2,
+      answerPreview: 'COMMIT',
+      flags: [{
+        id: flagId,
+        type: 'bad_answer',
+        severity: 'high',
+        status: 'open',
+        note: '答案与解析不一致',
+        createdAt: '2026-07-13T10:00:00.000Z',
+        createdBy: { id: '50000000-0000-4000-8000-000000000001', displayName: 'Operator' },
+        resolvedAt: null,
+        resolvedBy: null,
+      }],
+      excludedFromPractice: true,
+    };
+
+    expect(AdminQuestionReviewListResponseV1Schema.parse({
+      questions: [question],
+      page: { limit: 20, offset: 0, hasMore: false },
+    }).questions[0]?.excludedFromPractice).toBe(true);
+    expect(AdminQuestionReviewDetailResponseV1Schema.parse({ question }).question.flags[0]?.type).toBe('bad_answer');
+    expect(() => AdminQuestionReviewDetailResponseV1Schema.parse({
+      question: { ...question, flags: [{ ...question.flags[0], severity: 'fatal' }] },
     })).toThrow();
   });
 

@@ -5,6 +5,7 @@ import { createAuditService, createPgAuditLogRepository } from '../../src/admin/
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
 import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
 import { createPgAdminImportJobRepository } from '../../src/admin/importJobs.js';
+import { createPgAdminQuestionReviewRepository } from '../../src/admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
 import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
 import { hashPassword } from '../../src/auth/password.js';
@@ -32,6 +33,7 @@ describe('PostgreSQL-backed API integration', () => {
     adminBankMappingRepository: createPgAdminBankMappingRepository(pool),
     adminImportJobRepository: createPgAdminImportJobRepository(pool),
     adminImportAllowedRoots: [importFixtureDir],
+    adminQuestionReviewRepository: createPgAdminQuestionReviewRepository(pool),
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
@@ -106,7 +108,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 6, currentMigration: '0006_import_jobs.sql' },
+      database: { ok: true, migrationCount: 7, currentMigration: '0007_question_quality_flags.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -115,7 +117,7 @@ describe('PostgreSQL-backed API integration', () => {
         visibleBanks: 1,
       },
       imports: { tableExists: true, runningJobId: null, lastJob: null },
-      quality: { tableExists: false, openFlags: 0, blockingFlags: 0, excludedQuestions: 0 },
+      quality: { tableExists: true, openFlags: 0, blockingFlags: 0, excludedQuestions: 0 },
     });
 
     const adminAuditState = await pool.query<{ audit_count: string }>(`
@@ -700,6 +702,95 @@ describe('PostgreSQL-backed API integration', () => {
       reviewCount: 0,
       status: 'active',
     });
+
+    const questionReviewUpdate = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}`,
+      headers: { cookie: editorCookie },
+      payload: {
+        addFlags: [{
+          type: 'bad_answer',
+          severity: 'blocking',
+          note: 'Integration review excludes this question from new practice sessions.',
+        }],
+        excludedFromPractice: true,
+      },
+    });
+    expect(questionReviewUpdate.statusCode).toBe(200);
+    expect(questionReviewUpdate.json()).toMatchObject({
+      question: {
+        questionId: fixtureIds.questions.unanswered,
+        bankId: fixtureIds.bank,
+        excludedFromPractice: true,
+        flags: [expect.objectContaining({
+          type: 'bad_answer',
+          severity: 'blocking',
+          status: 'open',
+          createdBy: {
+            id: '50000000-0000-4000-8000-000000000002',
+            displayName: 'Integration Editor',
+          },
+        })],
+      },
+    });
+    const qualityFlagId = questionReviewUpdate.json().question.flags[0].id as string;
+
+    const questionReviewList = await app.inject({
+      method: 'GET',
+      url: `/api/admin/question-review?bankId=${fixtureIds.bank}&status=open&severity=blocking`,
+      headers: { cookie: editorCookie },
+    });
+    expect(questionReviewList.statusCode).toBe(200);
+    expect(questionReviewList.json()).toMatchObject({
+      questions: [{
+        questionId: fixtureIds.questions.unanswered,
+        bankId: fixtureIds.bank,
+        optionCount: 2,
+        excludedFromPractice: true,
+        flags: [{ id: qualityFlagId, status: 'open' }],
+      }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    const questionReviewAuditState = await pool.query<{ audit_count: string }>(`
+      SELECT COUNT(*) AS audit_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND action IN ('question_review.flag_add', 'question_review.exclude_update')
+        AND result = 'success'
+    `, ['50000000-0000-4000-8000-000000000002']);
+    expect(questionReviewAuditState.rows[0]).toEqual({ audit_count: '2' });
+
+    const adminSystemStatusAfterQuestionReview = await app.inject({
+      method: 'GET',
+      url: '/api/admin/system/status',
+      headers: { cookie: adminCookie },
+    });
+    expect(adminSystemStatusAfterQuestionReview.statusCode).toBe(200);
+    expect(adminSystemStatusAfterQuestionReview.json()).toMatchObject({
+      quality: {
+        tableExists: true,
+        openFlags: 1,
+        blockingFlags: 1,
+        excludedQuestions: 1,
+      },
+    });
+
+    const postReviewCreated = await app.inject({
+      method: 'POST',
+      url: '/api/practice/sessions',
+      headers: { cookie: aliceCookie },
+      payload: {
+        bankId: fixtureIds.bank,
+        mode: 'sequential',
+        limit: 4,
+      },
+    });
+    expect(postReviewCreated.statusCode).toBe(200);
+    expect(postReviewCreated.json().session.questionCount).toBe(3);
+    expect(postReviewCreated.json().questions.map((question: { id: string }) => question.id)).not.toContain(
+      fixtureIds.questions.unanswered,
+    );
 
     const bobLogin = await app.inject({
       method: 'POST',

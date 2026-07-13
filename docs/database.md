@@ -127,6 +127,28 @@ Indexes and constraints:
 - `import_jobs_created_by_idx` on `(created_by_admin_id, created_at DESC)`.
 - `import_jobs_one_running_kind_idx` allows only one `running` job for each `kind`.
 
+### `question_quality_flags`
+
+Stores admin-side question quality flags and practice-exclusion overrides without editing imported source question rows.
+
+- `id`: UUID primary key.
+- `question_id`: FK to `questions.id`.
+- `bank_id`: nearest mapped bank/classification for filtering.
+- `flag_type`: quality reason such as `bad_answer`, `missing_option`, `bad_option`, `garbled_content`, `duplicate_question`, `wrong_type`, or `needs_manual_review`.
+- `severity`: `low`, `medium`, `high`, or `blocking`.
+- `status`: `open`, `resolved`, or `ignored`.
+- `note`: admin note.
+- `excluded_from_practice`: when true on an open flag, new practice sessions exclude the question from automatic bank selection.
+- `created_by_admin_id` / `resolved_by_admin_id`: admin attribution.
+- `created_at`, `updated_at`, `resolved_at`: review timestamps.
+
+Indexes:
+
+- `question_quality_flags_question_id_idx` on `question_id`.
+- `question_quality_flags_bank_status_idx` on `(bank_id, status)`.
+- `question_quality_flags_type_status_idx` on `(flag_type, status)`.
+- `question_quality_flags_excluded_open_idx` on excluded open flags used by practice selection.
+
 ### `students`
 
 Stores student identities.
@@ -276,6 +298,8 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 
 `apps/api/src/db/migrations/0006_import_jobs.sql` adds Admin Import Jobs. It creates `import_jobs`, indexes status/creator paging, and enforces a partial unique lock so only one same-kind job can be `running` at a time.
 
+`apps/api/src/db/migrations/0007_question_quality_flags.sql` adds Admin Question Review flags. It creates `question_quality_flags`, quality filter indexes, and the excluded-open index used by new practice session selection.
+
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
 Run API migrations with:
@@ -293,7 +317,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-13 all six migrations, including Admin foundation and Import Jobs, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all seven migrations, including Admin foundation, Import Jobs, and Question Review flags, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

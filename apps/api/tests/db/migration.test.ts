@@ -69,4 +69,17 @@ describe('initial database migration', () => {
     expect(sql).toContain('import_jobs_one_running_kind_idx');
     expect(sql).toContain("WHERE status = 'running'");
   });
+
+  it('creates question quality flags for admin review', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0007_question_quality_flags.sql'), 'utf8');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS question_quality_flags');
+    expect(sql).toContain("flag_type IN");
+    expect(sql).toContain("severity text NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'blocking'))");
+    expect(sql).toContain("status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'ignored'))");
+    expect(sql).toContain('excluded_from_practice boolean NOT NULL DEFAULT false');
+    expect(sql).toContain('question_quality_flags_question_id_idx');
+    expect(sql).toContain('question_quality_flags_bank_status_idx');
+    expect(sql).toContain('question_quality_flags_excluded_open_idx');
+  });
 });

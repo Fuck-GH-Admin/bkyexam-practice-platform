@@ -325,3 +325,126 @@ export const CreateAdminImportJobResponseV1Schema = z.object({
   job: AdminImportJobV1Schema,
 }).strict();
 export type CreateAdminImportJobResponseV1 = z.infer<typeof CreateAdminImportJobResponseV1Schema>;
+
+export const AdminQuestionFlagTypeV1Schema = z.enum([
+  'bad_answer',
+  'missing_option',
+  'bad_option',
+  'garbled_content',
+  'duplicate_question',
+  'wrong_type',
+  'needs_manual_review',
+]);
+export type AdminQuestionFlagTypeV1 = z.infer<typeof AdminQuestionFlagTypeV1Schema>;
+
+export const AdminQuestionFlagSeverityV1Schema = z.enum(['low', 'medium', 'high', 'blocking']);
+export type AdminQuestionFlagSeverityV1 = z.infer<typeof AdminQuestionFlagSeverityV1Schema>;
+
+export const AdminQuestionFlagStatusV1Schema = z.enum(['open', 'resolved', 'ignored']);
+export type AdminQuestionFlagStatusV1 = z.infer<typeof AdminQuestionFlagStatusV1Schema>;
+
+export const AdminQuestionReviewActorV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  displayName: z.string().min(1),
+}).strict();
+export type AdminQuestionReviewActorV1 = z.infer<typeof AdminQuestionReviewActorV1Schema>;
+
+export const AdminQuestionReviewFlagV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  type: AdminQuestionFlagTypeV1Schema,
+  severity: AdminQuestionFlagSeverityV1Schema,
+  status: AdminQuestionFlagStatusV1Schema,
+  note: z.string(),
+  createdAt: z.string().datetime(),
+  createdBy: AdminQuestionReviewActorV1Schema.nullable(),
+  resolvedAt: z.string().datetime().nullable(),
+  resolvedBy: AdminQuestionReviewActorV1Schema.nullable(),
+}).strict();
+export type AdminQuestionReviewFlagV1 = z.infer<typeof AdminQuestionReviewFlagV1Schema>;
+
+export const AdminQuestionReviewItemV1Schema = z.object({
+  questionId: CanonicalUuidV1Schema,
+  bankId: CanonicalUuidV1Schema,
+  bankName: z.string().min(1),
+  questionType: z.string().min(1),
+  contentPreview: z.string(),
+  optionCount: z.number().int().nonnegative(),
+  answerPreview: z.string(),
+  flags: z.array(AdminQuestionReviewFlagV1Schema),
+  excludedFromPractice: z.boolean(),
+}).strict();
+export type AdminQuestionReviewItemV1 = z.infer<typeof AdminQuestionReviewItemV1Schema>;
+
+export const ListAdminQuestionReviewsRequestV1Schema = z.object({
+  bankId: CaseInsensitiveUuidV1Schema.optional(),
+  questionType: z.string().min(1).optional(),
+  flagType: AdminQuestionFlagTypeV1Schema.optional(),
+  status: AdminQuestionFlagStatusV1Schema.default('open'),
+  severity: AdminQuestionFlagSeverityV1Schema.optional(),
+  keyword: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminQuestionReviewsRequestV1 = z.infer<
+  typeof ListAdminQuestionReviewsRequestV1Schema
+>;
+
+export const AddAdminQuestionReviewFlagV1Schema = z.object({
+  type: AdminQuestionFlagTypeV1Schema,
+  severity: AdminQuestionFlagSeverityV1Schema,
+  note: z.string().default(''),
+}).strict();
+export type AddAdminQuestionReviewFlagV1 = z.infer<typeof AddAdminQuestionReviewFlagV1Schema>;
+
+export const UpdateAdminQuestionReviewRequestV1Schema = z.object({
+  addFlags: z.array(AddAdminQuestionReviewFlagV1Schema).max(20).default([]),
+  resolveFlagIds: z.array(CaseInsensitiveUuidV1Schema).max(100).default([]),
+  ignoredFlagIds: z.array(CaseInsensitiveUuidV1Schema).max(100).default([]),
+  excludedFromPractice: z.boolean().optional(),
+}).strict().superRefine((request, context) => {
+  const actionCount = request.addFlags.length
+    + request.resolveFlagIds.length
+    + request.ignoredFlagIds.length
+    + (request.excludedFromPractice === undefined ? 0 : 1);
+
+  if (actionCount === 0) {
+    context.addIssue({
+      code: 'custom',
+      message: 'At least one question review change is required',
+    });
+  }
+
+  const ignored = new Set(request.ignoredFlagIds);
+  for (const flagId of request.resolveFlagIds) {
+    if (ignored.has(flagId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A flag cannot be both resolved and ignored',
+        path: ['resolveFlagIds'],
+      });
+      break;
+    }
+  }
+});
+export type UpdateAdminQuestionReviewRequestV1 = z.infer<
+  typeof UpdateAdminQuestionReviewRequestV1Schema
+>;
+
+export const AdminQuestionReviewListResponseV1Schema = z.object({
+  questions: z.array(AdminQuestionReviewItemV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminQuestionReviewListResponseV1 = z.infer<
+  typeof AdminQuestionReviewListResponseV1Schema
+>;
+
+export const AdminQuestionReviewDetailResponseV1Schema = z.object({
+  question: AdminQuestionReviewItemV1Schema,
+}).strict();
+export type AdminQuestionReviewDetailResponseV1 = z.infer<
+  typeof AdminQuestionReviewDetailResponseV1Schema
+>;

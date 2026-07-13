@@ -146,6 +146,13 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
             FROM questions
             JOIN bank_classifications ON bank_classifications.id = questions.classification_id
             WHERE questions.normalized_type = ANY($2::text[])
+              AND NOT EXISTS (
+                SELECT 1
+                FROM question_quality_flags
+                WHERE question_quality_flags.question_id = questions.id
+                  AND question_quality_flags.status = 'open'
+                  AND question_quality_flags.excluded_from_practice = true
+              )
             ORDER BY ${orderBy}
             LIMIT $3
           `,

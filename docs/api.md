@@ -495,13 +495,117 @@ Errors：
 - `409`：同类 job 已在运行。
 - `422`：请求 `mode=import`。
 
+## Admin Question Review
+
+Admin Question Review 是 B5.6 已实现的题目质检后端。第一版只建立 flag/override 层，不直接编辑 `questions.content`、`questions.answer_raw` 或 `question_options`。当 `excludedFromPractice=true` 时，新的学生练习选题会排除该题；已经创建并锁题的旧 session 不回写改变。
+
+### `GET /api/admin/question-review`
+
+Permission：`question_review:read`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `bankId` | UUID | optional |
+| `questionType` | string | optional |
+| `flagType` | `bad_answer|missing_option|bad_option|garbled_content|duplicate_question|wrong_type|needs_manual_review` | optional |
+| `status` | `open|resolved|ignored` | `open` |
+| `severity` | `low|medium|high|blocking` | optional |
+| `keyword` | string | optional |
+| `limit` | integer 1..100 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "questions": [
+    {
+      "questionId": "question-uuid",
+      "bankId": "bank-uuid",
+      "bankName": "数据库集成测试题库",
+      "questionType": "single_choice",
+      "contentPreview": "PostgreSQL 中哪个命令用于提交当前事务？",
+      "optionCount": 2,
+      "answerPreview": "COMMIT",
+      "flags": [
+        {
+          "id": "flag-uuid",
+          "type": "bad_answer",
+          "severity": "blocking",
+          "status": "open",
+          "note": "答案与解析不一致",
+          "createdAt": "2026-07-14T10:00:00.000Z",
+          "createdBy": { "id": "admin-user-uuid", "displayName": "内容编辑" },
+          "resolvedAt": null,
+          "resolvedBy": null
+        }
+      ],
+      "excludedFromPractice": true
+    }
+  ],
+  "page": { "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+### `PATCH /api/admin/question-review/:questionId`
+
+Permission：`question_review:write`
+
+Request：
+
+```json
+{
+  "addFlags": [
+    {
+      "type": "bad_answer",
+      "severity": "blocking",
+      "note": "答案与解析不一致"
+    }
+  ],
+  "resolveFlagIds": [],
+  "ignoredFlagIds": [],
+  "excludedFromPractice": true
+}
+```
+
+Rules：
+
+- `addFlags` 单次最多 20 个。
+- `resolveFlagIds` / `ignoredFlagIds` 单次最多各 100 个。
+- 同一个 flag id 不能同时 resolved 和 ignored。
+- 空变更返回 `400`。
+- flag 不属于该 question 或不存在时返回 `404`。
+- 成功写入 audit log：
+  - `question_review.flag_add`
+  - `question_review.flag_resolve`
+  - `question_review.exclude_update`
+
+Response：
+
+```json
+{
+  "question": {
+    "...": "same shape as list item"
+  }
+}
+```
+
+Errors：
+
+- `400`：query、body 或 question id 无效。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：缺少 `question_review:read/write`。
+- `404`：question 或 flag 不存在。
+
 ## Admin System Status
 
 ### `GET /api/admin/system/status`
 
 Permission：`system_status:read`
 
-这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量、Import Job 简要状态，以及未来 Question Review 表存在时的简要状态。
+这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量、Import Job 简要状态和 Question Review 质量摘要。
 
 Response：
 
@@ -514,8 +618,8 @@ Response：
   },
   "database": {
     "ok": true,
-    "migrationCount": 6,
-    "currentMigration": "0006_import_jobs.sql"
+    "migrationCount": 7,
+    "currentMigration": "0007_question_quality_flags.sql"
   },
   "corpus": {
     "classifications": 2941,
@@ -534,10 +638,10 @@ Response：
     }
   },
   "quality": {
-    "tableExists": false,
-    "openFlags": 0,
-    "blockingFlags": 0,
-    "excludedQuestions": 0
+    "tableExists": true,
+    "openFlags": 1,
+    "blockingFlags": 1,
+    "excludedQuestions": 1
   }
 }
 ```
@@ -546,7 +650,9 @@ Notes：
 
 - `visibleBanks` 与学生 `/api/banks` 口径一致：`visible=true`、`status=active` 且含客观题。
 - `imports.tableExists=true` 表示 Import Jobs migration 已落地；`lastJob` 是最近创建的导入任务摘要。
-- `quality.tableExists=false` 表示 Question Review flags migration 尚未落地。
+- `quality.openFlags` 是 open flag 数量。
+- `quality.blockingFlags` 是 open 且 severity 为 `blocking` 的 flag 数量。
+- `quality.excludedQuestions` 是当前因 open flag 的 `excludedFromPractice=true` 被新练习选题排除的题目数。
 
 Errors：
 
@@ -1058,9 +1164,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin Bank Mapping read/write、Admin System Status 与 Admin Import Job route/shared schema 已实现；Question Review、Audit Log read 和 Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job 与 Admin Question Review route/shared schema 已实现；Audit Log read 和 Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

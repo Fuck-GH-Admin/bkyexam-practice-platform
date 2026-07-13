@@ -28,6 +28,7 @@ const falseAnswerId = '22222222-2222-2222-2222-222222222222';
 export async function resetAndSeedPostgresFixture(client: QueryClient) {
   await client.query(`
     TRUNCATE TABLE
+      question_quality_flags,
       import_jobs,
       audit_logs,
       admin_sessions,

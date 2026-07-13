@@ -1,7 +1,7 @@
 # Backend Completeness And Next Plan
 
-状态日期：**2026-07-13**
-最近完整验证：**2026-07-13 `npm run verify:docker` PASS**
+状态日期：**2026-07-14**
+最近完整验证：**2026-07-14 `npm run verify:docker` PASS**
 本轮初始基线提交：`cae6657 feat: add student session home and history`
 
 本文专门从后端视角回答两个问题：
@@ -20,7 +20,7 @@
 | 学生客观题后端闭环 | **约 88–92%** | 已可内部试用；核心链路稳定。 |
 | 后端工程可验证性 | **约 80%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 54–62%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态和 dry-run 导入任务，但 Question Review、正式身份、全题型和生产能力仍未完成。 |
+| 完整平台后端 | **约 57–66%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务和题目质检 flag/exclusion，但管理员 bootstrap、Audit Log read、真正写入 import mode、正式身份、全题型和生产能力仍未完成。 |
 | 公开生产后端就绪 | **约 56%** | 缺正式安全策略、监控、备份恢复、rate limit、CSRF、部署验收和管理员 bootstrap。 |
 
 这些百分比是工程判断，不是测试覆盖率。
@@ -31,7 +31,7 @@
 
 已完成：
 
-- PostgreSQL schema 与六份 ordered SQL migration。
+- PostgreSQL schema 与七份 ordered SQL migration。
 - 原始题库解析：
   - classifications
   - questions
@@ -44,6 +44,8 @@
 - 可见题库筛选。
 - 管理端 `import_jobs` 任务表。
 - Import Jobs dry-run API 可复用现有题库解析和 mapping 生成逻辑产出 summary。
+- 管理端 `question_quality_flags` 质检表。
+- `excludedFromPractice=true` 的 open quality flag 会从新的 Practice bank session 自动选题中排除对应题目。
 - 完整 corpus slow smoke。
 
 已验证数据：
@@ -163,17 +165,17 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API 与 Import Job dry-run API 已实现；Question Review 尚未完成。**
+当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Job dry-run API 与 Question Review API 已实现；Audit Log read/Admin User manage 尚未完成。**
 
 ### 2.8 Verification
 
 已完成质量门：
 
 - `npm run verify:docker`
-- 357 Vitest
-- 308 API tests
+- 367 Vitest
+- 317 API tests
 - 31 Web tests
-- 18 Shared tests
+- 19 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -217,15 +219,13 @@
 - Bank Mapping list/detail/update/bulk-status APIs
 - System Status API
 - Import Jobs dry-run APIs
+- Question Review flag/exclusion APIs
 
 未完成：
 
-- Question Review API / `question_quality_flags`
 - Audit Log read API
 - Admin User 管理 / bootstrap CLI
 - 真正执行写入的 import mode
-- 题目质检标记
-- 学生端排除异常题策略
 - 管理端前端
 
 这是完整平台后端剩余最大的业务缺口。
@@ -251,7 +251,28 @@
 - 异步 worker/队列策略
 - 管理端可视化
 
-### 3.5 非客观题/复杂题型流程未完成
+### 3.5 Question Review 已有 flag/exclusion，尚无完整质检工作台
+
+已完成：
+
+- `question_quality_flags`
+- `GET /api/admin/question-review`
+- `PATCH /api/admin/question-review/:questionId`
+- open/resolved/ignored 状态
+- severity/reason/note
+- `excludedFromPractice=true` 排除新练习选题
+- System Status quality summary
+- audit log
+
+未完成：
+
+- 管理端可视化工作台
+- 批量处理/导出
+- 题目原文编辑器
+- 复杂审批流
+- 质检历史筛选 UI
+
+### 3.6 非客观题/复杂题型流程未完成
 
 已导入但没有完整练习闭环的类型包括：
 
@@ -282,7 +303,7 @@
 - 错题规则
 - 统计规则
 
-### 3.6 学习记录与统计不足
+### 3.7 学习记录与统计不足
 
 已有：
 
@@ -301,7 +322,7 @@
 - 长期学习档案
 - 题目收藏/长期存疑模型
 
-### 3.7 Practice 后端结构太大
+### 3.8 Practice 后端结构太大
 
 当前主要问题：
 
@@ -328,7 +349,7 @@
 - Admin/Stats/Non-objective 扩展会越来越难。
 - 测试定位成本上升。
 
-### 3.8 Wrongbook 与 Practice 边界不够好
+### 3.9 Wrongbook 与 Practice 边界不够好
 
 原先：
 
@@ -346,7 +367,7 @@
 - Wrongbook service 请求 Practice session service 创建再练 session。
 - Practice 统一负责 session 创建、锁题、origin 和约束。
 
-### 3.9 Contract 未完全覆盖后端
+### 3.10 Contract 未完全覆盖后端
 
 已覆盖：
 
@@ -356,17 +377,18 @@
 - Auth
 - Catalog
 - Admin Auth / Bank Mapping / System Status / Import Job
+- Admin Question Review
 - 通用 error
 - Health
 
 未覆盖：
 
-- Question Review
 - Audit Log read API
+- Admin User manage/bootstrap
 - Readiness/DB health
 - 部分 request schema 在 route 中仍手写
 
-### 3.10 生产运维能力不足
+### 3.11 生产运维能力不足
 
 缺：
 
@@ -384,7 +406,7 @@
 - production deploy checklist validation
 - 远端 CI 首次验收与 branch protection
 
-### 3.11 异常数据 fixture 不足
+### 3.12 异常数据 fixture 不足
 
 缺专项 fixture/test：
 
@@ -400,15 +422,15 @@
 
 ## 4. 后端下一步规划
 
-本路线中 B1 到 B5.5 已按顺序执行完毕。当前下一步仍然不要直接开管理端大工程，也不要先做最终视觉；应继续完成管理端后端最小闭环。
+本路线中 B1 到 B5.6 已按顺序执行完毕。当前仍然不要直接开管理端大工程，也不要先做最终视觉；应继续补齐管理端可运行、可追踪、可审核的非视觉能力。
 
-当前建议继续做 **B5.6 Question Review Flags**。
+当前建议下一步做 **B5.7 Admin Bootstrap + Audit Log Read / 管理端信息架构静态审核**。
 
 原因：
 
 1. 学生客观题主链路已经稳定，适合继续在稳定测试保护下补管理端能力。
-2. Bank Mapping read/write、System Status 与 Import Jobs 已有 Auth/RBAC/Audit 基础，Question Review 是管理端最小可运营闭环的最后一块后端业务能力。
-3. Question Review 稳定后，才更适合进入管理端信息架构审核、静态 wireframe 和最后的前端实现。
+2. Bank Mapping read/write、System Status、Import Jobs dry-run 与 Question Review Flags 已有 Auth/RBAC/Audit 基础，但真实管理员还缺安全初始化入口和审计查询入口。
+3. 在正式 Admin 前端前，先把 bootstrap、audit query 与管理端信息架构静态验收补齐，可以避免再次出现“先画 UI、后端语义又变”的问题。
 
 ## 5. 推荐执行路线
 
@@ -659,7 +681,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
 
 目标：最小可运营闭环。
 
-状态：**进行中。B5.1/B5.2/B5.3/B5.4/B5.5 已完成，2026-07-13。**
+状态：**进行中。B5.1/B5.2/B5.3/B5.4/B5.5/B5.6 已完成，2026-07-14。**
 
 优先实现：
 
@@ -669,11 +691,12 @@ bank_mappings.version / updated_at / updated_by_admin_id
 4. bank mappings update + batch visible/status — **已完成**
 5. system status — **已完成**
 6. import jobs — **已完成（dry-run first）**
+7. question review flags — **已完成**
 
 后实现：
 
-7. question review flags
-8. import error report
+8. admin bootstrap / audit log read
+9. import error report / true import mode
 
 验收：
 
@@ -821,29 +844,58 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - 成功创建写 `import_job.create` audit log。
   - PostgreSQL integration 覆盖 migration、创建、列表、详情、audit、System Status latest import job。
 
-下一步：**B5.6 Question Review Flags**。
+B5.6 已在下一节落地；当前下一步：**B5.7 Admin Bootstrap + Audit Log Read / 管理端 IA Gate**。
 
 ### Phase B5.6 — Question Review Flags
 
+状态：**已完成，2026-07-14。**
+
 目标：补齐管理端题目质量标记后端，让内容运营可以记录异常题并选择性排除练习。
 
-后端能力：
+实际落地：
 
-- migration `0007_question_quality_flags.sql`
-- shared v1 Question Review schema
-- `GET /api/admin/question-review`
-- `PATCH /api/admin/question-review/:questionId`
-- open/resolved/ignored 状态
-- severity、reason、note、excludedFromPractice
-- created/resolved admin attribution
-- System Status quality summary 使用真实表
-- 可选 practice exclusion rule，必须有显式测试
+- migration `0007_question_quality_flags.sql`，新增 `question_quality_flags`。
+- shared v1 Question Review schema，覆盖 list/update/detail response、flag type/severity/status 和 actor attribution。
+- `GET /api/admin/question-review`，支持 bank/type/flag/status/severity/keyword/pagination 查询。
+- `PATCH /api/admin/question-review/:questionId`，支持 add/resolve/ignore flag 与 `excludedFromPractice` 切换。
+- `question_review:read/write` 权限守卫，覆盖 `401/403/400/404`。
+- `question_review.flag_add`、`question_review.flag_resolve`、`question_review.exclude_update` audit log。
+- System Status quality summary 接入真实表。
+- 新建 Practice bank session 会排除 open 且 `excludedFromPractice=true` 的题目；错题再练等显式题目列表不受影响。
+- route/unit/schema/PostgreSQL integration 已覆盖。
 
 注意：
 
 - 第一版仍不直接编辑原始题干/答案，只记录 quality flag。
 - 不做管理前端。
-- 是否立即影响学生选题必须由 `excludedFromPractice=true` 明确控制。
+- 是否立即影响学生选题由 `excludedFromPractice=true` 明确控制。
+
+### Phase B5.7 — Admin Bootstrap + Audit Log Read / Admin IA Gate
+
+目标：在正式管理端 UI 前，让后台具备安全初始化、审计查询和信息架构静态验收能力。
+
+建议后端能力：
+
+- 初始 `super_admin` bootstrap：CLI/seed script 或一次性环境变量，不开放 public registration。
+- shared v1 Admin Audit Log schema。
+- `GET /api/admin/audit-logs`：按 action/resource/actor/time/limit/offset 查询。
+- `audit_log:read` 权限守卫。
+- audit log repository memory/PostgreSQL 双路径。
+- PostgreSQL integration 覆盖登录、写操作、审计查询和权限边界。
+
+建议文档/产品能力：
+
+- 管理端 sitemap：题库整理、导入任务、题目质检、系统状态、审计日志、管理员初始化/账号管理边界。
+- 各页面字段表、状态表、权限矩阵和空/错误/加载态。
+- 静态 wireframe 只用于 contract 校验，不启动正式前端实现。
+
+不做：
+
+- 不创建正式 Admin UI。
+- 不开放管理员注册。
+- 不直接编辑原始题目。
+- 不开启真正写入 import mode。
+- 不做复杂审批流。
 
 ### Phase B7 — Student Learning Record And Statistics
 
@@ -913,40 +965,39 @@ review_items
 
 如果继续本规划，下一步建议执行：
 
-> **B5.6 Question Review Flags。**
+> **B5.7 Admin Bootstrap + Audit Log Read / 管理端 IA Gate。**
 
-具体第一阶段 commit 目标：
+具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add admin question review api
+feat: add admin bootstrap and audit log api
 ```
 
-范围只包含：
+范围建议只包含：
 
-- migration `0007_question_quality_flags.sql`
-- shared v1 question review schema
-- `GET /api/admin/question-review`
-- `PATCH /api/admin/question-review/:questionId`
-- `question_review:read/write` 权限守卫
-- open/resolved/ignored quality flag
-- optional `excludedFromPractice` rule behind explicit tests
-- System Status quality summary 接入真实表
-- route/unit/PostgreSQL integration 覆盖
-- 更新 architecture/todo/status/api docs
-- 全量 verify:docker
+- 初始 `super_admin` bootstrap CLI/seed，避免默认账号和公开注册。
+- shared v1 Admin Audit Log schema。
+- `GET /api/admin/audit-logs`。
+- `audit_log:read` 权限守卫。
+- action/resource/actor/time/limit/offset 查询边界。
+- memory/PostgreSQL repository 与 route/unit/PostgreSQL integration 覆盖。
+- 更新管理端信息架构文档、权限矩阵、字段表和静态 wireframe checklist。
+- 全量 `npm run verify:docker`。
 
 不做：
 
-- 不改 UI
+- 不改正式 UI
 - 不创建 `apps/admin`
+- 不开放管理员注册
 - 不编辑原始题干/选项/答案
+- 不开启真正写入 import mode
 - 不做完整审核工作台
 - 不开启复杂审批流
-- 不改业务语义
+- 不改学生端业务语义
 - 不引入微服务
 - 不引入队列
 
-这样最稳。
+这样可以先让“管理端可被初始化、可追踪、可审核”，再进入正式前端设计审核。
 
 ## 7. 阶段提交规则
 
@@ -963,6 +1014,6 @@ feat: add admin question review api
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status 与 Import Jobs dry-run 已落地；完整平台后端还缺 Question Review、管理员 bootstrap、正式身份、模块化、非客观题和生产运维。**
+> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run 与 Question Review Flags 已落地；完整平台后端还缺管理员 bootstrap、Audit Log read、正式身份、模块化、非客观题、真正写入 import mode 和生产运维。**
 
-最合理的下一步是继续 Admin 后端 MVP：补 Question Review；前端仍应等管理后端 command/query 基本稳定后再进入设计审核。
+最合理的下一步是继续 Admin 后端 MVP：补 bootstrap/audit read，并同步做管理端信息架构静态审核；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

@@ -1,6 +1,6 @@
 # Admin Backend Contract Design
 
-状态日期：**2026-07-13**
+状态日期：**2026-07-14**
 阶段：**Phase B4 — Admin Backend Contract Design**
 状态：**设计完成；B5 已部分实现 API/migration，UI 未开始**
 
@@ -8,7 +8,7 @@
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API 与 Import Jobs dry-run API。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job schema、optimistic concurrency、audit log、import running lock、source allowlist 和 PostgreSQL integration 测试。Question Review 仍按本文后续章节实现。
+> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run API 与 Question Review Flags API。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job/Question Review schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。Audit Log read、Admin User manage、正式 Admin UI 仍按后续阶段实现。
 
 ## 1. 目标与非目标
 
@@ -898,13 +898,15 @@ Response：
 
 ### 10.1 Required migrations
 
-建议下一份 migration：
+当前 B5 migration 已按切片落地：
 
 ```text
 0005_admin_foundation.sql
+0006_import_jobs.sql
+0007_question_quality_flags.sql
 ```
 
-包含：
+其中 `0005_admin_foundation.sql` 包含：
 
 ```sql
 admin_users
@@ -916,14 +918,7 @@ bank_mappings.updated_at
 bank_mappings.updated_by_admin_id
 ```
 
-后续可拆：
-
-```text
-0006_import_jobs.sql
-0007_question_quality_flags.sql
-```
-
-也可以一次性包含三部分，但推荐按实现切片拆小。
+后续 migration 应继续按小切片追加，不在同一阶段混入 UI 或大规模数据重写。
 
 ### 10.2 `admin_users`
 
@@ -1168,12 +1163,16 @@ Rules：
 
 ### B5.6 Question Review Flags
 
+状态：**已完成，2026-07-14。**
+
 交付：
 
 - migration `0007_question_quality_flags.sql`
 - `GET /api/admin/question-review`
 - `PATCH /api/admin/question-review/:questionId`
-- optional practice exclusion rule behind explicit tests
+- practice exclusion rule behind explicit tests
+- `question_review.flag_add` / `question_review.flag_resolve` / `question_review.exclude_update` audit log
+- System Status quality summary 接入真实表
 
 ## 13. Acceptance Criteria For B5
 
@@ -1186,22 +1185,23 @@ B5 完成时必须满足：
 - 管理员可以查看题库 mapping。
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
+- 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
 - 写操作有 optimistic concurrency。
 - 写操作写 audit log。
 - 学生 `/api/banks` 只返回已发布可见且含客观题的题库。
 - `npm run verify:docker` 通过。
 - 文档同步更新。
 
-## 14. Open Questions Before Implementation
+## 14. Open Questions For Next Stage
 
-B5 实现前需要做最终确认：
+B5.1 到 B5.6 已实现；进入正式 Admin UI 前仍需要确认：
 
 1. 初始 `super_admin` 如何创建？
-   - 建议：CLI seed script 或环境变量一次性 bootstrap，不开放 public registration。
+   - 建议下一阶段实现 CLI seed script 或环境变量一次性 bootstrap，不开放 public registration。
 2. `sourceDir` allowlist 放在哪里？
-   - 建议：环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
+   - 已采用环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
 3. question quality flag 是否立即影响学生选题？
-   - 建议：第一版记录 flag；`excludedFromPractice=true` 才影响选题。
+   - 已固定为 `excludedFromPractice=true` 才影响新建普通练习选题。
 4. bank mapping `status=review` 是否应该是导入后的默认状态？
    - 当前自动 mapping 已将可见项设为 active；管理端上线后可考虑新导入先 review。
 5. audit log 是否记录失败尝试？
@@ -1209,8 +1209,8 @@ B5 实现前需要做最终确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status 与 import jobs dry-run 已完成，下一步应补：
+当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run 与 question review flags 已完成，下一步应先补齐非视觉管理能力与信息架构审核：
 
-> **Question Review backend APIs**
+> **Admin bootstrap / Audit Log read / 管理端信息架构静态审核**
 
-这会把最小可运营闭环继续向题目质检推进，同时保持前端最后设计。
+这会把最小可运营闭环从“后端 command/query 可用”推进到“能被真实管理员初始化、追踪和审核”，同时保持正式前端最后设计。

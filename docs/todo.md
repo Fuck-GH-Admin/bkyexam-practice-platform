@@ -5,6 +5,21 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.6 — 2026-07-14
+
+- [x] 新增 migration `0007_question_quality_flags.sql`，建立 `question_quality_flags`。
+- [x] 新增 shared v1 Admin Question Review schema。
+- [x] 实现 `GET /api/admin/question-review`。
+- [x] 实现 `PATCH /api/admin/question-review/:questionId`。
+- [x] 复用 `question_review:read/write` 权限守卫，覆盖 `401/403`。
+- [x] 支持 open/resolved/ignored quality flag。
+- [x] 支持 flag type、severity、note、created/resolved admin attribution。
+- [x] 支持 `excludedFromPractice=true`，新建普通练习 session 会排除 open excluded 题目。
+- [x] System Status quality summary 接入真实表。
+- [x] 写操作记录 `question_review.flag_add`、`question_review.flag_resolve`、`question_review.exclude_update` audit log。
+- [x] PostgreSQL integration 覆盖 Admin Question Review、practice exclusion 与 status summary。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B5.5 — 2026-07-13
 
 - [x] 新增 migration `0006_import_jobs.sql`，建立 `import_jobs`。
@@ -213,7 +228,10 @@
 - [x] `/api/admin/bank-mappings` 更新、批量状态。
 - [x] mapping 写入版本/并发控制与 audit log。
 - [x] import job table、dry-run 触发、进度、结果和错误摘要。
-- [ ] 题目质检标记与学生端排除策略。
+- [x] 题目质检标记与学生端排除策略。
+- [ ] 初始 `super_admin` bootstrap / Admin User 管理。
+- [ ] Audit Log read API。
+- [ ] 真正执行写入的 import mode。
 
 ### Frontend
 

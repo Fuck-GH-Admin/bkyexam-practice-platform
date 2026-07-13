@@ -106,6 +106,7 @@ export function assertCurrentCorpusImportCounts(counts: ImportQuestionBankCounts
 async function resetFullImportDatabase(client: QueryClient) {
   await client.query(`
     TRUNCATE TABLE
+      question_quality_flags,
       import_jobs,
       audit_logs,
       admin_sessions,

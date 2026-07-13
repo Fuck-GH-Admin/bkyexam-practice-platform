@@ -166,6 +166,40 @@ export const importJobs = pgTable(
   ],
 );
 
+export const questionQualityFlags = pgTable(
+  'question_quality_flags',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    bankId: uuid('bank_id').references(() => classifications.id),
+    flagType: text('flag_type').notNull(),
+    severity: text('severity').notNull(),
+    status: text('status').notNull().default('open'),
+    note: text('note').notNull().default(''),
+    excludedFromPractice: boolean('excluded_from_practice').notNull().default(false),
+    createdByAdminId: uuid('created_by_admin_id').references(() => adminUsers.id),
+    resolvedByAdminId: uuid('resolved_by_admin_id').references(() => adminUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('question_quality_flags_question_id_idx').on(table.questionId),
+    index('question_quality_flags_bank_status_idx').on(table.bankId, table.status),
+    index('question_quality_flags_type_status_idx').on(table.flagType, table.status),
+    index('question_quality_flags_excluded_open_idx').on(table.questionId)
+      .where(sql`${table.excludedFromPractice} = true AND ${table.status} = 'open'`),
+    check(
+      'question_quality_flags_type_check',
+      sql`${table.flagType} IN ('bad_answer', 'missing_option', 'bad_option', 'garbled_content', 'duplicate_question', 'wrong_type', 'needs_manual_review')`,
+    ),
+    check('question_quality_flags_severity_check', sql`${table.severity} IN ('low', 'medium', 'high', 'blocking')`),
+    check('question_quality_flags_status_check', sql`${table.status} IN ('open', 'resolved', 'ignored')`),
+  ],
+);
+
 export const bankMappings = pgTable(
   'bank_mappings',
   {

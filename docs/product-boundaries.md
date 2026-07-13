@@ -279,7 +279,7 @@ mastered -> active  # 再次答错时自动恢复
 - 管理命令。
 - 审计日志。
 - import job orchestration（当前已覆盖 dry-run）。
-- content review workflow。
+- content review workflow（当前已覆盖 quality flag 与 practice exclusion）。
 
 Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 route 任意执行 SQL。
 
@@ -307,7 +307,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、通用 error 已迁入 shared v1；Admin 其余后端 contract（Question Review、Audit Log read、Admin User manage）已完成设计，但 shared schema/route 尚未实现。
+- Auth、Catalog、Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、Admin Question Review、通用 error 已迁入 shared v1；Admin 其余后端 contract（Audit Log read、Admin User manage）已完成设计，但 shared schema/route 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision

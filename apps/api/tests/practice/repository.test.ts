@@ -206,6 +206,7 @@ describe('createPgPracticeRepository', () => {
     expect(questionQuery.sql).toContain('WITH RECURSIVE bank_classifications');
     expect(questionQuery.sql).toContain('classifications.parent_id = bank_classifications.id');
     expect(questionQuery.sql).toContain('questions.normalized_type = ANY($2::text[])');
+    expect(questionQuery.sql).toContain('question_quality_flags.excluded_from_practice = true');
     expect(questionQuery.sql).toContain('ORDER BY random()');
     expect(questionQuery.params).toEqual(['bank-1', ['single_choice', 'yes_no'], 2]);
   });

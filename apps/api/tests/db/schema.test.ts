@@ -13,6 +13,7 @@ import {
   practiceSessionDrafts,
   practiceSessionQuestions,
   practiceSessions,
+  questionQualityFlags,
   questionOptions,
   questions,
   studentSessions,
@@ -30,6 +31,7 @@ describe('database schema', () => {
     expect(getTableName(adminUserRoles)).toBe('admin_user_roles');
     expect(getTableName(auditLogs)).toBe('audit_logs');
     expect(getTableName(importJobs)).toBe('import_jobs');
+    expect(getTableName(questionQualityFlags)).toBe('question_quality_flags');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -115,6 +117,40 @@ describe('database schema', () => {
       'import_jobs_status_created_at_idx',
       'import_jobs_created_by_idx',
       'import_jobs_one_running_kind_idx',
+    ]));
+  });
+
+  it('defines question quality flags for admin review and practice exclusion', () => {
+    const tableConfig = getTableConfig(questionQualityFlags);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+    const checkNames = tableConfig.checks.map((tableCheck) => tableCheck.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'question_id',
+      'bank_id',
+      'flag_type',
+      'severity',
+      'status',
+      'note',
+      'excluded_from_practice',
+      'created_by_admin_id',
+      'resolved_by_admin_id',
+      'created_at',
+      'updated_at',
+      'resolved_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'question_quality_flags_question_id_idx',
+      'question_quality_flags_bank_status_idx',
+      'question_quality_flags_type_status_idx',
+      'question_quality_flags_excluded_open_idx',
+    ]));
+    expect(checkNames).toEqual(expect.arrayContaining([
+      'question_quality_flags_type_check',
+      'question_quality_flags_severity_check',
+      'question_quality_flags_status_check',
     ]));
   });
 
