@@ -49,7 +49,7 @@ Fastify API，负责：
 - 练习会话、题目锁定、进度、草稿和存疑状态。
 - 整卷提交、客观题判分和练习记录。
 - 错题本及错题再练。
-- 学习概览统计聚合。
+- 学习概览和趋势统计聚合。
 - 题库导入、映射生成、迁移和数据库 smoke。
 
 API 通过 repository 边界支持内存实现与 PostgreSQL 实现。真实运行必须使用 PostgreSQL；内存实现主要服务于快速 route 测试。
@@ -97,7 +97,7 @@ questionbank/*.txt
 | Catalog | 学生可见题库、分类与映射 | `repositories/bankRepository.ts`, `routes/banks.ts`, `mapping/` |
 | Practice | 会话、题目锁定、草稿、进度、存疑、提交、判分 | `practice/`, `routes/practice.ts` |
 | Wrongbook | 错题列表、详情、掌握状态、再练编排 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
-| Learning | 学习概览、最近题库、题型正确率、错题掌握摘要 | `learning/`, `routes/learning.ts` |
+| Learning | 学习概览、趋势、streak、最近题库、题型正确率、错题掌握摘要 | `learning/`, `routes/learning.ts` |
 | Import | 源文件解析、规范化、批量导入 | `import/` |
 | Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
 
@@ -162,13 +162,15 @@ questionbank/*.txt
 - “再练本组”由 `WrongQuestionService` 选出错题候选，再调用 `PracticeSessionService.createSessionFromQuestionIds` 创建普通 `practice_sessions`，不另建一套练习引擎。
 - Wrongbook repository 只读/更新 wrongbook 所属数据，不直接写 `practice_sessions` 或 `practice_session_questions`。
 
-## Learning Dashboard
+## Learning Analytics
 
 - `GET /api/learning/dashboard` 从现有事实表聚合，不新增派生统计表。
+- `GET /api/learning/trends?days=7..90` 按 UTC 日期桶返回每日练习/正确率/错题触达趋势和 activity streak。
 - 来源表包括 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings`。
-- 第一版返回 summary、recentBanks、questionTypes 与 wrongbook 四组数据。
+- Dashboard 返回 summary、recentBanks、questionTypes 与 wrongbook 四组数据。
+- Trends 返回 fromDate/toDate/daily/summary；`currentStreakDays` 从窗口最后一天倒推连续 active 天数。
 - `accuracy` 只用已判定 attempt 计算；无 graded attempt 时为 `null`。
-- 该接口是学生档案/首页统计的后端 contract，暂不引入推荐算法或长期日报表。
+- 这些接口是学生档案/首页统计的后端 contract，暂不引入推荐算法或持久化日报表。
 
 ## Current Structural Debt
 

@@ -80,6 +80,9 @@ describe('learning dashboard routes', () => {
           },
         };
       },
+      async getTrends() {
+        throw new Error('not used by dashboard route test');
+      },
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -100,6 +103,144 @@ describe('learning dashboard routes', () => {
       wrongbook: { total: 1, pending: 1 },
     });
     expect(requests).toEqual([{ studentId, recentLimit: 1 }]);
+  });
+
+  it('returns typed learning trends and forwards the day window', async () => {
+    const requests: Array<{ studentId: string; days: number }> = [];
+    const repository: LearningDashboardRepository = {
+      async getDashboard() {
+        throw new Error('not used by trends route test');
+      },
+      async getTrends(input) {
+        requests.push({ studentId: input.studentId, days: input.days });
+        return {
+          generatedAt: '2026-07-14T10:00:00.000Z',
+          fromDate: '2026-07-08',
+          toDate: '2026-07-14',
+          days: 7,
+          daily: [
+            {
+              date: '2026-07-08',
+              sessionsStarted: 0,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+            {
+              date: '2026-07-09',
+              sessionsStarted: 0,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+            {
+              date: '2026-07-10',
+              sessionsStarted: 0,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+            {
+              date: '2026-07-11',
+              sessionsStarted: 0,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+            {
+              date: '2026-07-12',
+              sessionsStarted: 1,
+              sessionsCompleted: 1,
+              attempts: 2,
+              gradedAttempts: 2,
+              correctAttempts: 1,
+              accuracy: 0.5,
+              wrongQuestionsTouched: 1,
+            },
+            {
+              date: '2026-07-13',
+              sessionsStarted: 1,
+              sessionsCompleted: 0,
+              attempts: 1,
+              gradedAttempts: 1,
+              correctAttempts: 1,
+              accuracy: 1,
+              wrongQuestionsTouched: 0,
+            },
+            {
+              date: '2026-07-14',
+              sessionsStarted: 1,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+          ],
+          summary: {
+            days: 7,
+            activeDays: 3,
+            currentStreakDays: 3,
+            longestStreakDays: 3,
+            sessionsStarted: 3,
+            sessionsCompleted: 1,
+            attempts: 3,
+            gradedAttempts: 3,
+            correctAttempts: 2,
+            accuracy: 0.6667,
+            wrongQuestionsTouched: 1,
+          },
+        };
+      },
+    };
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: repository,
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/learning/trends?days=7',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      fromDate: '2026-07-08',
+      toDate: '2026-07-14',
+      days: 7,
+      daily: expect.arrayContaining([
+        expect.objectContaining({ date: '2026-07-12', attempts: 2, accuracy: 0.5 }),
+      ]),
+      summary: {
+        days: 7,
+        activeDays: 3,
+        currentStreakDays: 3,
+        longestStreakDays: 3,
+        sessionsStarted: 3,
+        sessionsCompleted: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestionsTouched: 1,
+      },
+    });
+    expect(response.json().daily).toHaveLength(7);
+    expect(requests).toEqual([{ studentId, days: 7 }]);
   });
 
   it('rejects invalid query and fails closed on invalid repository payloads', async () => {
@@ -140,6 +281,53 @@ describe('learning dashboard routes', () => {
     const invalidPayload = await app.inject({
       method: 'GET',
       url: '/api/learning/dashboard',
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(invalidPayload.statusCode).toBe(500);
+  });
+
+  it('rejects invalid trends query and fails closed on invalid trend payloads', async () => {
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: {
+        async getDashboard() {
+          throw new Error('not used by trends validation test');
+        },
+        async getTrends() {
+          return {
+            generatedAt: '2026-07-14T10:00:00.000Z',
+            fromDate: '2026-07-08',
+            toDate: '2026-07-14',
+            days: 7,
+            daily: [],
+            summary: {
+              days: 7,
+              activeDays: 0,
+              currentStreakDays: 0,
+              longestStreakDays: 0,
+              sessionsStarted: 0,
+              sessionsCompleted: 0,
+              attempts: 0,
+              gradedAttempts: 0,
+              correctAttempts: 0,
+              accuracy: null,
+              wrongQuestionsTouched: 0,
+            },
+          };
+        },
+      } as LearningDashboardRepository,
+    });
+
+    const invalidQuery = await app.inject({
+      method: 'GET',
+      url: '/api/learning/trends?days=6',
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(invalidQuery.statusCode).toBe(400);
+
+    const invalidPayload = await app.inject({
+      method: 'GET',
+      url: '/api/learning/trends?days=7',
       headers: { cookie: 'bky_session=token' },
     });
     expect(invalidPayload.statusCode).toBe(500);

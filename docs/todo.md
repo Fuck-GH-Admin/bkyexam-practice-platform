@@ -5,6 +5,17 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B7.2 — 2026-07-14
+
+- [x] 新增 shared v1 Learning Trends schema。
+- [x] 实现 `GET /api/learning/trends?days=7..90`。
+- [x] 返回 UTC daily buckets：sessionsStarted、sessionsCompleted、attempts、graded/correct attempts、accuracy、wrongQuestionsTouched。
+- [x] 返回 summary：activeDays、currentStreakDays、longestStreakDays 和窗口总计。
+- [x] 实现 memory/PostgreSQL Learning trends repository。
+- [x] route fail-closed 覆盖不合法 trends payload。
+- [x] PostgreSQL integration 覆盖真实趋势聚合。
+- [x] 不新增前端页面，不提前做最终视觉。
+
 ## Completed Backend B7.1 — 2026-07-14
 
 - [x] 新增 shared v1 Learning Dashboard schema。
@@ -307,8 +318,9 @@
 - [ ] 题目收藏/存疑长期化是否需要独立模型。
 - [x] 基础学习统计后端：练习次数、正确率、错题摘要。
 - [x] 最近使用题库后端，不先做复杂算法。
+- [x] 周期趋势和 activity streak 后端 API。
 - [ ] 学习统计前端展示。
-- [ ] 周期趋势、学习目标和 streak。
+- [ ] 学习目标。
 - [ ] 主观题自评流程。
 - [ ] 填空题判分。
 - [ ] 编程与 Office 操作题采用独立执行/评测设计，不塞进现有 objective grader。

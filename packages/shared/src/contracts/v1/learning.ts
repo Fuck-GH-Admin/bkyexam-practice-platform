@@ -6,6 +6,9 @@ const IsoTimestampV1Schema = z.string().datetime({ offset: true });
 
 const AccuracyV1Schema = z.number().min(0).max(1).nullable();
 
+export const LearningDateV1Schema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+export type LearningDateV1 = z.infer<typeof LearningDateV1Schema>;
+
 export const LearningSummaryV1Schema = z.object({
   activeSessions: z.number().int().nonnegative(),
   completedSessions: z.number().int().nonnegative(),
@@ -149,3 +152,126 @@ export const GetLearningDashboardRequestV1Schema = z.object({
   recentLimit: z.coerce.number().int().min(1).max(10).default(5),
 }).strict();
 export type GetLearningDashboardRequestV1 = z.infer<typeof GetLearningDashboardRequestV1Schema>;
+
+export const LearningTrendDayV1Schema = z.object({
+  date: LearningDateV1Schema,
+  sessionsStarted: z.number().int().nonnegative(),
+  sessionsCompleted: z.number().int().nonnegative(),
+  attempts: z.number().int().nonnegative(),
+  gradedAttempts: z.number().int().nonnegative(),
+  correctAttempts: z.number().int().nonnegative(),
+  accuracy: AccuracyV1Schema,
+  wrongQuestionsTouched: z.number().int().nonnegative(),
+}).strict().superRefine((day, context) => {
+  if (day.gradedAttempts > day.attempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['gradedAttempts'],
+      message: 'gradedAttempts cannot exceed attempts',
+    });
+  }
+  if (day.correctAttempts > day.gradedAttempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['correctAttempts'],
+      message: 'correctAttempts cannot exceed gradedAttempts',
+    });
+  }
+});
+export type LearningTrendDayV1 = z.infer<typeof LearningTrendDayV1Schema>;
+
+export const LearningTrendSummaryV1Schema = z.object({
+  days: z.number().int().min(7).max(90),
+  activeDays: z.number().int().nonnegative(),
+  currentStreakDays: z.number().int().nonnegative(),
+  longestStreakDays: z.number().int().nonnegative(),
+  sessionsStarted: z.number().int().nonnegative(),
+  sessionsCompleted: z.number().int().nonnegative(),
+  attempts: z.number().int().nonnegative(),
+  gradedAttempts: z.number().int().nonnegative(),
+  correctAttempts: z.number().int().nonnegative(),
+  accuracy: AccuracyV1Schema,
+  wrongQuestionsTouched: z.number().int().nonnegative(),
+}).strict().superRefine((summary, context) => {
+  if (summary.activeDays > summary.days) {
+    context.addIssue({
+      code: 'custom',
+      path: ['activeDays'],
+      message: 'activeDays cannot exceed days',
+    });
+  }
+  if (summary.currentStreakDays > summary.activeDays) {
+    context.addIssue({
+      code: 'custom',
+      path: ['currentStreakDays'],
+      message: 'currentStreakDays cannot exceed activeDays',
+    });
+  }
+  if (summary.longestStreakDays > summary.activeDays) {
+    context.addIssue({
+      code: 'custom',
+      path: ['longestStreakDays'],
+      message: 'longestStreakDays cannot exceed activeDays',
+    });
+  }
+  if (summary.gradedAttempts > summary.attempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['gradedAttempts'],
+      message: 'gradedAttempts cannot exceed attempts',
+    });
+  }
+  if (summary.correctAttempts > summary.gradedAttempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['correctAttempts'],
+      message: 'correctAttempts cannot exceed gradedAttempts',
+    });
+  }
+});
+export type LearningTrendSummaryV1 = z.infer<typeof LearningTrendSummaryV1Schema>;
+
+export const LearningTrendsResponseV1Schema = z.object({
+  generatedAt: IsoTimestampV1Schema,
+  fromDate: LearningDateV1Schema,
+  toDate: LearningDateV1Schema,
+  days: z.number().int().min(7).max(90),
+  daily: z.array(LearningTrendDayV1Schema),
+  summary: LearningTrendSummaryV1Schema,
+}).strict().superRefine((response, context) => {
+  if (response.daily.length !== response.days) {
+    context.addIssue({
+      code: 'custom',
+      path: ['daily'],
+      message: 'daily length must equal days',
+    });
+  }
+  if (response.summary.days !== response.days) {
+    context.addIssue({
+      code: 'custom',
+      path: ['summary', 'days'],
+      message: 'summary days must equal response days',
+    });
+  }
+  if (response.daily[0] && response.daily[0].date !== response.fromDate) {
+    context.addIssue({
+      code: 'custom',
+      path: ['fromDate'],
+      message: 'fromDate must equal the first daily date',
+    });
+  }
+  const lastDaily = response.daily[response.daily.length - 1];
+  if (lastDaily && lastDaily.date !== response.toDate) {
+    context.addIssue({
+      code: 'custom',
+      path: ['toDate'],
+      message: 'toDate must equal the last daily date',
+    });
+  }
+});
+export type LearningTrendsResponseV1 = z.infer<typeof LearningTrendsResponseV1Schema>;
+
+export const GetLearningTrendsRequestV1Schema = z.object({
+  days: z.coerce.number().int().min(7).max(90).default(14),
+}).strict();
+export type GetLearningTrendsRequestV1 = z.infer<typeof GetLearningTrendsRequestV1Schema>;

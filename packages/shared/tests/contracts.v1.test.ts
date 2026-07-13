@@ -33,7 +33,9 @@ import {
   CatalogBankListResponseV1Schema,
   HealthResponseV1Schema,
   GetLearningDashboardRequestV1Schema,
+  GetLearningTrendsRequestV1Schema,
   LearningDashboardResponseV1Schema,
+  LearningTrendsResponseV1Schema,
   CreatePracticeSessionRequestV1Schema,
   ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
@@ -553,6 +555,114 @@ describe('v1 auth/catalog/error/health contracts', () => {
       summary: { ...dashboard.summary, correctAttempts: 4 },
     })).toThrow('correctAttempts cannot exceed gradedAttempts');
     expect(() => GetLearningDashboardRequestV1Schema.parse({ recentLimit: '11' })).toThrow();
+  });
+
+  it('parses learning trends contracts, streaks, and date boundaries', () => {
+    expect(GetLearningTrendsRequestV1Schema.parse({ days: '7' })).toEqual({ days: 7 });
+    expect(GetLearningTrendsRequestV1Schema.parse({})).toEqual({ days: 14 });
+
+    const trends = LearningTrendsResponseV1Schema.parse({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      fromDate: '2026-07-08',
+      toDate: '2026-07-14',
+      days: 7,
+      daily: [
+        {
+          date: '2026-07-08',
+          sessionsStarted: 0,
+          sessionsCompleted: 0,
+          attempts: 0,
+          gradedAttempts: 0,
+          correctAttempts: 0,
+          accuracy: null,
+          wrongQuestionsTouched: 0,
+        },
+        {
+          date: '2026-07-09',
+          sessionsStarted: 1,
+          sessionsCompleted: 1,
+          attempts: 2,
+          gradedAttempts: 2,
+          correctAttempts: 1,
+          accuracy: 0.5,
+          wrongQuestionsTouched: 1,
+        },
+        {
+          date: '2026-07-10',
+          sessionsStarted: 0,
+          sessionsCompleted: 0,
+          attempts: 0,
+          gradedAttempts: 0,
+          correctAttempts: 0,
+          accuracy: null,
+          wrongQuestionsTouched: 0,
+        },
+        {
+          date: '2026-07-11',
+          sessionsStarted: 1,
+          sessionsCompleted: 0,
+          attempts: 1,
+          gradedAttempts: 1,
+          correctAttempts: 1,
+          accuracy: 1,
+          wrongQuestionsTouched: 0,
+        },
+        {
+          date: '2026-07-12',
+          sessionsStarted: 1,
+          sessionsCompleted: 0,
+          attempts: 0,
+          gradedAttempts: 0,
+          correctAttempts: 0,
+          accuracy: null,
+          wrongQuestionsTouched: 0,
+        },
+        {
+          date: '2026-07-13',
+          sessionsStarted: 0,
+          sessionsCompleted: 1,
+          attempts: 1,
+          gradedAttempts: 1,
+          correctAttempts: 0,
+          accuracy: 0,
+          wrongQuestionsTouched: 1,
+        },
+        {
+          date: '2026-07-14',
+          sessionsStarted: 1,
+          sessionsCompleted: 0,
+          attempts: 0,
+          gradedAttempts: 0,
+          correctAttempts: 0,
+          accuracy: null,
+          wrongQuestionsTouched: 0,
+        },
+      ],
+      summary: {
+        days: 7,
+        activeDays: 5,
+        currentStreakDays: 4,
+        longestStreakDays: 4,
+        sessionsStarted: 4,
+        sessionsCompleted: 2,
+        attempts: 4,
+        gradedAttempts: 4,
+        correctAttempts: 2,
+        accuracy: 0.5,
+        wrongQuestionsTouched: 2,
+      },
+    });
+
+    expect(trends.summary.currentStreakDays).toBe(4);
+    expect(() => LearningTrendsResponseV1Schema.parse({
+      ...trends,
+      daily: trends.daily.slice(1),
+    })).toThrow('daily length must equal days');
+    expect(() => LearningTrendsResponseV1Schema.parse({
+      ...trends,
+      summary: { ...trends.summary, longestStreakDays: 6 },
+    })).toThrow('longestStreakDays cannot exceed activeDays');
+    expect(() => GetLearningTrendsRequestV1Schema.parse({ days: '91' })).toThrow();
   });
 });
 

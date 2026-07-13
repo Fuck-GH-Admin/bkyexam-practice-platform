@@ -1260,7 +1260,7 @@ Response：
 
 ## Learning
 
-所有 Learning 路由需要认证。第一版不新增统计表，直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合，作为学生首页/档案页后续可用的数据 contract。
+所有 Learning 路由需要认证。当前不新增统计表，直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合，作为学生首页/档案页后续可用的数据 contract。
 
 ### `GET /api/learning/dashboard`
 
@@ -1331,6 +1331,127 @@ Rules：
 - `reviewSessions` 统计 `origin=wrongbook` 的 practice session。
 - `recentBanks` 只返回当前学生创建过 session 的题库，按最近 `practice_sessions.updated_at DESC` 排序。
 - `questionTypes` 同时合并 attempt 统计和 wrongbook 统计。
+
+Errors：
+
+- `400`：query 无效。
+- `401`：缺少有效 `bky_session`。
+
+### `GET /api/learning/trends`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `days` | integer 7..90 | 14 |
+
+Response：
+
+```json
+{
+  "generatedAt": "2026-07-14T10:00:00.000Z",
+  "fromDate": "2026-07-08",
+  "toDate": "2026-07-14",
+  "days": 7,
+  "daily": [
+    {
+      "date": "2026-07-08",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-09",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-10",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-11",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-12",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-13",
+      "sessionsStarted": 0,
+      "sessionsCompleted": 0,
+      "attempts": 0,
+      "gradedAttempts": 0,
+      "correctAttempts": 0,
+      "accuracy": null,
+      "wrongQuestionsTouched": 0
+    },
+    {
+      "date": "2026-07-14",
+      "sessionsStarted": 4,
+      "sessionsCompleted": 1,
+      "attempts": 3,
+      "gradedAttempts": 3,
+      "correctAttempts": 2,
+      "accuracy": 0.6667,
+      "wrongQuestionsTouched": 1
+    }
+  ],
+  "summary": {
+    "days": 7,
+    "activeDays": 1,
+    "currentStreakDays": 1,
+    "longestStreakDays": 1,
+    "sessionsStarted": 4,
+    "sessionsCompleted": 1,
+    "attempts": 3,
+    "gradedAttempts": 3,
+    "correctAttempts": 2,
+    "accuracy": 0.6667,
+    "wrongQuestionsTouched": 1
+  }
+}
+```
+
+Rules：
+
+- `daily` 使用 UTC 日期桶，长度必须等于 `days`，从 `fromDate` 升序到 `toDate`。
+- `sessionsStarted` 按 `practice_sessions.created_at` 的 UTC 日期统计。
+- `sessionsCompleted` 按 completed session 的 `completed_at` UTC 日期统计。
+- `attempts`、`gradedAttempts`、`correctAttempts` 按 `practice_attempts.created_at` 的 UTC 日期统计。
+- `wrongQuestionsTouched` 按 `wrong_questions.last_wrong_at` 的 UTC 日期统计当前错题条目最后一次错误落点。
+- `activeDays` 统计任一 bucket 内有 session、attempt 或 wrongbook touch 的天数。
+- `currentStreakDays` 从 `toDate` 往前连续 active 的天数；如果 `toDate` 无活动则为 0。
+- `longestStreakDays` 是窗口内最长连续 active 天数。
+- `accuracy = correctAttempts / gradedAttempts`，无 graded attempt 时为 `null`。
 
 Errors：
 

@@ -53,6 +53,46 @@ describe('learning dashboard repositories', () => {
     });
   });
 
+  it('returns empty memory trends with UTC date buckets for students without activity', async () => {
+    const repository = createMemoryLearningDashboardRepository();
+
+    const trends = await repository.getTrends({
+      studentId,
+      days: 7,
+      now: new Date('2026-07-14T10:00:00.000Z'),
+    });
+
+    expect(trends).toMatchObject({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      fromDate: '2026-07-08',
+      toDate: '2026-07-14',
+      days: 7,
+      summary: {
+        days: 7,
+        activeDays: 0,
+        currentStreakDays: 0,
+        longestStreakDays: 0,
+        sessionsStarted: 0,
+        sessionsCompleted: 0,
+        attempts: 0,
+        gradedAttempts: 0,
+        correctAttempts: 0,
+        accuracy: null,
+        wrongQuestionsTouched: 0,
+      },
+    });
+    expect(trends.daily.map((day) => day.date)).toEqual([
+      '2026-07-08',
+      '2026-07-09',
+      '2026-07-10',
+      '2026-07-11',
+      '2026-07-12',
+      '2026-07-13',
+      '2026-07-14',
+    ]);
+    expect(trends.daily.every((day) => day.accuracy === null && day.attempts === 0)).toBe(true);
+  });
+
   it('maps PostgreSQL aggregate rows into learning dashboard counters', async () => {
     const client = new FakeQueryClient([
       [{
@@ -142,5 +182,114 @@ describe('learning dashboard repositories', () => {
     expect(client.queries[0]?.sql).toContain('FROM practice_sessions');
     expect(client.queries[1]?.params).toEqual([studentId, 3]);
     expect(client.queries[2]?.sql).toContain('FULL OUTER JOIN');
+  });
+
+  it('maps PostgreSQL daily aggregate rows into learning trends and streak counters', async () => {
+    const client = new FakeQueryClient([
+      [
+        {
+          date: '2026-07-08',
+          sessions_started: '0',
+          sessions_completed: '0',
+          attempts: '0',
+          graded_attempts: '0',
+          correct_attempts: '0',
+          wrong_questions_touched: '0',
+        },
+        {
+          date: '2026-07-09',
+          sessions_started: '1',
+          sessions_completed: '0',
+          attempts: '1',
+          graded_attempts: '1',
+          correct_attempts: '1',
+          wrong_questions_touched: '0',
+        },
+        {
+          date: '2026-07-10',
+          sessions_started: '0',
+          sessions_completed: '0',
+          attempts: '0',
+          graded_attempts: '0',
+          correct_attempts: '0',
+          wrong_questions_touched: '0',
+        },
+        {
+          date: '2026-07-11',
+          sessions_started: '1',
+          sessions_completed: '1',
+          attempts: '2',
+          graded_attempts: '2',
+          correct_attempts: '1',
+          wrong_questions_touched: '1',
+        },
+        {
+          date: '2026-07-12',
+          sessions_started: '0',
+          sessions_completed: '1',
+          attempts: '0',
+          graded_attempts: '0',
+          correct_attempts: '0',
+          wrong_questions_touched: '0',
+        },
+        {
+          date: '2026-07-13',
+          sessions_started: '0',
+          sessions_completed: '0',
+          attempts: '0',
+          graded_attempts: '0',
+          correct_attempts: '0',
+          wrong_questions_touched: '0',
+        },
+        {
+          date: '2026-07-14',
+          sessions_started: '1',
+          sessions_completed: '0',
+          attempts: '1',
+          graded_attempts: '1',
+          correct_attempts: '0',
+          wrong_questions_touched: '0',
+        },
+      ],
+    ]);
+    const repository = createPgLearningDashboardRepository(client);
+
+    const trends = await repository.getTrends({
+      studentId,
+      days: 7,
+      now: new Date('2026-07-14T10:00:00.000Z'),
+    });
+
+    expect(trends).toMatchObject({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      fromDate: '2026-07-08',
+      toDate: '2026-07-14',
+      days: 7,
+      daily: [
+        { date: '2026-07-08', attempts: 0, accuracy: null },
+        { date: '2026-07-09', sessionsStarted: 1, attempts: 1, correctAttempts: 1, accuracy: 1 },
+        { date: '2026-07-10', attempts: 0, accuracy: null },
+        { date: '2026-07-11', sessionsCompleted: 1, attempts: 2, wrongQuestionsTouched: 1, accuracy: 0.5 },
+        { date: '2026-07-12', sessionsCompleted: 1, attempts: 0, accuracy: null },
+        { date: '2026-07-13', attempts: 0, accuracy: null },
+        { date: '2026-07-14', sessionsStarted: 1, attempts: 1, correctAttempts: 0, accuracy: 0 },
+      ],
+      summary: {
+        days: 7,
+        activeDays: 4,
+        currentStreakDays: 1,
+        longestStreakDays: 2,
+        sessionsStarted: 3,
+        sessionsCompleted: 2,
+        attempts: 4,
+        gradedAttempts: 4,
+        correctAttempts: 2,
+        accuracy: 0.5,
+        wrongQuestionsTouched: 1,
+      },
+    });
+    expect(client.queries).toHaveLength(1);
+    expect(client.queries[0]?.sql).toContain('generate_series');
+    expect(client.queries[0]?.params).toEqual([studentId, '2026-07-14', 7]);
   });
 });

@@ -1218,6 +1218,49 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(learningDashboard.json().recentBanks).toHaveLength(1);
 
+    const learningTrends = await app.inject({
+      method: 'GET',
+      url: '/api/learning/trends?days=7',
+      headers: { cookie: aliceCookie },
+    });
+    expect(learningTrends.statusCode).toBe(200);
+    const learningTrendsBody = learningTrends.json();
+    expect(learningTrendsBody).toMatchObject({
+      generatedAt: expect.any(String),
+      fromDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      toDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      days: 7,
+      summary: {
+        days: 7,
+        sessionsStarted: 4,
+        sessionsCompleted: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestionsTouched: 1,
+      },
+    });
+    expect(learningTrendsBody.daily).toHaveLength(7);
+    expect(learningTrendsBody.daily[0].date).toBe(learningTrendsBody.fromDate);
+    expect(learningTrendsBody.daily.at(-1).date).toBe(learningTrendsBody.toDate);
+    expect(learningTrendsBody.daily).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        sessionsStarted: 4,
+        sessionsCompleted: 1,
+        attempts: 3,
+        gradedAttempts: 3,
+        correctAttempts: 2,
+        accuracy: 0.6667,
+        wrongQuestionsTouched: 1,
+      }),
+    ]));
+    expect(learningTrendsBody.summary.activeDays).toBeGreaterThanOrEqual(1);
+    expect(learningTrendsBody.summary.currentStreakDays).toBeGreaterThanOrEqual(1);
+    expect(learningTrendsBody.summary.longestStreakDays).toBeGreaterThanOrEqual(
+      learningTrendsBody.summary.currentStreakDays,
+    );
+
     const logout = await app.inject({
       method: 'POST',
       url: '/api/auth/logout',

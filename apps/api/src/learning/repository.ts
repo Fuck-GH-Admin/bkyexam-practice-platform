@@ -3,6 +3,9 @@ import type {
   LearningQuestionTypeStatV1,
   LearningRecentBankV1,
   LearningSummaryV1,
+  LearningTrendDayV1,
+  LearningTrendSummaryV1,
+  LearningTrendsResponseV1,
   LearningWrongbookSummaryV1,
 } from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
@@ -13,6 +16,11 @@ export interface LearningDashboardRepository {
     recentLimit: number;
     now?: Date;
   }): Promise<LearningDashboardResponseV1>;
+  getTrends(input: {
+    studentId: string;
+    days: number;
+    now?: Date;
+  }): Promise<LearningTrendsResponseV1>;
 }
 
 interface QueryRows<T> {
@@ -23,8 +31,13 @@ type MemoryDashboard = Omit<LearningDashboardResponseV1, 'generatedAt'> & {
   generatedAt?: string;
 };
 
+type MemoryTrends = Omit<LearningTrendsResponseV1, 'generatedAt'> & {
+  generatedAt?: string;
+};
+
 export function createMemoryLearningDashboardRepository(
   dashboards: Record<string, MemoryDashboard> = {},
+  trends: Record<string, MemoryTrends> = {},
 ): LearningDashboardRepository {
   return {
     async getDashboard({ studentId, recentLimit, now = new Date() }) {
@@ -36,6 +49,19 @@ export function createMemoryLearningDashboardRepository(
         recentBanks: dashboard.recentBanks.slice(0, recentLimit).map((bank) => ({ ...bank })),
         questionTypes: dashboard.questionTypes.map((stat) => ({ ...stat })),
         wrongbook: { ...dashboard.wrongbook },
+      };
+    },
+    async getTrends({ studentId, days, now = new Date() }) {
+      const trend = trends[studentId];
+      if (!trend) return emptyTrendResponse(days, now);
+
+      return {
+        generatedAt: trend.generatedAt ?? now.toISOString(),
+        fromDate: trend.fromDate,
+        toDate: trend.toDate,
+        days: trend.days,
+        daily: trend.daily.map((day) => ({ ...day })),
+        summary: { ...trend.summary },
       };
     },
   };
@@ -77,6 +103,16 @@ interface QuestionTypeRow {
   wrong_questions: string | null;
 }
 
+interface TrendRow {
+  date: string;
+  sessions_started: string | number | null;
+  sessions_completed: string | number | null;
+  attempts: string | number | null;
+  graded_attempts: string | number | null;
+  correct_attempts: string | number | null;
+  wrong_questions_touched: string | number | null;
+}
+
 export function createPgLearningDashboardRepository(client: QueryClient): LearningDashboardRepository {
   return {
     async getDashboard({ studentId, recentLimit, now = new Date() }) {
@@ -92,6 +128,19 @@ export function createPgLearningDashboardRepository(client: QueryClient): Learni
         recentBanks,
         questionTypes,
         wrongbook: summary.wrongbook,
+      };
+    },
+    async getTrends({ studentId, days, now = new Date() }) {
+      const toDate = toUtcDateKey(now);
+      const daily = await loadDailyTrends(client, studentId, days, toDate);
+
+      return {
+        generatedAt: now.toISOString(),
+        fromDate: daily[0]?.date ?? addUtcDays(toDate, -(days - 1)),
+        toDate: daily[daily.length - 1]?.date ?? toDate,
+        days,
+        daily,
+        summary: summarizeTrendDays(daily, days),
       };
     },
   };
@@ -299,6 +348,99 @@ async function loadQuestionTypes(client: QueryClient, studentId: string): Promis
   });
 }
 
+async function loadDailyTrends(
+  client: QueryClient,
+  studentId: string,
+  days: number,
+  toDate: string,
+): Promise<LearningTrendDayV1[]> {
+  const result = (await client.query(
+    `
+      WITH bounds AS (
+        SELECT
+          ($2::date - (($3::int - 1) * INTERVAL '1 day'))::date AS from_date,
+          $2::date AS to_date
+      ),
+      days AS (
+        SELECT series.day::date AS day
+        FROM bounds, generate_series(bounds.from_date, bounds.to_date, INTERVAL '1 day') AS series(day)
+      ),
+      session_started_stats AS (
+        SELECT
+          (created_at AT TIME ZONE 'UTC')::date AS day,
+          COUNT(*) AS sessions_started
+        FROM practice_sessions, bounds
+        WHERE student_id = $1
+          AND (created_at AT TIME ZONE 'UTC')::date BETWEEN bounds.from_date AND bounds.to_date
+        GROUP BY 1
+      ),
+      session_completed_stats AS (
+        SELECT
+          (completed_at AT TIME ZONE 'UTC')::date AS day,
+          COUNT(*) AS sessions_completed
+        FROM practice_sessions, bounds
+        WHERE student_id = $1
+          AND status = 'completed'
+          AND completed_at IS NOT NULL
+          AND (completed_at AT TIME ZONE 'UTC')::date BETWEEN bounds.from_date AND bounds.to_date
+        GROUP BY 1
+      ),
+      attempt_stats AS (
+        SELECT
+          (created_at AT TIME ZONE 'UTC')::date AS day,
+          COUNT(*) AS attempts,
+          COUNT(*) FILTER (WHERE is_correct IS NOT NULL) AS graded_attempts,
+          COUNT(*) FILTER (WHERE is_correct = true) AS correct_attempts
+        FROM practice_attempts, bounds
+        WHERE student_id = $1
+          AND (created_at AT TIME ZONE 'UTC')::date BETWEEN bounds.from_date AND bounds.to_date
+        GROUP BY 1
+      ),
+      wrong_stats AS (
+        SELECT
+          (last_wrong_at AT TIME ZONE 'UTC')::date AS day,
+          COUNT(*) AS wrong_questions_touched
+        FROM wrong_questions, bounds
+        WHERE student_id = $1
+          AND (last_wrong_at AT TIME ZONE 'UTC')::date BETWEEN bounds.from_date AND bounds.to_date
+        GROUP BY 1
+      )
+      SELECT
+        to_char(days.day, 'YYYY-MM-DD') AS date,
+        COALESCE(session_started_stats.sessions_started, 0) AS sessions_started,
+        COALESCE(session_completed_stats.sessions_completed, 0) AS sessions_completed,
+        COALESCE(attempt_stats.attempts, 0) AS attempts,
+        COALESCE(attempt_stats.graded_attempts, 0) AS graded_attempts,
+        COALESCE(attempt_stats.correct_attempts, 0) AS correct_attempts,
+        COALESCE(wrong_stats.wrong_questions_touched, 0) AS wrong_questions_touched
+      FROM days
+      LEFT JOIN session_started_stats ON session_started_stats.day = days.day
+      LEFT JOIN session_completed_stats ON session_completed_stats.day = days.day
+      LEFT JOIN attempt_stats ON attempt_stats.day = days.day
+      LEFT JOIN wrong_stats ON wrong_stats.day = days.day
+      ORDER BY days.day ASC
+    `,
+    [studentId, toDate, days],
+  )) as QueryRows<TrendRow>;
+
+  return result.rows.map((row) => {
+    const attempts = toCount(row.attempts);
+    const gradedAttempts = toCount(row.graded_attempts);
+    const correctAttempts = toCount(row.correct_attempts);
+
+    return {
+      date: row.date,
+      sessionsStarted: toCount(row.sessions_started),
+      sessionsCompleted: toCount(row.sessions_completed),
+      attempts,
+      gradedAttempts,
+      correctAttempts,
+      accuracy: toAccuracy(correctAttempts, gradedAttempts),
+      wrongQuestionsTouched: toCount(row.wrong_questions_touched),
+    };
+  });
+}
+
 function emptyDashboard(): MemoryDashboard {
   return {
     summary: {
@@ -325,6 +467,86 @@ function emptyDashboard(): MemoryDashboard {
   };
 }
 
+function emptyTrendResponse(days: number, now: Date): LearningTrendsResponseV1 {
+  const toDate = toUtcDateKey(now);
+  const fromDate = addUtcDays(toDate, -(days - 1));
+  const daily = Array.from({ length: days }, (_, index) => emptyTrendDay(addUtcDays(fromDate, index)));
+
+  return {
+    generatedAt: now.toISOString(),
+    fromDate,
+    toDate,
+    days,
+    daily,
+    summary: summarizeTrendDays(daily, days),
+  };
+}
+
+function emptyTrendDay(date: string): LearningTrendDayV1 {
+  return {
+    date,
+    sessionsStarted: 0,
+    sessionsCompleted: 0,
+    attempts: 0,
+    gradedAttempts: 0,
+    correctAttempts: 0,
+    accuracy: null,
+    wrongQuestionsTouched: 0,
+  };
+}
+
+function summarizeTrendDays(daily: LearningTrendDayV1[], days: number): LearningTrendSummaryV1 {
+  let activeDays = 0;
+  let currentRun = 0;
+  let longestStreakDays = 0;
+
+  for (const day of daily) {
+    if (isActiveTrendDay(day)) {
+      activeDays += 1;
+      currentRun += 1;
+      longestStreakDays = Math.max(longestStreakDays, currentRun);
+    } else {
+      currentRun = 0;
+    }
+  }
+
+  let currentStreakDays = 0;
+  for (let index = daily.length - 1; index >= 0; index -= 1) {
+    if (!isActiveTrendDay(daily[index])) break;
+    currentStreakDays += 1;
+  }
+
+  const totals = daily.reduce((accumulator, day) => ({
+    sessionsStarted: accumulator.sessionsStarted + day.sessionsStarted,
+    sessionsCompleted: accumulator.sessionsCompleted + day.sessionsCompleted,
+    attempts: accumulator.attempts + day.attempts,
+    gradedAttempts: accumulator.gradedAttempts + day.gradedAttempts,
+    correctAttempts: accumulator.correctAttempts + day.correctAttempts,
+    wrongQuestionsTouched: accumulator.wrongQuestionsTouched + day.wrongQuestionsTouched,
+  }), {
+    sessionsStarted: 0,
+    sessionsCompleted: 0,
+    attempts: 0,
+    gradedAttempts: 0,
+    correctAttempts: 0,
+    wrongQuestionsTouched: 0,
+  });
+
+  return {
+    days,
+    activeDays,
+    currentStreakDays,
+    longestStreakDays,
+    ...totals,
+    accuracy: toAccuracy(totals.correctAttempts, totals.gradedAttempts),
+  };
+}
+
+function isActiveTrendDay(day: LearningTrendDayV1 | undefined): boolean {
+  if (!day) return false;
+  return day.sessionsStarted + day.sessionsCompleted + day.attempts + day.wrongQuestionsTouched > 0;
+}
+
 function toCount(value: string | number | null | undefined): number {
   if (value === null || value === undefined) return 0;
   return typeof value === 'number' ? value : Number.parseInt(value, 10);
@@ -341,4 +563,13 @@ function toIso(value: Date | string): string {
 
 function toIsoOrNull(value: Date | string | null): string | null {
   return value ? toIso(value) : null;
+}
+
+function toUtcDateKey(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function addUtcDays(date: string, offset: number): string {
+  const [year, month, day] = date.split('-').map((part) => Number.parseInt(part, 10)) as [number, number, number];
+  return new Date(Date.UTC(year, month - 1, day + offset)).toISOString().slice(0, 10);
 }
