@@ -683,6 +683,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
 - 管理员能整理题库并发布给学生端。
 - 所有写操作有 admin ownership、permission 和 audit。
 - 学生 API 不暴露 admin 字段。
+- 本阶段不创建正式 Admin 前端；只允许补充功能流程、字段表和静态 wireframe 作为 contract 校验材料。
 - `npm run verify:docker` 通过。
 
 ### Phase B6 — Import Jobs And Data Health

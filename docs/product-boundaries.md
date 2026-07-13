@@ -311,34 +311,42 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 ## 6. Frontend Timing Decision
 
-结论不是“前端最后做”或“前端现在全部做”，而是：
+结论不是“前端完全不想”或“先做完整前端”，而是：
 
-> **现在做信息架构、交互流程和低保真可用界面；等业务 contract 稳定后再做最终视觉系统。**
+> **现在先设计功能、信息架构和交互流程；后端 contract 与 command 稳定后再做可运行前端；最终视觉系统最后做。**
 
 推荐三层推进：
 
-### Layer A — Now: Product Skeleton
+### Layer A — Now: Functional Product Skeleton
 
 - 固定学生端和管理端导航。
 - 固定对象、状态机、空状态、错误状态。
-- 用真实 API 做低保真垂直切片。
-- 让前端尽早暴露后端缺失 contract。
+- 用文档、流程图、字段表和必要的静态 wireframe 定义功能。
+- 不在这个阶段启动正式 `apps/admin` 或大规模 UI 实现。
+- 目标是尽早暴露后端缺失 contract，而不是先堆页面。
 
-### Layer B — Next: Contract And Workflow Stabilization
+### Layer B — Next: Contract And Backend Workflow Stabilization
 
 - 补齐管理工作流。
 - 补齐练习历史、身份策略和数据语义。
 - 扩展已建立的共享 contract，并继续拆分大文件。
-- 用真实数据 dogfood。
+- 用 API tests、integration tests、脚本和必要的极简调试入口 dogfood 真实数据。
+- 仍然避免把不稳定业务语义固化成正式前端。
 
-### Layer C — Later: Final Visual Design
+### Layer C — Later: Runnable Frontend
+
+- 在后端 command/query 稳定后实现学生端缺口和管理端界面。
+- 优先实现真实工作流、表单状态、错误状态、权限守卫和数据反馈。
+- 先做到功能可信，再进入视觉精修。
+
+### Layer D — Last: Final Visual Design
 
 - 统一品牌、排版、颜色、组件、动效和无障碍。
 - 学生端与管理端分别建立视觉层级。
 - 做完整 responsive 和可用性测试。
 - 只在已经稳定的流程上精修，不再靠视觉稿猜业务。
 
-前端在 Layer A/B 是“产品规格探针”，不是装饰；最终视觉精修放到 Layer C，可以避免再次出现漂亮页面与真实状态/后端语义冲突。
+前端在 Layer A/B 是“产品规格探针”，不是装饰，也不是正式实现；可运行前端放到 Layer C，最终视觉精修放到 Layer D，可以避免再次出现漂亮页面与真实状态/后端语义冲突。
 
 ## 7. Decision Gate Before Final UI
 

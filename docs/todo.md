@@ -138,7 +138,7 @@
 
 - [x] 确认管理员角色：content editor、operator、super admin。
 - [x] 设计题库整理、导入任务、题目质检、系统状态四个工作流。
-- [ ] 用低保真界面验证工作流和所需后端 command。
+- [ ] 用文档、流程图、字段表和静态 wireframe 验证工作流与所需后端 command；暂不启动正式管理端前端实现。
 
 ### Backend
 
@@ -193,7 +193,7 @@
 
 原则：
 
-> 最终视觉放后，但前端流程和低保真实现不能放后。
+> 先设计功能、流程和数据语义，不先做正式前端；可运行前端等后端 contract/command 稳定后再做，最终视觉精修最后做。
 
 ## P6 — Production Readiness
 
