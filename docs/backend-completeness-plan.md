@@ -20,8 +20,8 @@
 | 学生客观题后端闭环 | **约 88–92%** | 已可内部试用；核心链路稳定。 |
 | 后端工程可验证性 | **约 80%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 60–68%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、题目质检 flag/exclusion、管理员 bootstrap 与 Audit Log read，但 Admin User manage、真正写入 import mode、正式身份、全题型和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 57%** | 已补第一个 `super_admin` bootstrap，但仍缺正式安全策略、监控、备份恢复、rate limit、CSRF 和部署验收。 |
+| 完整平台后端 | **约 63–70%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage，但真正写入 import mode、正式身份、全题型和生产能力仍未完成。 |
+| 公开生产后端就绪 | **约 58%** | 已补第一个 `super_admin` bootstrap 和 Admin User manage API，但仍缺正式安全策略、监控、备份恢复、rate limit、CSRF 和部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -165,17 +165,17 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Job dry-run API、Question Review API 与 Audit Log read API 已实现；Admin User manage 尚未完成。**
+当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Admin User manage、Bank Mapping read/write API、System Status API、Import Job dry-run/Error Report API、Question Review API 与 Audit Log read API 已实现；true import mode 仍未启用。**
 
 ### 2.8 Verification
 
 已完成质量门：
 
 - `npm run verify:docker`
-- 378 Vitest
-- 327 API tests
+- 391 Vitest
+- 339 API tests
 - 31 Web tests
-- 20 Shared tests
+- 21 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -218,14 +218,14 @@
 - Admin Auth/RBAC/session/audit foundation
 - Bank Mapping list/detail/update/bulk-status APIs
 - System Status API
-- Import Jobs dry-run APIs
+- Import Jobs dry-run/Error Report APIs
 - Question Review flag/exclusion APIs
 - Audit Log read API
+- Admin User manage API
 - `super_admin` bootstrap CLI
 
 未完成：
 
-- Admin User 管理
 - 真正执行写入的 import mode
 - 管理端前端
 
@@ -422,14 +422,14 @@
 
 ## 4. 后端下一步规划
 
-本路线中 B1 到 B5.7 已按顺序执行完毕。当前仍然不要直接开管理端大工程，也不要先做最终视觉；应继续补齐管理端账号生命周期、导入写入模式和剩余运营闭环。
+本路线中 B1 到 B5.8 已按顺序执行完毕。当前仍然不要直接开管理端大工程，也不要先做最终视觉；应继续补齐导入写入模式、学生学习统计和剩余运营闭环。
 
-当前建议下一步做 **B5.8 Admin User Manage + Import Error Report / true import mode gate**。
+当前建议下一步做 **B5.9 True Import Mode Gate（或先做 B7 Student Learning Record）**。
 
 原因：
 
 1. 学生客观题主链路已经稳定，适合继续在稳定测试保护下补管理端能力。
-2. Bank Mapping read/write、System Status、Import Jobs dry-run、Question Review Flags、bootstrap 和 audit query 已有 Auth/RBAC/Audit 基础，但真实运营还缺管理员账号生命周期和 import 写入闭环。
+2. Bank Mapping read/write、System Status、Import Jobs dry-run/error report、Question Review Flags、Admin User manage、bootstrap 和 audit query 已有 Auth/RBAC/Audit 基础，但真实运营还缺 import 写入闭环与长期学习数据。
 3. 管理端信息架构已先以静态文档冻结，继续补后端 command/query 比现在直接做 UI 更稳。
 
 ## 5. 推荐执行路线
@@ -693,11 +693,12 @@ bank_mappings.version / updated_at / updated_by_admin_id
 6. import jobs — **已完成（dry-run first）**
 7. question review flags — **已完成**
 8. admin bootstrap / audit log read / admin IA gate — **已完成**
+9. admin user manage — **已完成**
+10. import error report / true import mode gate — **已完成 error report；true import mode 继续关闭**
 
 后实现：
 
-9. admin user manage
-10. import error report / true import mode
+11. true import mode enablement（需专门 fixture、rollback/idempotency 和 PostgreSQL integration）
 
 验收：
 
@@ -845,7 +846,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - 成功创建写 `import_job.create` audit log。
   - PostgreSQL integration 覆盖 migration、创建、列表、详情、audit、System Status latest import job。
 
-B5.6/B5.7 已在下一节落地；当前下一步：**B5.8 Admin User Manage + Import Error Report / true import mode gate**。
+B5.6/B5.7/B5.8 已在下一节落地；当前下一步：**B5.9 True Import Mode Gate 或 B7 Student Learning Record**。
 
 ### Phase B5.6 — Question Review Flags
 
@@ -901,22 +902,34 @@ B5.6/B5.7 已在下一节落地；当前下一步：**B5.8 Admin User Manage + I
 
 ### Phase B5.8 — Admin User Manage + Import Error Report / True Import Gate
 
-目标：继续补管理端后端剩余运营闭环，仍不进入正式前端实现。
+状态：**已完成 Admin User Manage + Import Error Report，2026-07-14。True import mode 继续关闭。**
 
-建议后端能力：
+实际落地：
 
-- Admin User list/detail/create/disable/role update。
-- 管理员账号生命周期 audit：`admin_user.create/update/disable`。
-- Import Job error detail/report download。
-- 明确 `mode=import` 的真正写入启用条件、幂等策略、失败回滚和 reset 策略。
-- 如果开启 true import mode，必须先有专门 fixture 和 PostgreSQL integration 覆盖。
+- shared v1 Admin Managed User schema：list/detail/create/update request/response。
+- `GET /api/admin/users`：status/role/keyword/limit/offset。
+- `GET /api/admin/users/:adminId`。
+- `POST /api/admin/users`：hash password，不返回 password/passwordHash。
+- `PATCH /api/admin/users/:adminId`：displayName/status/roles/password 更新。
+- `admin_user:manage` 权限守卫，非 `super_admin` 返回 `403`。
+- 阻止禁用或移除最后一个 active `super_admin`。
+- `admin_user.create` / `admin_user.update` audit log。
+- memory/PostgreSQL Admin User repository/service。
+- shared v1 Import Job Error Report schema。
+- `GET /api/admin/import-jobs/:jobId/errors`：返回 `{ jobId, status, errorSummary }`。
+- PostgreSQL integration 覆盖真实 create/update/list/detail、last-super-admin guard、audit 和 import error report。
 
-不做：
+保留不做：
 
 - 不创建正式 Admin UI。
 - 不开放 public admin registration。
 - 不做复杂审批流。
-- 不做视觉精修。
+- 不开启真正写入 import mode；`mode=import` 继续返回 `422`，等待专门 rollback/idempotency fixture 后再启用。
+
+下一步候选：
+
+- **B5.9 True Import Mode Gate**：实现或明确继续推迟真正写入导入，必须先有 reset/rollback/idempotency fixture 与 PostgreSQL integration。
+- **B7 Student Learning Record And Statistics**：若暂缓 true import，可先补学生学习统计、长期学习记录和错题趋势。
 
 ### Phase B7 — Student Learning Record And Statistics
 
@@ -986,12 +999,12 @@ review_items
 
 如果继续本规划，下一步建议执行：
 
-> **B5.8 Admin User Manage + Import Error Report / true import mode gate。**
+> **B5.9 True Import Mode Gate（或先做 B7 Student Learning Record）。**
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add admin user management api
+feat: add true import mode gate
 ```
 
 范围建议只包含：
@@ -1035,6 +1048,6 @@ feat: add admin user management api
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run、Question Review Flags、Audit Log read 与 super_admin bootstrap 已落地；完整平台后端还缺 Admin User manage、正式身份、模块化、非客观题、真正写入 import mode 和生产运维。**
+> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；完整平台后端还缺正式身份、模块化、非客观题、真正写入 import mode 和生产运维。**
 
-最合理的下一步是继续 Admin 后端 MVP：补 Admin User manage 和 import error/true import gate；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：先做 true import mode gate（或若决定继续推迟，则做学生学习记录/统计）；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

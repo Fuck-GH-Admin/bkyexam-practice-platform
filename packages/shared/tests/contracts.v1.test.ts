@@ -5,10 +5,13 @@ import {
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminImportJobDetailResponseV1Schema,
+  AdminImportJobErrorReportResponseV1Schema,
   AdminImportJobListResponseV1Schema,
   AdminAuditLogListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  AdminUserDetailResponseV1Schema,
+  AdminUserListResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
   AdminQuestionReviewListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
@@ -16,12 +19,15 @@ import {
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
+  CreateAdminUserRequestV1Schema,
   ListAdminAuditLogsRequestV1Schema,
+  ListAdminUsersRequestV1Schema,
   ListAdminQuestionReviewsRequestV1Schema,
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
+  UpdateAdminUserRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
@@ -271,10 +277,68 @@ describe('v1 auth/catalog/error/health contracts', () => {
       page: { limit: 20, offset: 0, hasMore: false },
     }).jobs[0]?.id).toBe(jobId);
     expect(AdminImportJobDetailResponseV1Schema.parse({ job }).job.createdBy?.id).toBe(createdBy);
+    expect(AdminImportJobErrorReportResponseV1Schema.parse({
+      jobId,
+      status: 'failed',
+      errorSummary: [{ message: 'source file malformed', path: 'q.txt' }],
+    }).errorSummary[0]?.message).toBe('source file malformed');
     expect(() => CreateAdminImportJobRequestV1Schema.parse({
       ...request,
       options: { ...request.options, batchSize: 0 },
     })).toThrow();
+  });
+
+  it('parses admin user management contracts and protects role boundaries', () => {
+    const adminId = '50000000-0000-4000-8000-000000000001';
+
+    expect(ListAdminUsersRequestV1Schema.parse({
+      status: 'active',
+      role: 'operator',
+      keyword: 'operator',
+      limit: '10',
+      offset: '5',
+    })).toEqual({
+      status: 'active',
+      role: 'operator',
+      keyword: 'operator',
+      limit: 10,
+      offset: 5,
+    });
+
+    expect(CreateAdminUserRequestV1Schema.parse({
+      loginName: 'operator@example.com',
+      displayName: 'Operator',
+      password: 'secret123',
+      roles: ['operator'],
+    }).roles).toEqual(['operator']);
+    expect(() => CreateAdminUserRequestV1Schema.parse({
+      loginName: 'operator@example.com',
+      displayName: 'Operator',
+      password: 'short',
+      roles: ['operator'],
+    })).toThrow();
+    expect(() => UpdateAdminUserRequestV1Schema.parse({})).toThrow();
+    expect(() => UpdateAdminUserRequestV1Schema.parse({
+      roles: ['operator', 'operator'],
+    })).toThrow();
+
+    const adminUser = {
+      id: adminId,
+      loginName: 'operator@example.com',
+      displayName: 'Operator',
+      status: 'active',
+      roles: ['operator'],
+      permissions: ['admin:self:read', 'bank_mapping:read', 'import_job:read', 'import_job:create', 'system_status:read'],
+      createdAt: '2026-07-14T10:00:00.000Z',
+      updatedAt: '2026-07-14T10:00:00.000Z',
+      lastLoginAt: null,
+    };
+
+    expect(AdminUserListResponseV1Schema.parse({
+      adminUsers: [adminUser],
+      page: { limit: 20, offset: 0, hasMore: false },
+    }).adminUsers[0]?.loginName).toBe('operator@example.com');
+    expect(AdminUserDetailResponseV1Schema.parse({ adminUser }).adminUser.status).toBe('active');
   });
 
   it('parses admin audit log list contracts and filters', () => {

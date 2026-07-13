@@ -206,6 +206,121 @@ Response：
 }
 ```
 
+## Admin Users
+
+Admin User manage API 是 B5.8 已实现的管理员账号生命周期后端。它只允许拥有 `admin_user:manage` 的 `super_admin` 使用，不开放 public registration。
+
+所有响应都不返回 password 或 passwordHash；创建/修改密码只通过 write request 进入服务端 hash。系统会阻止禁用或移除最后一个 active `super_admin`。
+
+### `GET /api/admin/users`
+
+Permission：`admin_user:manage`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `status` | `active|disabled` | optional |
+| `role` | `content_editor|operator|super_admin` | optional |
+| `keyword` | string | optional |
+| `limit` | integer 1..100 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "adminUsers": [
+    {
+      "id": "admin-user-uuid",
+      "loginName": "operator@example.com",
+      "displayName": "Operator",
+      "status": "active",
+      "roles": ["operator"],
+      "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"],
+      "createdAt": "2026-07-14T10:00:00.000Z",
+      "updatedAt": "2026-07-14T10:00:00.000Z",
+      "lastLoginAt": null
+    }
+  ],
+  "page": { "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+### `GET /api/admin/users/:adminId`
+
+Permission：`admin_user:manage`
+
+Response：
+
+```json
+{
+  "adminUser": {
+    "id": "admin-user-uuid",
+    "loginName": "operator@example.com",
+    "displayName": "Operator",
+    "status": "active",
+    "roles": ["operator"],
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"],
+    "createdAt": "2026-07-14T10:00:00.000Z",
+    "updatedAt": "2026-07-14T10:00:00.000Z",
+    "lastLoginAt": null
+  }
+}
+```
+
+### `POST /api/admin/users`
+
+Permission：`admin_user:manage`
+
+Request：
+
+```json
+{
+  "loginName": "operator@example.com",
+  "displayName": "Operator",
+  "password": "secret123",
+  "roles": ["operator"]
+}
+```
+
+Rules：
+
+- `password` 最少 8 个字符。
+- `roles` 至少 1 个，最多 3 个，不能重复。
+- `loginName` 冲突返回 `409`。
+- 成功写 `admin_user.create` audit log。
+
+### `PATCH /api/admin/users/:adminId`
+
+Permission：`admin_user:manage`
+
+Request 至少包含一个字段：
+
+```json
+{
+  "displayName": "Content Editor",
+  "status": "active",
+  "roles": ["content_editor"],
+  "password": "newsecret123"
+}
+```
+
+Rules：
+
+- `roles` 不能重复。
+- `password` 出现时最少 8 个字符。
+- 禁用最后一个 active `super_admin`，或移除最后一个 active `super_admin` 的 `super_admin` role，返回 `409`。
+- 成功写 `admin_user.update` audit log，metadata 包含 `passwordChanged`。
+
+Errors：
+
+- `400`：query、body 或 admin id 无效。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：缺少 `admin_user:manage`。
+- `404`：admin user 不存在。
+- `409`：loginName 冲突，或试图禁用/移除最后一个 active `super_admin`。
+
 ## Admin Bank Mappings
 
 Admin Bank Mapping APIs 是 B5.2/B5.3 已实现的管理端题库整理模型。读接口查看 `bank_mappings` 与统计数据；写接口覆盖运营字段、发布/隐藏状态、乐观并发控制和 audit log。
@@ -391,7 +506,7 @@ Rules：
 
 ## Admin Import Jobs
 
-Admin Import Jobs 是 B5.5 已实现的导入任务后端第一版。当前只启用 `mode=dry_run`：它会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；真正写入数据库的 `mode=import` 暂时返回 `422`。
+Admin Import Jobs 是 B5.5/B5.8 已实现的导入任务后端第一版。当前只启用 `mode=dry_run`：它会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；B5.8 增加错误报告读取接口。真正写入数据库的 `mode=import` 暂时返回 `422`。
 
 运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。
 
@@ -485,6 +600,27 @@ Response：
   }
 }
 ```
+
+### `GET /api/admin/import-jobs/:jobId/errors`
+
+Permission：`import_job:read`
+
+Response：
+
+```json
+{
+  "jobId": "import-job-uuid",
+  "status": "failed",
+  "errorSummary": [
+    {
+      "message": "source file malformed",
+      "path": "q.txt"
+    }
+  ]
+}
+```
+
+说明：第一版返回 job 当前保存的 `errorSummary`；额外字段允许透传，便于后续按文件/行号扩展。不存在 job 返回 `404`。
 
 Errors：
 
@@ -1249,9 +1385,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；真正写入 import mode 尚未启用。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；真正写入 import mode 和正式 Admin UI 尚未实现。

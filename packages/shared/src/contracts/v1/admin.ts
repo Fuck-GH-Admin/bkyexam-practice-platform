@@ -48,6 +48,73 @@ export const AdminLogoutResponseV1Schema = z.object({
 }).strict();
 export type AdminLogoutResponseV1 = z.infer<typeof AdminLogoutResponseV1Schema>;
 
+export const AdminManagedUserStatusV1Schema = z.enum(['active', 'disabled']);
+export type AdminManagedUserStatusV1 = z.infer<typeof AdminManagedUserStatusV1Schema>;
+
+const AdminManagedUserRolesV1Schema = z.array(AdminRoleV1Schema).min(1).max(3).superRefine((roles, context) => {
+  if (new Set(roles).size !== roles.length) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Duplicate admin roles are not allowed',
+    });
+  }
+});
+
+export const AdminManagedUserV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  loginName: z.string().min(1),
+  displayName: z.string().min(1),
+  status: AdminManagedUserStatusV1Schema,
+  roles: AdminManagedUserRolesV1Schema,
+  permissions: z.array(AdminPermissionV1Schema),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  lastLoginAt: z.string().datetime().nullable(),
+}).strict();
+export type AdminManagedUserV1 = z.infer<typeof AdminManagedUserV1Schema>;
+
+export const ListAdminUsersRequestV1Schema = z.object({
+  status: AdminManagedUserStatusV1Schema.optional(),
+  role: AdminRoleV1Schema.optional(),
+  keyword: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminUsersRequestV1 = z.infer<typeof ListAdminUsersRequestV1Schema>;
+
+export const CreateAdminUserRequestV1Schema = z.object({
+  loginName: z.string().min(1),
+  displayName: z.string().min(1),
+  password: z.string().min(8),
+  roles: AdminManagedUserRolesV1Schema,
+}).strict();
+export type CreateAdminUserRequestV1 = z.infer<typeof CreateAdminUserRequestV1Schema>;
+
+export const UpdateAdminUserRequestV1Schema = z.object({
+  displayName: z.string().min(1).optional(),
+  status: AdminManagedUserStatusV1Schema.optional(),
+  roles: AdminManagedUserRolesV1Schema.optional(),
+  password: z.string().min(8).optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, {
+  message: 'At least one admin user change is required',
+});
+export type UpdateAdminUserRequestV1 = z.infer<typeof UpdateAdminUserRequestV1Schema>;
+
+export const AdminUserListResponseV1Schema = z.object({
+  adminUsers: z.array(AdminManagedUserV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminUserListResponseV1 = z.infer<typeof AdminUserListResponseV1Schema>;
+
+export const AdminUserDetailResponseV1Schema = z.object({
+  adminUser: AdminManagedUserV1Schema,
+}).strict();
+export type AdminUserDetailResponseV1 = z.infer<typeof AdminUserDetailResponseV1Schema>;
+
 export const AdminAuditLogResultV1Schema = z.enum(['success', 'failure']);
 export type AdminAuditLogResultV1 = z.infer<typeof AdminAuditLogResultV1Schema>;
 
@@ -307,7 +374,7 @@ export type AdminImportJobSummaryV1 = z.infer<typeof AdminImportJobSummaryV1Sche
 
 export const AdminImportJobErrorSummaryV1Schema = z.array(z.object({
   message: z.string().min(1),
-}).catchall(z.unknown()).strict());
+}).catchall(z.unknown()));
 export type AdminImportJobErrorSummaryV1 = z.infer<typeof AdminImportJobErrorSummaryV1Schema>;
 
 export const AdminImportJobActorV1Schema = z.object({
@@ -372,6 +439,15 @@ export const CreateAdminImportJobResponseV1Schema = z.object({
   job: AdminImportJobV1Schema,
 }).strict();
 export type CreateAdminImportJobResponseV1 = z.infer<typeof CreateAdminImportJobResponseV1Schema>;
+
+export const AdminImportJobErrorReportResponseV1Schema = z.object({
+  jobId: CanonicalUuidV1Schema,
+  status: AdminImportJobStatusV1Schema,
+  errorSummary: AdminImportJobErrorSummaryV1Schema,
+}).strict();
+export type AdminImportJobErrorReportResponseV1 = z.infer<
+  typeof AdminImportJobErrorReportResponseV1Schema
+>;
 
 export const AdminQuestionFlagTypeV1Schema = z.enum([
   'bad_answer',

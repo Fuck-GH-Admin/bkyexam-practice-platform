@@ -146,7 +146,7 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
-- administrator account lifecycle beyond the current one-time `super_admin` bootstrap and Admin Auth/RBAC foundation;
+- operational policy and UI for administrator account lifecycle; backend Admin User manage API and one-time `super_admin` bootstrap already exist;
 - strong student identity policy;
 - secrets management;
 - PostgreSQL backup and restore drill;

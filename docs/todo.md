@@ -41,6 +41,7 @@
 - [x] 实现 `GET /api/admin/import-jobs`。
 - [x] 实现 `POST /api/admin/import-jobs`。
 - [x] 实现 `GET /api/admin/import-jobs/:jobId`。
+- [x] 实现 `GET /api/admin/import-jobs/:jobId/errors`。
 - [x] 复用 `import_job:read/create` 权限守卫，覆盖 `401/403`。
 - [x] 支持 `ADMIN_IMPORT_ALLOWED_ROOTS` source allowlist。
 - [x] 支持同类 `running` job lock，冲突返回 `409`。
@@ -245,7 +246,7 @@
 - [x] 题目质检标记与学生端排除策略。
 - [x] 初始 `super_admin` bootstrap。
 - [x] Audit Log read API。
-- [ ] Admin User 管理。
+- [x] Admin User 管理。
 - [ ] 真正执行写入的 import mode。
 
 ### Frontend

@@ -2,13 +2,13 @@
 
 状态日期：**2026-07-14**
 阶段：**Phase B4 — Admin Backend Contract Design**
-状态：**设计完成；B5 已部分实现 API/migration，UI 未开始**
+状态：**设计完成；B5.1–B5.8 后端 API/migration 已部分落地，UI 未开始**
 
 本文定义 BKYExam 管理平台第一版后端 contract。它是下一阶段 **Phase B5 — Admin Backend MVP Implementation** 的实现依据。
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run API、Question Review Flags API、Audit Log read API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`npm run admin:bootstrap`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。Admin User manage、真正写入 import mode、正式 Admin UI 仍按后续阶段实现。
+> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/import-jobs/:id/errors`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`GET/POST/PATCH /api/admin/users`、`npm run admin:bootstrap`、shared v1 Admin Auth/User/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。真正写入 import mode 与正式 Admin UI 仍按后续阶段实现。
 
 ## 1. 目标与非目标
 
@@ -675,6 +675,27 @@ Response：
 }
 ```
 
+### 6.5 `GET /api/admin/import-jobs/:id/errors`
+
+Permission：`import_job:read`
+
+Response：
+
+```json
+{
+  "jobId": "job-uuid",
+  "status": "failed",
+  "errorSummary": [
+    {
+      "message": "source file malformed",
+      "path": "q.txt"
+    }
+  ]
+}
+```
+
+第一版复用 job 保存的 `errorSummary`，额外字段 passthrough，后续可扩展 file/line/path 等错误定位。
+
 ## 7. Workflow D — Question Review
 
 ### 7.1 不直接编辑原题
@@ -1208,6 +1229,27 @@ Rules：
 - action/resource/actor/result/time/pagination filters
 - 管理端信息架构静态审核文档：[`admin-console-ia.md`](./admin-console-ia.md)
 
+### B5.8 Admin User Manage + Import Error Report / True Import Gate
+
+状态：**已完成 Admin User Manage + Import Error Report，2026-07-14。True import mode 继续关闭。**
+
+交付：
+
+- shared v1 Admin Managed User schema。
+- `GET /api/admin/users`
+- `GET /api/admin/users/:adminId`
+- `POST /api/admin/users`
+- `PATCH /api/admin/users/:adminId`
+- `admin_user:manage` 权限守卫。
+- memory/PostgreSQL Admin User repository/service。
+- 密码只写入 hash，不在 response 中暴露 password/passwordHash。
+- 阻止禁用或移除最后一个 active `super_admin`。
+- `admin_user.create` / `admin_user.update` audit log。
+- shared v1 Import Job Error Report schema。
+- `GET /api/admin/import-jobs/:jobId/errors`。
+- PostgreSQL integration 覆盖真实 admin user create/update/list/detail/last-super-admin guard/audit 与 import error report。
+- `mode=import` 仍显式返回 `422`；真正写入启用条件进入后续阶段，不在本阶段偷偷打开。
+
 ## 13. Acceptance Criteria For B5
 
 B5 完成时必须满足：
@@ -1245,8 +1287,8 @@ B5.1 到 B5.7 已实现；进入正式 Admin UI 前仍需要确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run、question review flags、audit log read 与 super_admin bootstrap 已完成，下一步应先补齐管理端信息架构审核和剩余账号/导入能力：
+当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成，下一步应先处理真正写入 import mode 的启用条件，或转入学生学习记录/统计后端：
 
-> **管理端信息架构静态审核 / Admin User manage / true import mode**
+> **true import mode gate / Student Learning Record And Statistics**
 
-这会把最小可运营闭环从“后端 command/query 可用”推进到“能被真实管理员初始化、追踪和审核”，同时保持正式前端最后设计。
+这会把最小可运营闭环从“后端 command/query 可用”继续推进到“导入可闭环、学生学习数据可长期沉淀”，同时保持正式前端最后设计。

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   AdminImportJobDetailResponseV1Schema,
+  AdminImportJobErrorReportResponseV1Schema,
   AdminImportJobListResponseV1Schema,
   ApiErrorResponseV1Schema,
   CaseInsensitiveUuidV1Schema,
@@ -102,6 +103,31 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       }
 
       return AdminImportJobDetailResponseV1Schema.parse({ job });
+    });
+
+    app.get('/api/admin/import-jobs/:jobId/errors', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'import_job:read');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { jobId?: unknown };
+      const parsedJobId = CaseInsensitiveUuidV1Schema.safeParse(params.jobId);
+      if (!parsedJobId.success) {
+        return reply.status(400).send(errorResponse('Invalid import job id'));
+      }
+
+      const job = await service.findImportJobById(parsedJobId.data.toLocaleLowerCase());
+      if (!job) {
+        return reply.status(404).send(errorResponse('Import job not found'));
+      }
+
+      return AdminImportJobErrorReportResponseV1Schema.parse({
+        jobId: job.id,
+        status: job.status,
+        errorSummary: job.errorSummary,
+      });
     });
 
     app.post('/api/admin/import-jobs', async (request, reply) => {

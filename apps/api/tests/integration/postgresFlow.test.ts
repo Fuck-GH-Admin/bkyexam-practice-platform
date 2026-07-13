@@ -9,6 +9,7 @@ import { createPgAdminImportJobRepository } from '../../src/admin/importJobs.js'
 import { createPgAdminQuestionReviewRepository } from '../../src/admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
 import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
+import { createPgAdminUserRepository } from '../../src/admin/adminUsers.js';
 import { hashPassword } from '../../src/auth/password.js';
 import { createPgStudentSessionRepository, createSessionService } from '../../src/auth/session.js';
 import { createPgStudentAuthRepository } from '../../src/auth/studentAuth.js';
@@ -37,6 +38,7 @@ describe('PostgreSQL-backed API integration', () => {
     adminImportAllowedRoots: [importFixtureDir],
     adminQuestionReviewRepository: createPgAdminQuestionReviewRepository(pool),
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
+    adminUserRepository: createPgAdminUserRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
     practiceSessionService: createPgPracticeSessionService(pool),
@@ -162,6 +164,106 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(operatorAuditForbidden.statusCode).toBe(403);
 
+    const operatorAdminUserForbidden = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users',
+      headers: { cookie: adminCookie },
+    });
+    expect(operatorAdminUserForbidden.statusCode).toBe(403);
+
+    const adminUserList = await app.inject({
+      method: 'GET',
+      url: '/api/admin/users?role=super_admin&limit=10&offset=0',
+      headers: { cookie: superAdminCookie },
+    });
+    expect(adminUserList.statusCode).toBe(200);
+    expect(adminUserList.json()).toMatchObject({
+      adminUsers: [expect.objectContaining({
+        loginName: 'integration-super@example.com',
+        roles: ['super_admin'],
+        permissions: expect.arrayContaining(['admin_user:manage']),
+      })],
+      page: { limit: 10, offset: 0, hasMore: false },
+    });
+
+    const createdAdminUser = await app.inject({
+      method: 'POST',
+      url: '/api/admin/users',
+      headers: { cookie: superAdminCookie },
+      payload: {
+        loginName: 'integration-managed@example.com',
+        displayName: 'Integration Managed Admin',
+        password: 'secret123',
+        roles: ['operator'],
+      },
+    });
+    expect(createdAdminUser.statusCode).toBe(200);
+    expect(createdAdminUser.json()).toMatchObject({
+      adminUser: {
+        loginName: 'integration-managed@example.com',
+        displayName: 'Integration Managed Admin',
+        status: 'active',
+        roles: ['operator'],
+        permissions: expect.arrayContaining(['import_job:create']),
+      },
+    });
+    expect(JSON.stringify(createdAdminUser.json())).not.toContain('secret123');
+    const managedAdminId = createdAdminUser.json().adminUser.id as string;
+
+    const updatedAdminUser = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${managedAdminId}`,
+      headers: { cookie: superAdminCookie },
+      payload: {
+        displayName: 'Integration Managed Editor',
+        roles: ['content_editor', 'operator'],
+        password: 'newsecret123',
+      },
+    });
+    expect(updatedAdminUser.statusCode).toBe(200);
+    expect(updatedAdminUser.json()).toMatchObject({
+      adminUser: {
+        id: managedAdminId,
+        displayName: 'Integration Managed Editor',
+        status: 'active',
+        roles: ['content_editor', 'operator'],
+        permissions: expect.arrayContaining(['bank_mapping:write', 'import_job:create']),
+      },
+    });
+
+    const managedAdminDetail = await app.inject({
+      method: 'GET',
+      url: `/api/admin/users/${managedAdminId}`,
+      headers: { cookie: superAdminCookie },
+    });
+    expect(managedAdminDetail.statusCode).toBe(200);
+    expect(managedAdminDetail.json().adminUser).toMatchObject({
+      id: managedAdminId,
+      loginName: 'integration-managed@example.com',
+      displayName: 'Integration Managed Editor',
+      roles: ['content_editor', 'operator'],
+    });
+
+    const lastSuperAdminGuard = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/users/${superAdminLogin.json().admin.id}`,
+      headers: { cookie: superAdminCookie },
+      payload: { status: 'disabled' },
+    });
+    expect(lastSuperAdminGuard.statusCode).toBe(409);
+    expect(lastSuperAdminGuard.json()).toEqual({ error: 'Cannot remove or disable the last active super_admin' });
+
+    const adminUserAuditState = await pool.query<{ create_count: string; update_count: string }>(`
+      SELECT
+        COUNT(*) FILTER (WHERE action = 'admin_user.create') AS create_count,
+        COUNT(*) FILTER (WHERE action = 'admin_user.update') AS update_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND resource_type = 'admin_user'
+        AND result = 'success'
+    `, [superAdminLogin.json().admin.id]);
+    expect(adminUserAuditState.rows[0]).toEqual({ create_count: '1', update_count: '1' });
+
     const adminAuditLogList = await app.inject({
       method: 'GET',
       url: '/api/admin/audit-logs?action=admin_user.bootstrap&limit=5',
@@ -238,6 +340,18 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(importJobDetail.statusCode).toBe(200);
     expect(importJobDetail.json().job.id).toBe(importJobId);
+
+    const importJobErrorReport = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${importJobId}/errors`,
+      headers: { cookie: adminCookie },
+    });
+    expect(importJobErrorReport.statusCode).toBe(200);
+    expect(importJobErrorReport.json()).toEqual({
+      jobId: importJobId,
+      status: 'succeeded',
+      errorSummary: [],
+    });
 
     const importJobAuditState = await pool.query<{ audit_count: string }>(`
       SELECT COUNT(*) AS audit_count

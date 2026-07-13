@@ -115,6 +115,18 @@ describe('admin import job routes', () => {
     expect(detail.statusCode).toBe(200);
     expect(detail.json().job.id).toBe(jobId);
 
+    const errors = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${jobId}/errors`,
+      headers: { cookie },
+    });
+    expect(errors.statusCode).toBe(200);
+    expect(errors.json()).toEqual({
+      jobId,
+      status: 'succeeded',
+      errorSummary: [],
+    });
+
     const list = await app.inject({
       method: 'GET',
       url: '/api/admin/import-jobs?status=succeeded&limit=10&offset=0',
@@ -164,6 +176,50 @@ describe('admin import job routes', () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json()).toEqual({ error: 'Import job already running' });
+  });
+
+  it('reads failed import job error reports', async () => {
+    const failedJob: AdminImportJobV1 = {
+      id: '60000000-0000-4000-8000-000000000002',
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'failed',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      progress: { phase: 'failed', current: 0, total: 0 },
+      summary: {},
+      errorSummary: [{ message: 'Failed to parse source file', file: 'questions.xlsx' }],
+      createdBy: { id: adminId, displayName: 'Operator' },
+      createdAt: '2026-07-13T10:00:00.000Z',
+      startedAt: '2026-07-13T10:00:00.000Z',
+      finishedAt: '2026-07-13T10:00:01.000Z',
+    };
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: createMemoryAdminImportJobRepository([failedJob]),
+      adminImportAllowedRoots: [fixtureDir],
+    });
+    const cookie = await loginAdmin(app);
+
+    const report = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${failedJob.id}/errors`,
+      headers: { cookie },
+    });
+    expect(report.statusCode).toBe(200);
+    expect(report.json()).toEqual({
+      jobId: failedJob.id,
+      status: 'failed',
+      errorSummary: [{ message: 'Failed to parse source file', file: 'questions.xlsx' }],
+    });
+
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/admin/import-jobs/60000000-0000-4000-8000-000000000099/errors',
+      headers: { cookie },
+    });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.json()).toEqual({ error: 'Import job not found' });
   });
 
   it('returns 403 for disallowed roots and resetBeforeImport without super_admin', async () => {

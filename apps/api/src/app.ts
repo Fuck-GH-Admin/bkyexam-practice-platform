@@ -8,6 +8,7 @@ import {
   type AuditLogRepository,
   type AuditService,
 } from './admin/audit.js';
+import type { AdminUserRepository } from './admin/adminUsers.js';
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
 import type { AdminImportJobRepository } from './admin/importJobs.js';
@@ -25,6 +26,7 @@ import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
 import { createAdminImportJobRoutes } from './routes/adminImportJobs.js';
 import { createAdminQuestionReviewRoutes } from './routes/adminQuestionReview.js';
 import { createAdminSystemStatusRoutes } from './routes/adminSystemStatus.js';
+import { createAdminUserRoutes } from './routes/adminUsers.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -42,6 +44,7 @@ interface BuildAppOptions {
   adminImportAllowedRoots?: readonly string[];
   adminQuestionReviewRepository?: AdminQuestionReviewRepository;
   adminSystemStatusRepository?: AdminSystemStatusRepository;
+  adminUserRepository?: AdminUserRepository;
   bankRepository?: BankRepository;
   practiceRepository?: PracticeRepository;
   practiceSessionService?: PracticeSessionService;
@@ -97,6 +100,11 @@ export function buildApp(options: BuildAppOptions = {}) {
   void app.register(createAdminAuditLogRoutes({
     repository: auditLogRepository,
     sessionService: adminSessionService,
+  }));
+  void app.register(createAdminUserRoutes({
+    repository: options.adminUserRepository,
+    sessionService: adminSessionService,
+    auditService,
   }));
   void app.register(createAdminBankMappingRoutes({
     repository: options.adminBankMappingRepository,

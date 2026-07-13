@@ -1,4 +1,5 @@
 import { createAuditService, createPgAuditLogRepository } from './admin/audit.js';
+import { createPgAdminUserRepository } from './admin/adminUsers.js';
 import { createPgAdminAuthRepository } from './admin/auth.js';
 import { createPgAdminBankMappingRepository } from './admin/bankMappings.js';
 import { createPgAdminImportJobRepository } from './admin/importJobs.js';
@@ -26,6 +27,7 @@ const app = buildApp({
   adminImportAllowedRoots: config.ADMIN_IMPORT_ALLOWED_ROOTS,
   adminQuestionReviewRepository: pool ? createPgAdminQuestionReviewRepository(pool) : undefined,
   adminSystemStatusRepository: pool ? createPgAdminSystemStatusRepository(pool) : undefined,
+  adminUserRepository: pool ? createPgAdminUserRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,
   practiceSessionService: pool ? createPgPracticeSessionService(pool) : undefined,
