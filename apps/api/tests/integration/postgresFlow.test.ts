@@ -129,7 +129,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 7, currentMigration: '0007_question_quality_flags.sql' },
+      database: { ok: true, migrationCount: 8, currentMigration: '0008_student_learning_goals.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -1260,6 +1260,98 @@ describe('PostgreSQL-backed API integration', () => {
     expect(learningTrendsBody.summary.longestStreakDays).toBeGreaterThanOrEqual(
       learningTrendsBody.summary.currentStreakDays,
     );
+
+    const learningGoals = await app.inject({
+      method: 'GET',
+      url: '/api/learning/goals',
+      headers: { cookie: aliceCookie },
+    });
+    expect(learningGoals.statusCode).toBe(200);
+    expect(learningGoals.json()).toMatchObject({
+      generatedAt: expect.any(String),
+      goals: {
+        dailyAttemptsTarget: 20,
+        weeklyActiveDaysTarget: 5,
+        wrongQuestionsReviewTarget: 10,
+        source: 'default',
+        updatedAt: null,
+      },
+      progress: {
+        today: {
+          date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          attempts: 3,
+          gradedAttempts: 3,
+          correctAttempts: 2,
+          accuracy: 0.6667,
+          dailyAttempts: { current: 3, target: 20, completed: false, remaining: 17 },
+        },
+        week: {
+          fromDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          toDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+          attempts: 3,
+          gradedAttempts: 3,
+          correctAttempts: 2,
+          accuracy: 0.6667,
+        },
+        wrongbook: {
+          total: 1,
+          mastered: 1,
+          pending: 0,
+          reviewedToday: 0,
+          wrongQuestionsReview: { current: 0, target: 10, completed: true, remaining: 0 },
+        },
+      },
+      feedback: expect.arrayContaining([
+        expect.objectContaining({ type: 'wrongbook_review_goal', severity: 'success' }),
+      ]),
+    });
+    expect(learningGoals.json().progress.week.activeDays).toBeGreaterThanOrEqual(1);
+
+    const updatedLearningGoals = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/goals',
+      headers: { cookie: aliceCookie },
+      payload: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: 1,
+        wrongQuestionsReviewTarget: 1,
+      },
+    });
+    expect(updatedLearningGoals.statusCode).toBe(200);
+    expect(updatedLearningGoals.json()).toMatchObject({
+      goals: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: 1,
+        wrongQuestionsReviewTarget: 1,
+        source: 'student',
+        updatedAt: expect.any(String),
+      },
+      progress: {
+        today: {
+          dailyAttempts: { current: 3, target: 3, completed: true, remaining: 0 },
+        },
+        week: {
+          weeklyActiveDays: { target: 1, completed: true, remaining: 0 },
+        },
+        wrongbook: {
+          wrongQuestionsReview: { current: 0, target: 1, completed: true, remaining: 0 },
+        },
+      },
+      feedback: expect.arrayContaining([
+        expect.objectContaining({ type: 'daily_attempts_goal', severity: 'success' }),
+        expect.objectContaining({ type: 'weekly_active_days_goal', severity: 'success' }),
+      ]),
+    });
+
+    const learningGoalState = await pool.query<{ goal_count: string }>(`
+      SELECT COUNT(*) AS goal_count
+      FROM student_learning_goals
+      WHERE student_id = $1
+        AND daily_attempts_target = 3
+        AND weekly_active_days_target = 1
+        AND wrong_questions_review_target = 1
+    `, [aliceId]);
+    expect(learningGoalState.rows[0]).toEqual({ goal_count: '1' });
 
     const logout = await app.inject({
       method: 'POST',

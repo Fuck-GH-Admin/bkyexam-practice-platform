@@ -3,7 +3,9 @@ import {
   GetLearningDashboardRequestV1Schema,
   GetLearningTrendsRequestV1Schema,
   LearningDashboardResponseV1Schema,
+  LearningGoalsResponseV1Schema,
   LearningTrendsResponseV1Schema,
+  UpdateLearningGoalsRequestV1Schema,
 } from '@bkyexam-practice/shared';
 import type { SessionStudent } from '../auth/session.js';
 import type { LearningDashboardRepository } from '../learning/repository.js';
@@ -55,6 +57,40 @@ export function createLearningRoutes({ repository, requireStudent }: LearningRou
       });
 
       return LearningTrendsResponseV1Schema.parse(trends);
+    });
+
+    app.get('/api/learning/goals', async (request, reply) => {
+      const student = await requireStudent(request);
+      if (!student) {
+        return reply.status(401).send({ error: 'Unauthenticated' });
+      }
+
+      const goals = await repository.getGoals({
+        studentId: student.id,
+      });
+
+      return LearningGoalsResponseV1Schema.parse(goals);
+    });
+
+    app.put('/api/learning/goals', async (request, reply) => {
+      const student = await requireStudent(request);
+      if (!student) {
+        return reply.status(401).send({ error: 'Unauthenticated' });
+      }
+
+      const validation = UpdateLearningGoalsRequestV1Schema.safeParse(request.body ?? {});
+      if (!validation.success) {
+        return reply.status(400).send({
+          error: validation.error.issues[0]?.message ?? 'Invalid learning goals payload',
+        });
+      }
+
+      const goals = await repository.updateGoals({
+        studentId: student.id,
+        goals: validation.data,
+      });
+
+      return LearningGoalsResponseV1Schema.parse(goals);
     });
   };
 }

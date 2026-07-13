@@ -50,7 +50,7 @@ PostgreSQL / memory repository
 | Practice session collection | `PracticeSessionCardV1Schema`, `PracticeSessionPageV1Schema`, `ListPracticeSessionsRequestV1Schema` |
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
-| Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend stat schemas |
+| Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, `LearningGoalsResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend/goal/feedback stat schemas |
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
@@ -135,6 +135,9 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 - `LearningTrendsResponseV1Schema.daily` 必须是连续 UTC date bucket，长度等于 `days`，且首尾分别等于 `fromDate`/`toDate`。
 - `currentStreakDays` 从 `toDate` 往前连续 active 的天数；active day 指当日有 session、attempt 或 wrongbook touch。
 - trends summary 的 `activeDays/currentStreakDays/longestStreakDays` 不能超过窗口 `days`，attempt 计数保持同一套不变量。
+- `LearningGoalsResponseV1Schema` 固定三类目标：daily attempts、weekly active days、wrongbook review；目标可为 `null`，此时对应 progress `remaining` 必须为 `null` 且 `completed=false`。
+- goal progress 中 `current/target/completed/remaining` 必须自洽；已判定/正确 attempt 仍遵循 dashboard/trends 的计数不变量。
+- `feedback` 只允许枚举化 signal type/severity/action，避免前端依赖任意字符串策略。
 
 ### Auth
 
@@ -197,5 +200,5 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
 - Readiness/DB health 尚未定义。

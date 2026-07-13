@@ -93,6 +93,63 @@ describe('learning dashboard repositories', () => {
     expect(trends.daily.every((day) => day.accuracy === null && day.attempts === 0)).toBe(true);
   });
 
+  it('returns and updates memory learning goals with default progress', async () => {
+    const repository = createMemoryLearningDashboardRepository();
+
+    const initial = await repository.getGoals({
+      studentId,
+      now: new Date('2026-07-14T10:00:00.000Z'),
+    });
+    expect(initial).toMatchObject({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      goals: {
+        dailyAttemptsTarget: 20,
+        weeklyActiveDaysTarget: 5,
+        wrongQuestionsReviewTarget: 10,
+        source: 'default',
+        updatedAt: null,
+      },
+      progress: {
+        today: {
+          date: '2026-07-14',
+          attempts: 0,
+          dailyAttempts: { current: 0, target: 20, completed: false, remaining: 20 },
+        },
+        week: {
+          fromDate: '2026-07-08',
+          toDate: '2026-07-14',
+          activeDays: 0,
+          weeklyActiveDays: { current: 0, target: 5, completed: false, remaining: 5 },
+        },
+        wrongbook: {
+          total: 0,
+          pending: 0,
+          wrongQuestionsReview: { current: 0, target: 10, completed: true, remaining: 0 },
+        },
+      },
+    });
+
+    const updated = await repository.updateGoals({
+      studentId,
+      goals: { dailyAttemptsTarget: 5, weeklyActiveDaysTarget: null },
+      now: new Date('2026-07-14T10:05:00.000Z'),
+    });
+
+    expect(updated.goals).toEqual({
+      dailyAttemptsTarget: 5,
+      weeklyActiveDaysTarget: null,
+      wrongQuestionsReviewTarget: 10,
+      source: 'student',
+      updatedAt: '2026-07-14T10:05:00.000Z',
+    });
+    expect(updated.progress.week.weeklyActiveDays).toEqual({
+      current: 0,
+      target: null,
+      completed: false,
+      remaining: null,
+    });
+  });
+
   it('maps PostgreSQL aggregate rows into learning dashboard counters', async () => {
     const client = new FakeQueryClient([
       [{
@@ -291,5 +348,154 @@ describe('learning dashboard repositories', () => {
     expect(client.queries).toHaveLength(1);
     expect(client.queries[0]?.sql).toContain('generate_series');
     expect(client.queries[0]?.params).toEqual([studentId, '2026-07-14', 7]);
+  });
+
+  it('maps PostgreSQL learning goal settings and activity facts into feedback signals', async () => {
+    const client = new FakeQueryClient([
+      [{
+        daily_attempts_target: '3',
+        weekly_active_days_target: '2',
+        wrong_questions_review_target: '1',
+        updated_at: new Date('2026-07-14T09:55:00.000Z'),
+      }],
+      [{
+        today_date: '2026-07-14',
+        week_from_date: '2026-07-08',
+        week_to_date: '2026-07-14',
+        today_attempts: '3',
+        today_graded_attempts: '3',
+        today_correct_attempts: '2',
+        week_active_days: '2',
+        week_attempts: '5',
+        week_graded_attempts: '5',
+        week_correct_attempts: '4',
+        wrong_questions: '2',
+        mastered_wrong_questions: '1',
+        pending_wrong_questions: '1',
+        wrong_questions_reviewed_today: '0',
+      }],
+    ]);
+    const repository = createPgLearningDashboardRepository(client);
+
+    const goals = await repository.getGoals({
+      studentId,
+      now: new Date('2026-07-14T10:00:00.000Z'),
+    });
+
+    expect(goals).toMatchObject({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      goals: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: 2,
+        wrongQuestionsReviewTarget: 1,
+        source: 'student',
+        updatedAt: '2026-07-14T09:55:00.000Z',
+      },
+      progress: {
+        today: {
+          date: '2026-07-14',
+          attempts: 3,
+          gradedAttempts: 3,
+          correctAttempts: 2,
+          accuracy: 0.6667,
+          dailyAttempts: { current: 3, target: 3, completed: true, remaining: 0 },
+        },
+        week: {
+          fromDate: '2026-07-08',
+          toDate: '2026-07-14',
+          activeDays: 2,
+          attempts: 5,
+          accuracy: 0.8,
+          weeklyActiveDays: { current: 2, target: 2, completed: true, remaining: 0 },
+        },
+        wrongbook: {
+          total: 2,
+          mastered: 1,
+          pending: 1,
+          reviewedToday: 0,
+          wrongQuestionsReview: { current: 0, target: 1, completed: false, remaining: 1 },
+        },
+      },
+      feedback: expect.arrayContaining([
+        expect.objectContaining({ type: 'daily_attempts_goal', severity: 'success' }),
+        expect.objectContaining({ type: 'weekly_active_days_goal', severity: 'success' }),
+        expect.objectContaining({ type: 'wrongbook_review_needed', severity: 'warning' }),
+      ]),
+    });
+    expect(client.queries).toHaveLength(2);
+    expect(client.queries[0]?.sql).toContain('FROM student_learning_goals');
+    expect(client.queries[1]?.params).toEqual([studentId, '2026-07-14']);
+  });
+
+  it('upserts PostgreSQL learning goals before returning current progress', async () => {
+    const client = new FakeQueryClient([
+      [],
+      [{
+        daily_attempts_target: '3',
+        weekly_active_days_target: null,
+        wrong_questions_review_target: '1',
+        updated_at: new Date('2026-07-14T10:05:00.000Z'),
+      }],
+      [{
+        today_date: '2026-07-14',
+        week_from_date: '2026-07-08',
+        week_to_date: '2026-07-14',
+        today_attempts: '3',
+        today_graded_attempts: '3',
+        today_correct_attempts: '2',
+        week_active_days: '1',
+        week_attempts: '3',
+        week_graded_attempts: '3',
+        week_correct_attempts: '2',
+        wrong_questions: '1',
+        mastered_wrong_questions: '1',
+        pending_wrong_questions: '0',
+        wrong_questions_reviewed_today: '0',
+      }],
+    ]);
+    const repository = createPgLearningDashboardRepository(client);
+
+    const goals = await repository.updateGoals({
+      studentId,
+      goals: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: null,
+        wrongQuestionsReviewTarget: 1,
+      },
+      now: new Date('2026-07-14T10:05:00.000Z'),
+    });
+
+    expect(goals).toMatchObject({
+      goals: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: null,
+        wrongQuestionsReviewTarget: 1,
+        source: 'student',
+      },
+      progress: {
+        today: {
+          dailyAttempts: { current: 3, target: 3, completed: true, remaining: 0 },
+        },
+        week: {
+          weeklyActiveDays: { current: 1, target: null, completed: false, remaining: null },
+        },
+        wrongbook: {
+          pending: 0,
+          wrongQuestionsReview: { current: 0, target: 1, completed: true, remaining: 0 },
+        },
+      },
+      feedback: expect.arrayContaining([
+        expect.objectContaining({ type: 'wrongbook_review_goal', severity: 'success' }),
+      ]),
+    });
+    expect(client.queries).toHaveLength(3);
+    expect(client.queries[1]?.sql).toContain('ON CONFLICT (student_id) DO UPDATE');
+    expect(client.queries[1]?.params).toEqual([
+      studentId,
+      3,
+      null,
+      1,
+      '2026-07-14T10:05:00.000Z',
+    ]);
   });
 });

@@ -841,8 +841,8 @@ Response：
   },
   "database": {
     "ok": true,
-    "migrationCount": 7,
-    "currentMigration": "0007_question_quality_flags.sql"
+    "migrationCount": 8,
+    "currentMigration": "0008_student_learning_goals.sql"
   },
   "corpus": {
     "classifications": 2941,
@@ -1458,6 +1458,109 @@ Errors：
 - `400`：query 无效。
 - `401`：缺少有效 `bky_session`。
 
+### `GET /api/learning/goals`
+
+返回当前学生的学习目标、今日/近 7 日进度和错题复习反馈信号。没有学生自定义目标时返回默认目标：
+
+- `dailyAttemptsTarget = 20`
+- `weeklyActiveDaysTarget = 5`
+- `wrongQuestionsReviewTarget = 10`
+
+Response：
+
+```json
+{
+  "generatedAt": "2026-07-14T10:00:00.000Z",
+  "goals": {
+    "dailyAttemptsTarget": 3,
+    "weeklyActiveDaysTarget": 1,
+    "wrongQuestionsReviewTarget": 1,
+    "source": "student",
+    "updatedAt": "2026-07-14T10:00:00.000Z"
+  },
+  "progress": {
+    "today": {
+      "date": "2026-07-14",
+      "attempts": 3,
+      "gradedAttempts": 3,
+      "correctAttempts": 2,
+      "accuracy": 0.6667,
+      "dailyAttempts": {
+        "current": 3,
+        "target": 3,
+        "completed": true,
+        "remaining": 0
+      }
+    },
+    "week": {
+      "fromDate": "2026-07-08",
+      "toDate": "2026-07-14",
+      "activeDays": 1,
+      "attempts": 3,
+      "gradedAttempts": 3,
+      "correctAttempts": 2,
+      "accuracy": 0.6667,
+      "weeklyActiveDays": {
+        "current": 1,
+        "target": 1,
+        "completed": true,
+        "remaining": 0
+      }
+    },
+    "wrongbook": {
+      "total": 1,
+      "mastered": 1,
+      "pending": 0,
+      "reviewedToday": 0,
+      "wrongQuestionsReview": {
+        "current": 0,
+        "target": 1,
+        "completed": true,
+        "remaining": 0
+      }
+    }
+  },
+  "feedback": [
+    {
+      "type": "daily_attempts_goal",
+      "severity": "success",
+      "title": "Daily practice goal reached",
+      "message": "Completed 3/3 attempts today.",
+      "action": "view_trends"
+    }
+  ]
+}
+```
+
+### `PUT /api/learning/goals`
+
+Upsert 当前学生的目标设置，并返回同 `GET /api/learning/goals` 的完整进度响应。
+
+Request：
+
+```json
+{
+  "dailyAttemptsTarget": 20,
+  "weeklyActiveDaysTarget": 5,
+  "wrongQuestionsReviewTarget": 10
+}
+```
+
+Rules：
+
+- 三个字段至少传一个。
+- 任一字段可传 `null` 表示关闭该目标。
+- `dailyAttemptsTarget`：`1..500`。
+- `weeklyActiveDaysTarget`：`1..7`。
+- `wrongQuestionsReviewTarget`：`1..100`。
+- `reviewedToday` 当前按当天 completed `origin=wrongbook` session 的 `completed_count` 汇总；创建但未提交的错题再练 session 不算复习完成。
+- `feedback` 是只读策略信号，第一版只用于提示目标完成、继续练习、错题复习和低正确率关注；不是推荐算法。
+
+Errors：
+
+- `400`：body 无效。
+- `401`：缺少有效 `bky_session`。
+
 ## Wrongbook
 
 所有 Wrongbook 路由需要认证。
@@ -1587,7 +1690,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

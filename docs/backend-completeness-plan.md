@@ -17,10 +17,10 @@
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
-| 学生客观题后端闭环 | **约 89–93%** | 已可内部试用；核心链路稳定，学习趋势后端也已具备。 |
+| 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
 | 后端工程可验证性 | **约 80%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 68–75%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览与趋势 API 已落地，但正式身份、全题型、管理前端和生产能力仍未完成。 |
+| 完整平台后端 | **约 69–76%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览、趋势、目标与反馈 API 已落地，但正式身份、全题型、管理前端和生产能力仍未完成。 |
 | 公开生产后端就绪 | **约 59%** | 已补第一个 `super_admin` bootstrap、Admin User manage API 和 gated true import，但仍缺正式安全策略、监控、备份恢复、rate limit、CSRF 和部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
@@ -31,7 +31,7 @@
 
 已完成：
 
-- PostgreSQL schema 与七份 ordered SQL migration。
+- PostgreSQL schema 与八份 ordered SQL migration。
 - 原始题库解析：
   - classifications
   - questions
@@ -155,6 +155,8 @@
 
 - `GET /api/learning/dashboard`
 - `GET /api/learning/trends?days=7..90`
+- `GET/PUT /api/learning/goals`
+- `student_learning_goals` 持久化目标设置
 - shared v1 Learning contract
 - summary：active/completed/review session 数、attempt 数、graded/correct attempt、正确率、最近练习时间
 - recent banks：最近练习题库、会话数、完成数、正确率、错题数
@@ -162,10 +164,12 @@
 - wrongbook summary：total/mastered/pending/lastWrongAt
 - daily trends：UTC 日期桶、sessions started/completed、attempts、accuracy、wrongbook touch
 - streak：activeDays、currentStreakDays、longestStreakDays
+- learning goals：daily attempts、weekly active days、wrongbook review 三类目标
+- feedback signals：目标完成、继续练习、错题复习、低正确率关注
 - memory/PostgreSQL repository
 - PostgreSQL integration 覆盖真实聚合
 
-当前定位：**学生学习统计后端 MVP+ 已具备；前端展示、学习目标、长期档案和推荐策略未完成。**
+当前定位：**学生学习统计后端 MVP+ 已具备；前端展示、长期档案和推荐策略未完成。**
 
 ### 2.7 Shared Runtime Contract
 
@@ -194,10 +198,10 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 410 Vitest
-- 356 API tests
+- 417 Vitest
+- 362 API tests
 - 31 Web tests
-- 23 Shared tests
+- 24 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -341,6 +345,8 @@
 - 正确率趋势 API
 - 错题 touch 趋势 API
 - activity streak
+- 学习目标 API
+- 错题复习反馈信号
 
 仍缺：
 
@@ -450,14 +456,14 @@
 
 ## 4. 后端下一步规划
 
-本路线中 B1 到 B5.9 已按顺序执行完毕，B7.1 学习概览与 B7.2 学习趋势也已落地。当前仍然不要直接开管理端大工程，也不要先做最终视觉；应继续补齐正式身份、学习目标/长期反馈、导入 reset/队列化和剩余运营闭环。
+本路线中 B1 到 B5.9 已按顺序执行完毕，B7.1 学习概览、B7.2 学习趋势与 B7.3 学习目标/反馈也已落地。当前仍然不要直接开管理端大工程，也不要先做最终视觉；应继续补齐正式身份、长期档案/推荐策略、导入 reset/队列化和剩余运营闭环。
 
-当前建议下一步做 **B7.3 Learning Goals / Wrongbook Feedback**，或切到 **B9 Production Backend Readiness 前置项**。
+当前建议下一步做 **B9 Production Backend Readiness 前置项**，或补 **B7.4 Bookmarks / Long-term Review Flags**。
 
 原因：
 
 1. 学生客观题主链路已经稳定，适合继续在稳定测试保护下补管理端能力。
-2. Bank Mapping read/write、System Status、Import Jobs dry-run/error report/true import gate、Question Review Flags、Admin User manage、bootstrap 和 audit query 已有 Auth/RBAC/Audit 基础；学生学习概览/趋势已有后端 API，但真实运营还缺学习目标/反馈、导入 reset/队列化和正式管理 UI。
+2. Bank Mapping read/write、System Status、Import Jobs dry-run/error report/true import gate、Question Review Flags、Admin User manage、bootstrap 和 audit query 已有 Auth/RBAC/Audit 基础；学生学习概览/趋势/目标/反馈已有后端 API，但真实运营还缺导入 reset/队列化、正式管理 UI、生产安全与长期学习档案。
 3. 管理端信息架构已先以静态文档冻结，继续补后端 command/query 比现在直接做 UI 更稳。
 
 ## 5. 推荐执行路线
@@ -870,7 +876,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - 成功创建写 `import_job.create` audit log。
   - PostgreSQL integration 覆盖 migration、创建、列表、详情、audit、System Status latest import job。
 
-B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2 已在下一节落地；当前下一步：**B7.3 Learning Goals / Wrongbook Feedback** 或 **B9 Production Backend Readiness**。
+B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2/B7.3 已在下一节落地；当前下一步：**B9 Production Backend Readiness** 或 **B7.4 Bookmarks / Long-term Review Flags**。
 
 ### Phase B5.6 — Question Review Flags
 
@@ -982,12 +988,12 @@ B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2 已在下一节落地；当前下一步：**B7
 
 下一步候选：
 
-- **B7.3 Learning Goals / Wrongbook Feedback**：补学生目标、错题再练反馈和长期学习信号。
-- 或 **Production Backend Readiness** 的安全/运维前置项：rate limit、CSRF、readiness、备份恢复演练。
+- **B9 Production Backend Readiness** 的安全/运维前置项：rate limit、CSRF、readiness、备份恢复演练。
+- **B7.4 Bookmarks / Long-term Review Flags**：补收藏、长期存疑和学习档案信号。
 
 ### Phase B7 — Student Learning Record And Statistics
 
-状态：**B7.1 学习概览与 B7.2 学习趋势已完成，2026-07-14。**
+状态：**B7.1 学习概览、B7.2 学习趋势与 B7.3 学习目标/反馈已完成，2026-07-14。**
 
 目标：补学生长期学习闭环。
 
@@ -995,9 +1001,14 @@ B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2 已在下一节落地；当前下一步：**B7
 
 - `GET /api/learning/dashboard`
 - `GET /api/learning/trends`
+- `GET /api/learning/goals`
+- `PUT /api/learning/goals`
+- `student_learning_goals`
 - practice summary stats
 - daily trends
 - activity streak
+- learning goals
+- wrongbook feedback signals
 - recent banks
 - wrongbook trend summary
 - correct rate by bank/type
@@ -1009,8 +1020,7 @@ B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2 已在下一节落地；当前下一步：**B7
 仍未完成：
 
 - 周/月聚合展示或前端派生。
-- 学习目标。
-- wrongbook re-practice feedback 的前端展示和策略。
+- wrongbook re-practice feedback 的前端展示和更细策略。
 - favorite / long-term review flag。
 - 前端学生档案/学习概览页面。
 
@@ -1068,19 +1078,20 @@ review_items
 
 如果继续本规划，下一步建议执行：
 
-> **B7.3 Learning Goals / Wrongbook Feedback，或 B9 Production Backend Readiness 前置项。**
+> **B9 Production Backend Readiness 前置项，或 B7.4 Bookmarks / Long-term Review Flags。**
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add learning goals and feedback signals
+feat: add backend readiness guardrails
 ```
 
 范围建议只包含：
 
-- 学习目标 contract/API 草案与最小后端实现。
-- wrongbook re-practice feedback 策略与只读信号。
-- 如需持久化再新增 `student_learning_goals` 或 review feedback 表；否则先从现有事实表轻量聚合。
+- readiness health / DB health contract。
+- request id / structured error 基础。
+- rate limit / CSRF 策略草案与最小实现候选。
+- 或如继续 B7.4：`question_bookmarks` / long-term review flag contract。
 - 全量 `npm run verify:docker`。
 
 不做：
@@ -1096,7 +1107,7 @@ feat: add learning goals and feedback signals
 - 不引入微服务
 - 不引入队列
 
-这样可以把“学生能看概览与趋势”推进到“学习目标和反馈可以闭环”，再进入正式前端设计审核。
+这样可以把“学生学习后端闭环”转向“生产安全与运营闭环”，或继续补长期学习档案信号，再进入正式前端设计审核。
 
 ## 7. 阶段提交规则
 
@@ -1113,6 +1124,6 @@ feat: add learning goals and feedback signals
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；完整平台后端还缺正式身份、模块化、非客观题、学习目标/长期反馈、管理前端和生产运维。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；完整平台后端还缺正式身份、模块化、非客观题、长期学习档案、管理前端和生产运维。**
 
-最合理的下一步是继续后端闭环：可以做学习目标/错题反馈，也可以转入生产安全与运维前置项；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：优先转入生产安全与运维前置项，也可以补收藏/长期复习信号；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

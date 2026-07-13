@@ -82,4 +82,15 @@ describe('initial database migration', () => {
     expect(sql).toContain('question_quality_flags_bank_status_idx');
     expect(sql).toContain('question_quality_flags_excluded_open_idx');
   });
+
+  it('creates per-student learning goals with bounded targets', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0008_student_learning_goals.sql'), 'utf8');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS student_learning_goals');
+    expect(sql).toContain('student_id uuid PRIMARY KEY REFERENCES students(id) ON DELETE CASCADE');
+    expect(sql).toContain('daily_attempts_target BETWEEN 1 AND 500');
+    expect(sql).toContain('weekly_active_days_target BETWEEN 1 AND 7');
+    expect(sql).toContain('wrong_questions_review_target BETWEEN 1 AND 100');
+    expect(sql).toContain('student_learning_goals_updated_at_idx');
+  });
 });

@@ -71,18 +71,18 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 410 个 Vitest 测试覆盖：
+当前 417 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
-- identity、catalog、practice、wrongbook、learning dashboard/trends 的 repository 行为。
+- identity、catalog、practice、wrongbook、learning dashboard/trends/goals 的 repository 行为。
 - Fastify route 的输入、输出和错误映射。
 - Web 练习 model 与关键状态转换。
 - 学生端 URL parser/builder。
 - Practice/Wrongbook/Learning/Admin Auth/Admin User/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 23 项、API 356 项、Web 31 项。Practice/Wrongbook/Learning/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 24 项、API 362 项、Web 31 项。Practice/Wrongbook/Learning/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
@@ -118,7 +118,7 @@ npm run test:integration:db:docker
 
 1. 通过 Compose 在 `127.0.0.1:55432` 启动临时 `postgres:16-alpine`。
 2. 等待数据库 healthcheck。
-3. 对空的 `bkyexam_test` 执行全部七份 migration。
+3. 对空的 `bkyexam_test` 执行全部八份 migration。
 4. 装载只含可见/隐藏题库、父子分类和客观题的最小 fixture。
 5. 运行真实 PostgreSQL repository + Fastify API integration test。
 6. 无论成功或失败都停止并删除临时容器。
@@ -137,6 +137,7 @@ npm run test:integration:db:docker
 - 错题归集、详情参考答案规范化、掌握筛选和 `origin=wrongbook` 再练。
 - 学习概览 dashboard：active/completed/review session 数、attempt 正确率、最近题库、题型统计和错题掌握摘要。
 - 学习趋势 trends：7 日 UTC 日期桶、session/attempt/wrongbook touch 汇总、正确率和 activity streak。
+- 学习目标 goals：默认/学生自定义目标、今日/近 7 日进度、错题复习反馈信号和持久化 upsert。
 - 不同学生之间的 session 与错题所有权隔离。
 - 退出后服务端 session 失效。
 - 真实 PostgreSQL repository 返回值能够通过 Fastify v1 response contract。

@@ -275,3 +275,177 @@ export const GetLearningTrendsRequestV1Schema = z.object({
   days: z.coerce.number().int().min(7).max(90).default(14),
 }).strict();
 export type GetLearningTrendsRequestV1 = z.infer<typeof GetLearningTrendsRequestV1Schema>;
+
+const NullableDailyAttemptsTargetV1Schema = z.number().int().min(1).max(500).nullable();
+const NullableWeeklyActiveDaysTargetV1Schema = z.number().int().min(1).max(7).nullable();
+const NullableWrongQuestionsReviewTargetV1Schema = z.number().int().min(1).max(100).nullable();
+
+export const LearningGoalSourceV1Schema = z.enum(['default', 'student']);
+export type LearningGoalSourceV1 = z.infer<typeof LearningGoalSourceV1Schema>;
+
+export const LearningGoalSettingsV1Schema = z.object({
+  dailyAttemptsTarget: NullableDailyAttemptsTargetV1Schema,
+  weeklyActiveDaysTarget: NullableWeeklyActiveDaysTargetV1Schema,
+  wrongQuestionsReviewTarget: NullableWrongQuestionsReviewTargetV1Schema,
+  source: LearningGoalSourceV1Schema,
+  updatedAt: IsoTimestampV1Schema.nullable(),
+}).strict();
+export type LearningGoalSettingsV1 = z.infer<typeof LearningGoalSettingsV1Schema>;
+
+export const LearningGoalMetricProgressV1Schema = z.object({
+  current: z.number().int().nonnegative(),
+  target: z.number().int().positive().nullable(),
+  completed: z.boolean(),
+  remaining: z.number().int().nonnegative().nullable(),
+}).strict().superRefine((metric, context) => {
+  if (metric.target === null && metric.remaining !== null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['remaining'],
+      message: 'remaining must be null when target is null',
+    });
+  }
+  if (metric.target !== null && metric.remaining === null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['remaining'],
+      message: 'remaining is required when target is set',
+    });
+  }
+  if (metric.target === null && metric.completed) {
+    context.addIssue({
+      code: 'custom',
+      path: ['completed'],
+      message: 'completed must be false when target is null',
+    });
+  }
+});
+export type LearningGoalMetricProgressV1 = z.infer<typeof LearningGoalMetricProgressV1Schema>;
+
+export const LearningTodayGoalProgressV1Schema = z.object({
+  date: LearningDateV1Schema,
+  attempts: z.number().int().nonnegative(),
+  gradedAttempts: z.number().int().nonnegative(),
+  correctAttempts: z.number().int().nonnegative(),
+  accuracy: AccuracyV1Schema,
+  dailyAttempts: LearningGoalMetricProgressV1Schema,
+}).strict().superRefine((progress, context) => {
+  if (progress.gradedAttempts > progress.attempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['gradedAttempts'],
+      message: 'gradedAttempts cannot exceed attempts',
+    });
+  }
+  if (progress.correctAttempts > progress.gradedAttempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['correctAttempts'],
+      message: 'correctAttempts cannot exceed gradedAttempts',
+    });
+  }
+});
+export type LearningTodayGoalProgressV1 = z.infer<typeof LearningTodayGoalProgressV1Schema>;
+
+export const LearningWeekGoalProgressV1Schema = z.object({
+  fromDate: LearningDateV1Schema,
+  toDate: LearningDateV1Schema,
+  activeDays: z.number().int().min(0).max(7),
+  attempts: z.number().int().nonnegative(),
+  gradedAttempts: z.number().int().nonnegative(),
+  correctAttempts: z.number().int().nonnegative(),
+  accuracy: AccuracyV1Schema,
+  weeklyActiveDays: LearningGoalMetricProgressV1Schema,
+}).strict().superRefine((progress, context) => {
+  if (progress.gradedAttempts > progress.attempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['gradedAttempts'],
+      message: 'gradedAttempts cannot exceed attempts',
+    });
+  }
+  if (progress.correctAttempts > progress.gradedAttempts) {
+    context.addIssue({
+      code: 'custom',
+      path: ['correctAttempts'],
+      message: 'correctAttempts cannot exceed gradedAttempts',
+    });
+  }
+});
+export type LearningWeekGoalProgressV1 = z.infer<typeof LearningWeekGoalProgressV1Schema>;
+
+export const LearningWrongbookGoalProgressV1Schema = z.object({
+  total: z.number().int().nonnegative(),
+  mastered: z.number().int().nonnegative(),
+  pending: z.number().int().nonnegative(),
+  reviewedToday: z.number().int().nonnegative(),
+  wrongQuestionsReview: LearningGoalMetricProgressV1Schema,
+}).strict().superRefine((progress, context) => {
+  if (progress.mastered > progress.total) {
+    context.addIssue({
+      code: 'custom',
+      path: ['mastered'],
+      message: 'mastered cannot exceed total',
+    });
+  }
+  if (progress.pending > progress.total) {
+    context.addIssue({
+      code: 'custom',
+      path: ['pending'],
+      message: 'pending cannot exceed total',
+    });
+  }
+});
+export type LearningWrongbookGoalProgressV1 = z.infer<typeof LearningWrongbookGoalProgressV1Schema>;
+
+export const LearningGoalsProgressV1Schema = z.object({
+  today: LearningTodayGoalProgressV1Schema,
+  week: LearningWeekGoalProgressV1Schema,
+  wrongbook: LearningWrongbookGoalProgressV1Schema,
+}).strict();
+export type LearningGoalsProgressV1 = z.infer<typeof LearningGoalsProgressV1Schema>;
+
+export const LearningFeedbackSignalTypeV1Schema = z.enum([
+  'daily_attempts_goal',
+  'weekly_active_days_goal',
+  'wrongbook_review_goal',
+  'wrongbook_review_needed',
+  'accuracy_attention',
+]);
+export type LearningFeedbackSignalTypeV1 = z.infer<typeof LearningFeedbackSignalTypeV1Schema>;
+
+export const LearningFeedbackSignalSeverityV1Schema = z.enum(['success', 'info', 'warning']);
+export type LearningFeedbackSignalSeverityV1 = z.infer<typeof LearningFeedbackSignalSeverityV1Schema>;
+
+export const LearningFeedbackSignalActionV1Schema = z.enum([
+  'start_practice',
+  'review_wrongbook',
+  'view_trends',
+]);
+export type LearningFeedbackSignalActionV1 = z.infer<typeof LearningFeedbackSignalActionV1Schema>;
+
+export const LearningFeedbackSignalV1Schema = z.object({
+  type: LearningFeedbackSignalTypeV1Schema,
+  severity: LearningFeedbackSignalSeverityV1Schema,
+  title: z.string().min(1),
+  message: z.string().min(1),
+  action: LearningFeedbackSignalActionV1Schema.nullable(),
+}).strict();
+export type LearningFeedbackSignalV1 = z.infer<typeof LearningFeedbackSignalV1Schema>;
+
+export const LearningGoalsResponseV1Schema = z.object({
+  generatedAt: IsoTimestampV1Schema,
+  goals: LearningGoalSettingsV1Schema,
+  progress: LearningGoalsProgressV1Schema,
+  feedback: z.array(LearningFeedbackSignalV1Schema),
+}).strict();
+export type LearningGoalsResponseV1 = z.infer<typeof LearningGoalsResponseV1Schema>;
+
+export const UpdateLearningGoalsRequestV1Schema = z.object({
+  dailyAttemptsTarget: NullableDailyAttemptsTargetV1Schema.optional(),
+  weeklyActiveDaysTarget: NullableWeeklyActiveDaysTargetV1Schema.optional(),
+  wrongQuestionsReviewTarget: NullableWrongQuestionsReviewTargetV1Schema.optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, {
+  message: 'At least one learning goal change is required',
+});
+export type UpdateLearningGoalsRequestV1 = z.infer<typeof UpdateLearningGoalsRequestV1Schema>;

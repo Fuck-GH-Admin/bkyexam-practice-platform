@@ -35,7 +35,9 @@ import {
   GetLearningDashboardRequestV1Schema,
   GetLearningTrendsRequestV1Schema,
   LearningDashboardResponseV1Schema,
+  LearningGoalsResponseV1Schema,
   LearningTrendsResponseV1Schema,
+  UpdateLearningGoalsRequestV1Schema,
   CreatePracticeSessionRequestV1Schema,
   ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
@@ -194,7 +196,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
   it('parses admin system status contracts', () => {
     const status = AdminSystemStatusResponseV1Schema.parse({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-        database: { ok: true, migrationCount: 7, currentMigration: '0007_question_quality_flags.sql' },
+        database: { ok: true, migrationCount: 8, currentMigration: '0008_student_learning_goals.sql' },
       corpus: {
         classifications: 2941,
         questions: 89922,
@@ -219,7 +221,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
       },
     });
 
-    expect(status.database.currentMigration).toBe('0007_question_quality_flags.sql');
+    expect(status.database.currentMigration).toBe('0008_student_learning_goals.sql');
     expect(() => AdminSystemStatusResponseV1Schema.parse({
       ...status,
       corpus: { ...status.corpus, questions: -1 },
@@ -663,6 +665,84 @@ describe('v1 auth/catalog/error/health contracts', () => {
       summary: { ...trends.summary, longestStreakDays: 6 },
     })).toThrow('longestStreakDays cannot exceed activeDays');
     expect(() => GetLearningTrendsRequestV1Schema.parse({ days: '91' })).toThrow();
+  });
+
+  it('parses learning goals contracts and feedback boundaries', () => {
+    expect(UpdateLearningGoalsRequestV1Schema.parse({
+      dailyAttemptsTarget: 30,
+      weeklyActiveDaysTarget: 5,
+      wrongQuestionsReviewTarget: null,
+    })).toEqual({
+      dailyAttemptsTarget: 30,
+      weeklyActiveDaysTarget: 5,
+      wrongQuestionsReviewTarget: null,
+    });
+
+    const goals = LearningGoalsResponseV1Schema.parse({
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      goals: {
+        dailyAttemptsTarget: 3,
+        weeklyActiveDaysTarget: 2,
+        wrongQuestionsReviewTarget: 1,
+        source: 'student',
+        updatedAt: '2026-07-14T09:55:00.000Z',
+      },
+      progress: {
+        today: {
+          date: '2026-07-14',
+          attempts: 3,
+          gradedAttempts: 3,
+          correctAttempts: 2,
+          accuracy: 0.6667,
+          dailyAttempts: { current: 3, target: 3, completed: true, remaining: 0 },
+        },
+        week: {
+          fromDate: '2026-07-08',
+          toDate: '2026-07-14',
+          activeDays: 2,
+          attempts: 5,
+          gradedAttempts: 5,
+          correctAttempts: 4,
+          accuracy: 0.8,
+          weeklyActiveDays: { current: 2, target: 2, completed: true, remaining: 0 },
+        },
+        wrongbook: {
+          total: 2,
+          mastered: 1,
+          pending: 1,
+          reviewedToday: 1,
+          wrongQuestionsReview: { current: 1, target: 1, completed: true, remaining: 0 },
+        },
+      },
+      feedback: [{
+        type: 'daily_attempts_goal',
+        severity: 'success',
+        title: 'Daily practice goal reached',
+        message: 'Completed 3/3 attempts today.',
+        action: 'view_trends',
+      }],
+    });
+
+    expect(goals.progress.today.dailyAttempts.completed).toBe(true);
+    expect(() => LearningGoalsResponseV1Schema.parse({
+      ...goals,
+      progress: {
+        ...goals.progress,
+        today: { ...goals.progress.today, correctAttempts: 4 },
+      },
+    })).toThrow('correctAttempts cannot exceed gradedAttempts');
+    expect(() => LearningGoalsResponseV1Schema.parse({
+      ...goals,
+      progress: {
+        ...goals.progress,
+        today: {
+          ...goals.progress.today,
+          dailyAttempts: { current: 3, target: null, completed: true, remaining: 0 },
+        },
+      },
+    })).toThrow('remaining must be null when target is null');
+    expect(() => UpdateLearningGoalsRequestV1Schema.parse({ dailyAttemptsTarget: 0 })).toThrow();
+    expect(() => UpdateLearningGoalsRequestV1Schema.parse({})).toThrow('At least one learning goal change is required');
   });
 });
 

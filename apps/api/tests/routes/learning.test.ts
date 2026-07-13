@@ -83,6 +83,12 @@ describe('learning dashboard routes', () => {
       async getTrends() {
         throw new Error('not used by dashboard route test');
       },
+      async getGoals() {
+        throw new Error('not used by dashboard route test');
+      },
+      async updateGoals() {
+        throw new Error('not used by dashboard route test');
+      },
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -205,6 +211,12 @@ describe('learning dashboard routes', () => {
           },
         };
       },
+      async getGoals() {
+        throw new Error('not used by trends route test');
+      },
+      async updateGoals() {
+        throw new Error('not used by trends route test');
+      },
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -241,6 +253,78 @@ describe('learning dashboard routes', () => {
     });
     expect(response.json().daily).toHaveLength(7);
     expect(requests).toEqual([{ studentId, days: 7 }]);
+  });
+
+  it('returns and updates typed learning goals with feedback signals', async () => {
+    const requests: Array<{ kind: 'get' | 'update'; studentId: string; dailyAttemptsTarget?: number | null }> = [];
+    const repository: LearningDashboardRepository = {
+      async getDashboard() {
+        throw new Error('not used by goals route test');
+      },
+      async getTrends() {
+        throw new Error('not used by goals route test');
+      },
+      async getGoals(input) {
+        requests.push({ kind: 'get', studentId: input.studentId });
+        return sampleGoalsResponse('default');
+      },
+      async updateGoals(input) {
+        requests.push({
+          kind: 'update',
+          studentId: input.studentId,
+          dailyAttemptsTarget: input.goals.dailyAttemptsTarget,
+        });
+        return sampleGoalsResponse('student', input.goals.dailyAttemptsTarget ?? 3);
+      },
+    };
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: repository,
+    });
+
+    const readResponse = await app.inject({
+      method: 'GET',
+      url: '/api/learning/goals',
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(readResponse.statusCode).toBe(200);
+    expect(readResponse.json()).toMatchObject({
+      goals: { source: 'default', dailyAttemptsTarget: 3 },
+      progress: {
+        today: {
+          attempts: 2,
+          dailyAttempts: { current: 2, target: 3, completed: false, remaining: 1 },
+        },
+        wrongbook: {
+          pending: 1,
+          wrongQuestionsReview: { current: 0, target: 1, completed: false, remaining: 1 },
+        },
+      },
+      feedback: expect.arrayContaining([
+        expect.objectContaining({ type: 'wrongbook_review_needed', severity: 'warning' }),
+      ]),
+    });
+
+    const updateResponse = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/goals',
+      headers: { cookie: 'bky_session=token' },
+      payload: { dailyAttemptsTarget: 2 },
+    });
+    expect(updateResponse.statusCode).toBe(200);
+    expect(updateResponse.json()).toMatchObject({
+      goals: { source: 'student', dailyAttemptsTarget: 2 },
+      progress: {
+        today: {
+          attempts: 2,
+          dailyAttempts: { current: 2, target: 2, completed: true, remaining: 0 },
+        },
+      },
+    });
+    expect(requests).toEqual([
+      { kind: 'get', studentId },
+      { kind: 'update', studentId, dailyAttemptsTarget: 2 },
+    ]);
   });
 
   it('rejects invalid query and fails closed on invalid repository payloads', async () => {
@@ -332,4 +416,104 @@ describe('learning dashboard routes', () => {
     });
     expect(invalidPayload.statusCode).toBe(500);
   });
+
+  it('rejects invalid goals payloads and fails closed on invalid goals responses', async () => {
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: {
+        async getDashboard() {
+          throw new Error('not used by goals validation test');
+        },
+        async getTrends() {
+          throw new Error('not used by goals validation test');
+        },
+        async getGoals() {
+          return {
+            ...sampleGoalsResponse('student'),
+            progress: {
+              ...sampleGoalsResponse('student').progress,
+              today: {
+                ...sampleGoalsResponse('student').progress.today,
+                dailyAttempts: { current: 2, target: null, completed: true, remaining: 0 },
+              },
+            },
+          };
+        },
+        async updateGoals() {
+          return sampleGoalsResponse('student');
+        },
+      } as LearningDashboardRepository,
+    });
+
+    const invalidRequest = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/goals',
+      headers: { cookie: 'bky_session=token' },
+      payload: { weeklyActiveDaysTarget: 8 },
+    });
+    expect(invalidRequest.statusCode).toBe(400);
+
+    const invalidResponse = await app.inject({
+      method: 'GET',
+      url: '/api/learning/goals',
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(invalidResponse.statusCode).toBe(500);
+  });
 });
+
+function sampleGoalsResponse(source: 'default' | 'student', dailyAttemptsTarget = 3) {
+  const dailyCompleted = 2 >= dailyAttemptsTarget;
+
+  return {
+    generatedAt: '2026-07-14T10:00:00.000Z',
+    goals: {
+      dailyAttemptsTarget,
+      weeklyActiveDaysTarget: 2,
+      wrongQuestionsReviewTarget: 1,
+      source,
+      updatedAt: source === 'student' ? '2026-07-14T09:55:00.000Z' : null,
+    },
+    progress: {
+      today: {
+        date: '2026-07-14',
+        attempts: 2,
+        gradedAttempts: 2,
+        correctAttempts: 1,
+        accuracy: 0.5,
+        dailyAttempts: {
+          current: 2,
+          target: dailyAttemptsTarget,
+          completed: dailyCompleted,
+          remaining: Math.max(dailyAttemptsTarget - 2, 0),
+        },
+      },
+      week: {
+        fromDate: '2026-07-08',
+        toDate: '2026-07-14',
+        activeDays: 1,
+        attempts: 2,
+        gradedAttempts: 2,
+        correctAttempts: 1,
+        accuracy: 0.5,
+        weeklyActiveDays: { current: 1, target: 2, completed: false, remaining: 1 },
+      },
+      wrongbook: {
+        total: 1,
+        mastered: 0,
+        pending: 1,
+        reviewedToday: 0,
+        wrongQuestionsReview: { current: 0, target: 1, completed: false, remaining: 1 },
+      },
+    },
+    feedback: [
+      {
+        type: dailyCompleted ? 'daily_attempts_goal' : 'wrongbook_review_needed',
+        severity: dailyCompleted ? 'success' : 'warning',
+        title: dailyCompleted ? 'Daily practice goal reached' : 'Wrongbook review recommended',
+        message: dailyCompleted ? 'Completed 2/2 attempts today.' : '1 pending wrong question remains.',
+        action: dailyCompleted ? 'view_trends' : 'review_wrongbook',
+      },
+    ],
+  };
+}

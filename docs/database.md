@@ -300,6 +300,8 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 
 `apps/api/src/db/migrations/0007_question_quality_flags.sql` adds Admin Question Review flags. It creates `question_quality_flags`, quality filter indexes, and the excluded-open index used by new practice session selection.
 
+`apps/api/src/db/migrations/0008_student_learning_goals.sql` adds per-student learning goal settings. It creates `student_learning_goals` with bounded nullable targets for daily attempts, weekly active days, and wrong-question review goals.
+
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
 Run API migrations with:
@@ -317,7 +319,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all seven migrations, including Admin foundation, Import Jobs, and Question Review flags, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all eight migrations, including Admin foundation, Import Jobs, Question Review flags, and Student Learning Goals, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

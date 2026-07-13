@@ -97,7 +97,7 @@ questionbank/*.txt
 | Catalog | 学生可见题库、分类与映射 | `repositories/bankRepository.ts`, `routes/banks.ts`, `mapping/` |
 | Practice | 会话、题目锁定、草稿、进度、存疑、提交、判分 | `practice/`, `routes/practice.ts` |
 | Wrongbook | 错题列表、详情、掌握状态、再练编排 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
-| Learning | 学习概览、趋势、streak、最近题库、题型正确率、错题掌握摘要 | `learning/`, `routes/learning.ts` |
+| Learning | 学习概览、趋势、streak、学习目标、错题复习反馈、最近题库、题型正确率、错题掌握摘要 | `learning/`, `routes/learning.ts` |
 | Import | 源文件解析、规范化、批量导入 | `import/` |
 | Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
 
@@ -166,9 +166,11 @@ questionbank/*.txt
 
 - `GET /api/learning/dashboard` 从现有事实表聚合，不新增派生统计表。
 - `GET /api/learning/trends?days=7..90` 按 UTC 日期桶返回每日练习/正确率/错题触达趋势和 activity streak。
+- `GET/PUT /api/learning/goals` 使用 `student_learning_goals` 保存学生目标，并从现有事实表计算今日/近 7 日进度和错题复习反馈信号。
 - 来源表包括 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings`。
 - Dashboard 返回 summary、recentBanks、questionTypes 与 wrongbook 四组数据。
 - Trends 返回 fromDate/toDate/daily/summary；`currentStreakDays` 从窗口最后一天倒推连续 active 天数。
+- Goals 返回 daily attempts、weekly active days、wrongbook review 三类目标；目标可被设为 `null` 关闭。
 - `accuracy` 只用已判定 attempt 计算；无 graded attempt 时为 `null`。
 - 这些接口是学生档案/首页统计的后端 contract，暂不引入推荐算法或持久化日报表。
 
