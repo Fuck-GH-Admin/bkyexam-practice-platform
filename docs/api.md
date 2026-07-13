@@ -506,9 +506,9 @@ Rules：
 
 ## Admin Import Jobs
 
-Admin Import Jobs 是 B5.5/B5.8 已实现的导入任务后端第一版。当前只启用 `mode=dry_run`：它会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；B5.8 增加错误报告读取接口。真正写入数据库的 `mode=import` 暂时返回 `422`。
+Admin Import Jobs 是 B5.5/B5.8/B5.9 已实现的导入任务后端。`mode=dry_run` 会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode。
 
-运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。
+运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。`mode=import` 只有在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时才启用；否则返回 `422`。即使开启 true import，`resetBeforeImport=true` 仍被显式禁止并返回 `422`，当前只允许幂等 upsert 导入。
 
 ### `GET /api/admin/import-jobs`
 
@@ -584,8 +584,10 @@ Rules：
 - 同一 `kind` 同时只能有一个 `running` job；冲突返回 `409`。
 - `sourceDir` 必须在 `ADMIN_IMPORT_ALLOWED_ROOTS` 内；否则返回 `403`。
 - `resetBeforeImport=true` 必须由 `super_admin` 执行；否则返回 `403`。
-- `mode=import` 暂未启用；返回 `422`。
-- 成功创建后写 `import_job.create` audit log；dry-run 过程中解析失败会把 job 标为 `failed` 并返回失败摘要。
+- `mode=import` 默认关闭；只有 `ADMIN_IMPORT_ENABLE_WRITE=true` 且服务端连接 PostgreSQL 时才写入。
+- `mode=import` 复用导入器事务，写入 classifications/questions/question_options/bank_mappings，并保持幂等 upsert；`generateMappings=false` 时跳过 bank_mappings 生成。
+- `mode=import` 中 `resetBeforeImport=true` 仍返回 `422`：`resetBeforeImport is not enabled for import mode yet`。
+- 成功创建后写 `import_job.create` audit log；dry-run 或 import 过程中解析/写入失败会把 job 标为 `failed` 并返回失败摘要，写入失败由导入事务回滚。
 
 ### `GET /api/admin/import-jobs/:jobId`
 
@@ -629,7 +631,7 @@ Errors：
 - `403`：缺少 `import_job:read/create`、sourceDir 不在 allowlist，或非 super_admin 使用 `resetBeforeImport`。
 - `404`：job 不存在。
 - `409`：同类 job 已在运行。
-- `422`：请求 `mode=import`。
+- `422`：请求 `mode=import` 但 `ADMIN_IMPORT_ENABLE_WRITE` 未开启，或 true import 请求 `resetBeforeImport=true`。
 
 ## Admin Question Review
 
@@ -1385,9 +1387,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；真正写入 import mode 尚未启用。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；真正写入 import mode 和正式 Admin UI 尚未实现。
+- Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；正式 Admin UI 尚未实现。

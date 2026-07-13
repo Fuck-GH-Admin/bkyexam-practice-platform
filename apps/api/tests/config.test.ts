@@ -21,6 +21,7 @@ describe('loadConfig', () => {
     expect(config.COOKIE_SECURE).toBe(false);
     expect(config.SESSION_TTL_DAYS).toBe(30);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(8);
+    expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(false);
   });
 
   it('loads cookie session settings from environment', () => {
@@ -29,11 +30,13 @@ describe('loadConfig', () => {
       COOKIE_SECURE: 'true',
       SESSION_TTL_DAYS: '14',
       ADMIN_SESSION_TTL_HOURS: '6',
+      ADMIN_IMPORT_ENABLE_WRITE: 'true',
     });
 
     expect(config.COOKIE_SECRET).toBe('production-secret');
     expect(config.COOKIE_SECURE).toBe(true);
     expect(config.SESSION_TTL_DAYS).toBe(14);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(6);
+    expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(true);
   });
 });

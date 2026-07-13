@@ -12,6 +12,7 @@ import type { BankMapping } from '../mapping/bankMapping.js';
 
 export interface ImportQuestionBankOptions {
   batchSize: number;
+  generateMappings?: boolean;
 }
 
 export interface ImportQuestionBankCounts {
@@ -37,7 +38,9 @@ export async function importQuestionBank(
   options: ImportQuestionBankOptions,
 ): Promise<ImportQuestionBankCounts> {
   const batchSize = Math.max(1, Math.floor(options.batchSize));
-  const bankMappings = generateBankMappings(data.classifications, data.questions);
+  const bankMappings = options.generateMappings === false
+    ? []
+    : generateBankMappings(data.classifications, data.questions);
   const questionIds = new Set(data.questions.map((question) => question.id));
   const importableOptions = data.options.filter((option) => questionIds.has(option.questionId));
 

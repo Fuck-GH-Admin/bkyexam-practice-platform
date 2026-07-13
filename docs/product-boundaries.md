@@ -186,7 +186,7 @@ mastered -> active  # 再次答错时自动恢复
 4. 下载或查看错误摘要。
 5. 完成后运行数据健康检查。
 
-当前导入器是 CLI 同步任务，还没有 job table、状态 API 和管理 UI。
+当前已有 job table、dry-run/error report API，以及受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import 写入 gate；仍没有正式管理 UI、reset 导入、异步队列、取消/重试和错误文件级下载。
 
 ### Question Review
 
@@ -309,7 +309,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report、Admin Question Review、Admin Audit Log、通用 error 已迁入 shared v1；真正写入 import mode 尚未启用。
+- Auth、Catalog、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate、Admin Question Review、Admin Audit Log、通用 error 已迁入 shared v1；reset import、异步队列和正式 Admin UI 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision

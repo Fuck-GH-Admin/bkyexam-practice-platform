@@ -19,6 +19,7 @@ import {
   createAdminImportJobService,
   createMemoryAdminImportJobRepository,
   type AdminImportJobRepository,
+  type AdminImportJobRunner,
   type AdminImportJobService,
 } from '../admin/importJobs.js';
 import { hasAdminPermission } from '../admin/rbac.js';
@@ -37,6 +38,8 @@ interface AdminImportJobRoutesOptions {
   sessionService?: AdminSessionService;
   auditService?: AuditService;
   allowedRoots?: readonly string[];
+  importModeEnabled?: boolean;
+  importRunner?: AdminImportJobRunner;
 }
 
 function errorResponse(error: string) {
@@ -62,6 +65,8 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
   const repository = options.repository ?? createMemoryAdminImportJobRepository();
   const service = options.service ?? createAdminImportJobService(repository, {
     allowedRoots: options.allowedRoots ?? [],
+    enableImportMode: options.importModeEnabled ?? false,
+    importRun: options.importRunner,
   });
   const sessionService = options.sessionService
     ?? createAdminSessionService(createMemoryAdminSessionRepository(), { ttlHours: 8 });
@@ -162,6 +167,9 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       }
       if (result.status === 'import_mode_not_enabled') {
         return reply.status(422).send(errorResponse('Import mode is not enabled yet'));
+      }
+      if (result.status === 'reset_import_not_enabled') {
+        return reply.status(422).send(errorResponse('resetBeforeImport is not enabled for import mode yet'));
       }
 
       await auditService.record({

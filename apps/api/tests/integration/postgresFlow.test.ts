@@ -5,7 +5,7 @@ import { createAuditService, createPgAuditLogRepository } from '../../src/admin/
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
 import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
 import { createAdminBootstrapService, createPgAdminBootstrapRepository } from '../../src/admin/bootstrap.js';
-import { createPgAdminImportJobRepository } from '../../src/admin/importJobs.js';
+import { createPgAdminImportJobRepository, createPgQuestionBankImportRunner } from '../../src/admin/importJobs.js';
 import { createPgAdminQuestionReviewRepository } from '../../src/admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
 import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
@@ -25,6 +25,10 @@ import { fixtureIds, resetAndSeedPostgresFixture } from './postgresFixture.js';
 
 const migrationsDir = fileURLToPath(new URL('../../src/db/migrations/', import.meta.url));
 const importFixtureDir = resolve(fileURLToPath(new URL('../import/fixtures/compact-qtype/', import.meta.url)));
+const importUuidFixtureDir = resolve(fileURLToPath(new URL('../import/fixtures/compact-uuid-qtype/', import.meta.url)));
+const importBadFixtureDir = resolve(
+  fileURLToPath(new URL('../import/fixtures/bad-missing-classification/', import.meta.url)),
+);
 
 describe('PostgreSQL-backed API integration', () => {
   const databaseUrl = requireDedicatedTestDatabaseUrl(process.env.TEST_DATABASE_URL);
@@ -35,7 +39,9 @@ describe('PostgreSQL-backed API integration', () => {
     adminAuthRepository: createPgAdminAuthRepository(pool),
     adminBankMappingRepository: createPgAdminBankMappingRepository(pool),
     adminImportJobRepository: createPgAdminImportJobRepository(pool),
-    adminImportAllowedRoots: [importFixtureDir],
+    adminImportAllowedRoots: [importFixtureDir, importUuidFixtureDir, importBadFixtureDir],
+    adminImportModeEnabled: true,
+    adminImportRunner: createPgQuestionBankImportRunner(pool),
     adminQuestionReviewRepository: createPgAdminQuestionReviewRepository(pool),
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     adminUserRepository: createPgAdminUserRepository(pool),
@@ -988,6 +994,160 @@ describe('PostgreSQL-backed API integration', () => {
       sessions: [],
       page: { limit: 20, offset: 0, hasMore: false },
     });
+
+    const importedCorpus = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: adminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: importUuidFixtureDir,
+        options: { batchSize: 1, resetBeforeImport: false, generateMappings: true },
+      },
+    });
+    expect(importedCorpus.statusCode).toBe(200);
+    expect(importedCorpus.json()).toMatchObject({
+      job: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        status: 'succeeded',
+        sourceDir: importUuidFixtureDir,
+        progress: { phase: 'done', current: 2, total: 2 },
+        summary: {
+          classifications: 1,
+          questions: 2,
+          rawOptions: 1,
+          options: 1,
+          skippedOptions: 0,
+          bankMappings: 1,
+          questionTypes: { single_choice: 1, yes_no: 1 },
+        },
+      },
+    });
+
+    const importCorpusState = await pool.query<{
+      class_count: string;
+      question_count: string;
+      option_count: string;
+      mapping_count: string;
+    }>(`
+      SELECT
+        (SELECT COUNT(*) FROM classifications WHERE id = '11000000-0000-4000-8000-000000000001') AS class_count,
+        (
+          SELECT COUNT(*)
+          FROM questions
+          WHERE id IN (
+            '12000000-0000-4000-8000-000000000001',
+            '12000000-0000-4000-8000-000000000002'
+          )
+        ) AS question_count,
+        (SELECT COUNT(*) FROM question_options WHERE id = '13000000-0000-4000-8000-000000000001') AS option_count,
+        (SELECT COUNT(*) FROM bank_mappings WHERE bank_id = '11000000-0000-4000-8000-000000000001') AS mapping_count
+    `);
+    expect(importCorpusState.rows[0]).toEqual({
+      class_count: '1',
+      question_count: '2',
+      option_count: '1',
+      mapping_count: '1',
+    });
+
+    const repeatedImport = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: adminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: importUuidFixtureDir,
+        options: { batchSize: 1, resetBeforeImport: false, generateMappings: true },
+      },
+    });
+    expect(repeatedImport.statusCode).toBe(200);
+    expect(repeatedImport.json()).toMatchObject({
+      job: {
+        mode: 'import',
+        status: 'succeeded',
+        summary: { classifications: 1, questions: 2, options: 1, bankMappings: 1 },
+      },
+    });
+
+    const repeatedImportCorpusState = await pool.query<{
+      class_count: string;
+      question_count: string;
+      option_count: string;
+      mapping_count: string;
+    }>(`
+      SELECT
+        (SELECT COUNT(*) FROM classifications WHERE id = '11000000-0000-4000-8000-000000000001') AS class_count,
+        (
+          SELECT COUNT(*)
+          FROM questions
+          WHERE id IN (
+            '12000000-0000-4000-8000-000000000001',
+            '12000000-0000-4000-8000-000000000002'
+          )
+        ) AS question_count,
+        (SELECT COUNT(*) FROM question_options WHERE id = '13000000-0000-4000-8000-000000000001') AS option_count,
+        (SELECT COUNT(*) FROM bank_mappings WHERE bank_id = '11000000-0000-4000-8000-000000000001') AS mapping_count
+    `);
+    expect(repeatedImportCorpusState.rows[0]).toEqual(importCorpusState.rows[0]);
+
+    const failedImport = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: adminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: importBadFixtureDir,
+        options: { batchSize: 1, resetBeforeImport: false, generateMappings: true },
+      },
+    });
+    expect(failedImport.statusCode).toBe(200);
+    expect(failedImport.json()).toMatchObject({
+      job: {
+        mode: 'import',
+        status: 'failed',
+        progress: { phase: 'failed', current: 0, total: 0 },
+        errorSummary: [expect.objectContaining({ message: expect.any(String) })],
+      },
+    });
+    const failedImportJobId = failedImport.json().job.id as string;
+    expect(failedImport.json().job.errorSummary[0].message).toContain('questions_classification_id_fkey');
+
+    const rollbackState = await pool.query<{ rolled_back_class_count: string }>(`
+      SELECT COUNT(*) AS rolled_back_class_count
+      FROM classifications
+      WHERE id = '11000000-0000-4000-8000-000000000099'
+    `);
+    expect(rollbackState.rows[0]).toEqual({ rolled_back_class_count: '0' });
+
+    const failedImportErrors = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${failedImportJobId}/errors`,
+      headers: { cookie: adminCookie },
+    });
+    expect(failedImportErrors.statusCode).toBe(200);
+    expect(failedImportErrors.json()).toMatchObject({
+      jobId: failedImportJobId,
+      status: 'failed',
+      errorSummary: [expect.objectContaining({ message: expect.any(String) })],
+    });
+
+    const importResetGate = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: superAdminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: importUuidFixtureDir,
+        options: { batchSize: 1, resetBeforeImport: true, generateMappings: true },
+      },
+    });
+    expect(importResetGate.statusCode).toBe(422);
+    expect(importResetGate.json()).toEqual({ error: 'resetBeforeImport is not enabled for import mode yet' });
 
     const logout = await app.inject({
       method: 'POST',

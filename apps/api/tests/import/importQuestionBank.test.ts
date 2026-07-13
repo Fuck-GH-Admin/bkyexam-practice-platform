@@ -93,6 +93,19 @@ describe('importQuestionBank', () => {
     expect(optionInsert?.params).not.toContain('Orphan Option');
   });
 
+  it('skips bank mapping writes when generateMappings is false', async () => {
+    const client = new FakeClient();
+
+    const result = await importQuestionBank(client, questionBankData(), {
+      batchSize: 10,
+      generateMappings: false,
+    });
+
+    expect(result).toMatchObject({ bankMappings: 0 });
+    expect(client.queries.some((query) => query.sql.includes('INSERT INTO bank_mappings'))).toBe(false);
+    expect(client.queries.at(-1)?.sql).toBe('COMMIT');
+  });
+
   it('uses parameterized upserts for imported records', async () => {
     const client = new FakeClient();
 

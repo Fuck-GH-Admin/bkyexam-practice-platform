@@ -11,7 +11,7 @@
 - **学生客观题 MVP：可内部试用。**
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
-- **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
+- **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -19,8 +19,8 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 88%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练均可用；账户、统计、归档和部分 UX 未完成 |
-| 公开生产就绪度 | **约 58%** | 已补第一个管理员 bootstrap 和 Admin User manage API；仍缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
-| 完整产品愿景 | **约 67%** | 学生信息架构、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已落地，但分母仍包含管理前端、真正写入 import mode、全题型、运营与生产能力 |
+| 公开生产就绪度 | **约 59%** | 已补第一个管理员 bootstrap、Admin User manage API 和 gated true import；仍缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
+| 完整产品愿景 | **约 68%** | 学生信息架构、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -37,9 +37,9 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 21 |
-| `apps/api` | 50 | 339 |
+| `apps/api` | 50 | 347 |
 | `apps/web` | 2 | 31 |
-| **Total** | **54** | **391** |
+| **Total** | **54** | **399** |
 
 仓库内 Playwright smoke：
 
@@ -57,7 +57,7 @@ Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个
 | --- | ---: | ---: |
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
-该测试从空数据库执行七份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成学生登录、Admin Auth/RBAC/audit、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs 创建/list/detail/error-report/audit/status summary、Admin Question Review flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行七份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成学生登录、Admin Auth/RBAC/audit、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run 创建/list/detail/error-report/audit/status summary、true import mode 写入/幂等/失败回滚/reset gate、Admin Question Review flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
 
 全量题库慢速 smoke：
 
@@ -100,7 +100,7 @@ Practice/Wrongbook/Auth/Catalog/Admin/Error/Health v1 contract 已落到 `packag
 - `completedCount` 的 v1 语义固定为 `answered_or_graded_questions`。
 - 会话卡片/page contract 固定 `origin`、active/completed timestamp、answered/review counters 和分页边界。
 - 学生 catalog contract 固定 `visible=true` 和非负 `questionCount`。
-- Admin contract 固定 Auth/RBAC、Bank Mapping read/write、System Status、Import Job dry-run、Question Review 与 Audit Log read 的 request/response 边界。
+- Admin contract 固定 Auth/RBAC、Bank Mapping read/write、System Status、Import Job dry-run/error report/true import gate、Question Review 与 Audit Log read 的 request/response 边界。
 
 详细规则见 [contracts.md](contracts.md)。
 
@@ -279,7 +279,7 @@ PracticeSessionService
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
-| Admin console | 后端基础进行中，前端未实现 | 45% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*`、Admin User manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit | 真正写入 import mode、管理应用、工作流 UI |
+| Admin console | 后端基础进行中，前端未实现 | 48% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*`、Admin User manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit | 管理应用、工作流 UI、reset import/异步队列/取消重试 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
 | Operations | 可重复验证 | 70% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
 
@@ -288,7 +288,7 @@ PracticeSessionService
 ### P0 Before Public Production
 
 - 当前登录策略接近“用户名即身份”，不适合公开环境。
-- 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap，但仍缺真正写入 import mode 和正式运营流程。
+- 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap，但仍缺正式运营 UI、导入 reset/队列化和完整审核流程。
 - 没有备份/恢复演练、监控和告警。
 - 没有对正式域名部署进行本轮验收。
 

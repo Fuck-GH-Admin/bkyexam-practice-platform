@@ -11,7 +11,7 @@ import {
 import type { AdminUserRepository } from './admin/adminUsers.js';
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
-import type { AdminImportJobRepository } from './admin/importJobs.js';
+import type { AdminImportJobRepository, AdminImportJobRunner } from './admin/importJobs.js';
 import type { AdminQuestionReviewRepository } from './admin/questionReview.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
@@ -42,6 +42,8 @@ interface BuildAppOptions {
   adminBankMappingRepository?: AdminBankMappingRepository;
   adminImportJobRepository?: AdminImportJobRepository;
   adminImportAllowedRoots?: readonly string[];
+  adminImportModeEnabled?: boolean;
+  adminImportRunner?: AdminImportJobRunner;
   adminQuestionReviewRepository?: AdminQuestionReviewRepository;
   adminSystemStatusRepository?: AdminSystemStatusRepository;
   adminUserRepository?: AdminUserRepository;
@@ -116,6 +118,8 @@ export function buildApp(options: BuildAppOptions = {}) {
     sessionService: adminSessionService,
     auditService,
     allowedRoots: options.adminImportAllowedRoots,
+    importModeEnabled: options.adminImportModeEnabled ?? false,
+    importRunner: options.adminImportRunner,
   }));
   void app.register(createAdminQuestionReviewRoutes({
     repository: options.adminQuestionReviewRepository,

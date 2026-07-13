@@ -10,7 +10,8 @@ import type {
   CreateAdminImportJobRequestV1,
   ListAdminImportJobsRequestV1,
 } from '@bkyexam-practice/shared';
-import type { QueryClient } from '../db/client.js';
+import type { PgPool, QueryClient } from '../db/client.js';
+import { importQuestionBank } from '../import/importQuestionBank.js';
 import { loadQuestionBankData } from '../import/loadQuestionBankData.js';
 import { generateBankMappings } from '../mapping/generateBankMappings.js';
 
@@ -66,13 +67,21 @@ export interface AdminImportJobService {
     | { status: 'running_conflict' }
     | { status: 'source_dir_forbidden' }
     | { status: 'import_mode_not_enabled' }
+    | { status: 'reset_import_not_enabled' }
     | { status: 'reset_requires_super_admin' }
   >;
 }
 
+export type AdminImportJobRunner = (
+  sourceDir: string,
+  options: AdminImportJobOptionsV1,
+) => Promise<AdminImportJobSummaryV1>;
+
 export interface AdminImportJobServiceOptions {
   allowedRoots?: readonly string[];
-  dryRun?: (sourceDir: string, options: AdminImportJobOptionsV1) => Promise<AdminImportJobSummaryV1>;
+  dryRun?: AdminImportJobRunner;
+  importRun?: AdminImportJobRunner;
+  enableImportMode?: boolean;
 }
 
 interface QueryRows<T> {
@@ -193,6 +202,8 @@ export function createAdminImportJobService(
 ): AdminImportJobService {
   const allowedRoots = (options.allowedRoots ?? []).map((root) => resolve(root));
   const dryRun = options.dryRun ?? dryRunQuestionBankImport;
+  const importRun = options.importRun;
+  const enableImportMode = options.enableImportMode ?? false;
 
   return {
     listImportJobs(filters) {
@@ -204,12 +215,16 @@ export function createAdminImportJobService(
     },
 
     async createImportJob({ request, actor }) {
-      if (request.mode !== 'dry_run') {
+      if (request.mode === 'import' && (!enableImportMode || !importRun)) {
         return { status: 'import_mode_not_enabled' };
       }
 
       if (request.options.resetBeforeImport && !actor.roles.includes('super_admin')) {
         return { status: 'reset_requires_super_admin' };
+      }
+
+      if (request.mode === 'import' && request.options.resetBeforeImport) {
+        return { status: 'reset_import_not_enabled' };
       }
 
       const sourceDir = resolve(request.sourceDir);
@@ -229,7 +244,12 @@ export function createAdminImportJobService(
       }
 
       try {
-        const summary = await dryRun(sourceDir, request.options);
+        const runner = request.mode === 'dry_run' ? dryRun : importRun;
+        if (!runner) {
+          return { status: 'import_mode_not_enabled' };
+        }
+
+        const summary = await runner(sourceDir, request.options);
         const total = summary.questions ?? 0;
         const job = await repository.completeImportJob({
           jobId: created.job.id,
@@ -244,6 +264,41 @@ export function createAdminImportJobService(
         return { status: 'created', job };
       }
     },
+  };
+}
+
+export function createPgQuestionBankImportRunner(
+  pool: PgPool,
+  options: {
+    loadData?: typeof loadQuestionBankData;
+    importData?: typeof importQuestionBank;
+  } = {},
+): AdminImportJobRunner {
+  const loadData = options.loadData ?? loadQuestionBankData;
+  const importData = options.importData ?? importQuestionBank;
+
+  return async function runQuestionBankImport(sourceDir, importOptions) {
+    const data = await loadData(sourceDir);
+    const dbClient = await pool.connect();
+
+    try {
+      const counts = await importData(dbClient, data, {
+        batchSize: importOptions.batchSize,
+        generateMappings: importOptions.generateMappings,
+      });
+
+      return {
+        classifications: counts.classifications,
+        questions: counts.questions,
+        rawOptions: data.options.length,
+        options: counts.options,
+        skippedOptions: counts.skippedOptions,
+        bankMappings: counts.bankMappings,
+        questionTypes: data.summary.questionTypes,
+      };
+    } finally {
+      dbClient.release();
+    }
   };
 }
 
@@ -415,10 +470,12 @@ async function findPgImportJobById(client: QueryClient, jobId: string) {
 
 async function dryRunQuestionBankImport(
   sourceDir: string,
-  _options: AdminImportJobOptionsV1,
+  options: AdminImportJobOptionsV1,
 ): Promise<AdminImportJobSummaryV1> {
   const data = await loadQuestionBankData(sourceDir);
-  const bankMappings = generateBankMappings(data.classifications, data.questions);
+  const bankMappings = options.generateMappings === false
+    ? []
+    : generateBankMappings(data.classifications, data.questions);
   const questionIds = new Set(data.questions.map((question) => question.id));
   const importableOptions = data.options.filter((option) => questionIds.has(option.questionId));
 

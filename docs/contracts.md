@@ -50,7 +50,7 @@ PostgreSQL / memory repository
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
-| Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report schemas, Question Review list/update schemas, Audit Log list schemas |
+| Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
 | Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
@@ -183,5 +183,5 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report、Question Review 与 Audit Log read shared Zod schema/route 已实现；真正写入 import mode 仍未启用。
+- Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
 - Readiness/DB health 尚未定义。

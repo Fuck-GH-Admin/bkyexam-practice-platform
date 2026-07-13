@@ -5,6 +5,30 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.9 — 2026-07-14
+
+- [x] 新增 `ADMIN_IMPORT_ENABLE_WRITE`，默认关闭 true import 写入。
+- [x] API runtime 在 PostgreSQL 模式下注入真实 Question Bank import runner。
+- [x] `mode=import` 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 source allowlist 通过时执行。
+- [x] true import 复用事务导入，写入 classifications、questions、question_options、bank_mappings。
+- [x] `generateMappings=false` 时跳过 bank_mappings 写入。
+- [x] 重复 true import 保持 upsert 幂等。
+- [x] 失败 true import 记录 failed job/errorSummary，并回滚 corpus 写入。
+- [x] `resetBeforeImport=true` 在 import mode 中仍返回 `422`，不做清库重导。
+- [x] PostgreSQL integration 覆盖成功写入、幂等、失败回滚/error report 和 reset gate。
+- [x] 不创建正式 Admin 前端。
+
+## Completed Backend B5.8 — 2026-07-14
+
+- [x] 实现 Admin User manage API：list/detail/create/update。
+- [x] `admin_user:manage` 权限守卫，仅 `super_admin` 可用。
+- [x] 创建/修改密码只写入 hash，不在 response 暴露 password/passwordHash。
+- [x] 阻止禁用或移除最后一个 active `super_admin`。
+- [x] 写入 `admin_user.create` / `admin_user.update` audit log。
+- [x] 实现 `GET /api/admin/import-jobs/:jobId/errors`。
+- [x] PostgreSQL integration 覆盖 Admin User manage 与 Import Error Report。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B5.7 — 2026-07-14
 
 - [x] 新增 `npm run admin:bootstrap`。
@@ -45,7 +69,7 @@
 - [x] 复用 `import_job:read/create` 权限守卫，覆盖 `401/403`。
 - [x] 支持 `ADMIN_IMPORT_ALLOWED_ROOTS` source allowlist。
 - [x] 支持同类 `running` job lock，冲突返回 `409`。
-- [x] 先启用 `mode=dry_run`；`mode=import` 明确返回 `422`。
+- [x] 先启用 `mode=dry_run`；`mode=import` 在 B5.9 前明确返回 `422`。
 - [x] dry-run 写入 progress、summary、errorSummary。
 - [x] `resetBeforeImport=true` 需要 `super_admin`。
 - [x] 成功创建写 `import_job.create` audit log。
@@ -247,7 +271,8 @@
 - [x] 初始 `super_admin` bootstrap。
 - [x] Audit Log read API。
 - [x] Admin User 管理。
-- [ ] 真正执行写入的 import mode。
+- [x] 真正执行写入的 import mode（受 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护；reset 仍未启用）。
+- [ ] import reset、cancel/retry 和异步 worker/队列。
 
 ### Frontend
 

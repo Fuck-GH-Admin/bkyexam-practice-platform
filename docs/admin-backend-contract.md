@@ -2,13 +2,13 @@
 
 状态日期：**2026-07-14**
 阶段：**Phase B4 — Admin Backend Contract Design**
-状态：**设计完成；B5.1–B5.8 后端 API/migration 已部分落地，UI 未开始**
+状态：**设计完成；B5.1–B5.9 后端 API/migration 已落地，UI 未开始**
 
 本文定义 BKYExam 管理平台第一版后端 contract。它是下一阶段 **Phase B5 — Admin Backend MVP Implementation** 的实现依据。
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/import-jobs/:id/errors`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`GET/POST/PATCH /api/admin/users`、`npm run admin:bootstrap`、shared v1 Admin Auth/User/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。真正写入 import mode 与正式 Admin UI 仍按后续阶段实现。
+> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run/Error Report/True Import Gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/import-jobs/:id/errors`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`GET/POST/PATCH /api/admin/users`、`npm run admin:bootstrap`、shared v1 Admin Auth/User/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、`ADMIN_IMPORT_ENABLE_WRITE` 写入门、import rollback/idempotency fixture、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。正式 Admin UI 仍按后续阶段实现。
 
 ## 1. 目标与非目标
 
@@ -635,6 +635,9 @@ Rules：
 - 有 running job 时返回 `409`。
 - `sourceDir` 第一版只允许服务端 allowlist 路径，不能任意读文件系统。
 - `resetBeforeImport=true` 是高风险操作，只允许 `super_admin`。
+- 当前实现中 `mode=import` 还必须显式配置 `ADMIN_IMPORT_ENABLE_WRITE=true`。
+- 当前实现中 `resetBeforeImport=true` 在 `mode=import` 里仍禁止，即使 `super_admin` 也返回 `422`。
+- `mode=import` 成功时复用导入器事务和幂等 upsert；失败时记录 failed job/errorSummary，并回滚 corpus 写入。
 
 Audit action：
 
@@ -1250,6 +1253,21 @@ Rules：
 - PostgreSQL integration 覆盖真实 admin user create/update/list/detail/last-super-admin guard/audit 与 import error report。
 - `mode=import` 仍显式返回 `422`；真正写入启用条件进入后续阶段，不在本阶段偷偷打开。
 
+### B5.9 True Import Mode Gate
+
+状态：**已完成，2026-07-14。**
+
+交付：
+
+- 新增 `ADMIN_IMPORT_ENABLE_WRITE` 环境变量，默认关闭。
+- API runtime 在 `USE_DATABASE=true` 时注入 PostgreSQL import runner。
+- `mode=import` 只有在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 import runner 存在时执行；否则继续返回 `422`。
+- 真实 import 复用 `loadQuestionBankData` 与 `importQuestionBank`，在单事务中 upsert classifications、questions、question_options 和 bank_mappings。
+- `generateMappings=false` 跳过 bank_mappings 写入。
+- `resetBeforeImport=true` 在 import mode 中继续禁止，返回 `422 resetBeforeImport is not enabled for import mode yet`。
+- 失败 import 标记 job 为 `failed`，写入 `errorSummary`，并验证 corpus 写入回滚。
+- PostgreSQL integration 覆盖 enabled import 成功、重复 import 幂等、失败回滚/error report、reset gate。
+
 ## 13. Acceptance Criteria For B5
 
 B5 完成时必须满足：
@@ -1261,6 +1279,7 @@ B5 完成时必须满足：
 - 管理员可以查看题库 mapping。
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
+- 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行非 reset 的 true import，并得到幂等/回滚保护。
 - 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
 - 管理员可以通过 CLI 创建第一个 `super_admin`。
 - `super_admin` 可以查询 audit logs。
@@ -1272,23 +1291,25 @@ B5 完成时必须满足：
 
 ## 14. Open Questions For Next Stage
 
-B5.1 到 B5.7 已实现；进入正式 Admin UI 前仍需要确认：
+B5.1 到 B5.9 已实现；进入正式 Admin UI 前仍需要确认：
 
 1. 初始 `super_admin` 如何创建？
    - 已实现 `npm run admin:bootstrap`，通过环境变量一次性 bootstrap，不开放 public registration。
 2. `sourceDir` allowlist 放在哪里？
    - 已采用环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
-3. question quality flag 是否立即影响学生选题？
+3. `mode=import` 是否默认打开？
+   - 否。已采用 `ADMIN_IMPORT_ENABLE_WRITE=true` 显式开启；`resetBeforeImport` 仍禁用。
+4. question quality flag 是否立即影响学生选题？
    - 已固定为 `excludedFromPractice=true` 才影响新建普通练习选题。
-4. bank mapping `status=review` 是否应该是导入后的默认状态？
+5. bank mapping `status=review` 是否应该是导入后的默认状态？
    - 当前自动 mapping 已将可见项设为 active；管理端上线后可考虑新导入先 review。
-5. audit log 是否记录失败尝试？
+6. audit log 是否记录失败尝试？
    - 建议记录权限失败以外的业务写入失败；认证失败只进入安全日志/structured log，不进业务 audit。
 
 ## 15. One-line Decision
 
-当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成，下一步应先处理真正写入 import mode 的启用条件，或转入学生学习记录/统计后端：
+当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report/true import gate、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成，下一步应转入学生学习记录/统计后端，或补生产安全/运维前置项：
 
-> **true import mode gate / Student Learning Record And Statistics**
+> **Student Learning Record And Statistics**
 
-这会把最小可运营闭环从“后端 command/query 可用”继续推进到“导入可闭环、学生学习数据可长期沉淀”，同时保持正式前端最后设计。
+这会把最小可运营闭环从“后端 command/query 与导入写入可用”继续推进到“学生学习数据可长期沉淀”，同时保持正式前端最后设计。

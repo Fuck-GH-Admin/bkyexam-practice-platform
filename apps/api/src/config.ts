@@ -10,6 +10,7 @@ const configSchema = z.object({
   SESSION_TTL_DAYS: z.string().optional().transform((value) => parsePositiveInteger(value, 30)),
   ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
   ADMIN_IMPORT_ALLOWED_ROOTS: z.string().optional().transform(parsePathList),
+  ADMIN_IMPORT_ENABLE_WRITE: z.string().optional().transform((value) => value === 'true'),
 });
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {

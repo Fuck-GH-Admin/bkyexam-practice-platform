@@ -13,12 +13,12 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 错题自动归集、错题详情、标记掌握和错题再练。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
-- 完整管理平台、真正写入的 import mode 和管理端 UI。
+- 完整管理平台、管理端 UI，以及 import reset/异步队列/取消重试等完整导入运营能力。
 - 正式学生账户、档案、学习统计和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
@@ -106,6 +106,7 @@ COOKIE_SECURE=false
 SESSION_TTL_DAYS=30
 ADMIN_SESSION_TTL_HOURS=8
 ADMIN_IMPORT_ALLOWED_ROOTS=C:\path\to\questionbank
+ADMIN_IMPORT_ENABLE_WRITE=false
 ```
 
 PowerShell 示例：
@@ -115,6 +116,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 $env:USE_DATABASE="true"
 $env:COOKIE_SECRET="local-development-secret"
 $env:ADMIN_IMPORT_ALLOWED_ROOTS="C:\path\to\questionbank"
+$env:ADMIN_IMPORT_ENABLE_WRITE="false" # 改为 true 后允许 /api/admin/import-jobs mode=import 写入；resetBeforeImport 仍关闭
 ```
 
 初始化数据库：
