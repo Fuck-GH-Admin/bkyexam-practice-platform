@@ -8,7 +8,7 @@
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run API 与 Question Review Flags API。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job/Question Review schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。Audit Log read、Admin User manage、正式 Admin UI 仍按后续阶段实现。
+> B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run API、Question Review Flags API、Audit Log read API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`npm run admin:bootstrap`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。Admin User manage、真正写入 import mode、正式 Admin UI 仍按后续阶段实现。
 
 ## 1. 目标与非目标
 
@@ -853,9 +853,9 @@ Notes：
 - 这是 admin system status，不替代 public `/api/health`。
 - DB readiness 细节只对管理员暴露。
 
-## 9. Optional Workflow — Audit Log Read
+## 9. Workflow E — Audit Log Read
 
-写 audit log 是 B5 必做；读 audit log 可以作为 B5 后半或 B6。
+B5.7 已实现 audit log read。写 audit log 仍由各管理写操作负责；读接口只供具备 `audit_log:read` 权限的管理员追踪和审核。
 
 ### `GET /api/admin/audit-logs`
 
@@ -869,8 +869,9 @@ Query：
 | `action` | string optional |
 | `resourceType` | string optional |
 | `resourceId` | string optional |
-| `from` | ISO datetime optional |
-| `to` | ISO datetime optional |
+| `result` | `success | failure` optional |
+| `createdFrom` | ISO datetime optional |
+| `createdTo` | ISO datetime optional |
 | `limit` | 1..100 |
 | `offset` | >=0 |
 
@@ -881,18 +882,37 @@ Response：
   "auditLogs": [
     {
       "id": "audit-log-uuid",
-      "actor": { "id": "admin-user-uuid", "displayName": "内容编辑" },
+      "actor": { "id": "admin-user-uuid", "loginName": "editor@example.com", "displayName": "内容编辑" },
       "action": "bank_mapping.update",
       "resourceType": "bank_mapping",
       "resourceId": "bank-uuid",
       "before": { "visible": false, "status": "review" },
       "after": { "visible": true, "status": "active" },
-      "createdAt": "2026-07-13T09:00:00.000Z"
+      "metadata": { "ip": "127.0.0.1" },
+      "result": "success",
+      "createdAt": "2026-07-14T09:00:00.000Z"
     }
   ],
   "page": { "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+### Bootstrap CLI
+
+B5.7 已实现 `npm run admin:bootstrap`。它读取：
+
+- `DATABASE_URL`
+- `ADMIN_BOOTSTRAP_LOGIN_NAME`
+- `ADMIN_BOOTSTRAP_DISPLAY_NAME`
+- `ADMIN_BOOTSTRAP_PASSWORD`
+
+规则：
+
+- 只创建第一个 `super_admin`。
+- 已存在 `super_admin` 时返回 `already_bootstrapped`。
+- loginName 被非 super admin 占用时返回 `login_name_conflict`。
+- 不开放 public registration。
+- 成功写 `admin_user.bootstrap` audit log。
 
 ## 10. Database Design For B5
 
@@ -1174,6 +1194,20 @@ Rules：
 - `question_review.flag_add` / `question_review.flag_resolve` / `question_review.exclude_update` audit log
 - System Status quality summary 接入真实表
 
+### B5.7 Admin Bootstrap + Audit Log Read
+
+状态：**已完成，2026-07-14。**
+
+交付：
+
+- `npm run admin:bootstrap`
+- `admin_user.bootstrap` audit log
+- shared v1 Admin Audit Log schema
+- `GET /api/admin/audit-logs`
+- `audit_log:read` 权限守卫
+- action/resource/actor/result/time/pagination filters
+- 管理端信息架构静态审核文档：[`admin-console-ia.md`](./admin-console-ia.md)
+
 ## 13. Acceptance Criteria For B5
 
 B5 完成时必须满足：
@@ -1186,6 +1220,8 @@ B5 完成时必须满足：
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
 - 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
+- 管理员可以通过 CLI 创建第一个 `super_admin`。
+- `super_admin` 可以查询 audit logs。
 - 写操作有 optimistic concurrency。
 - 写操作写 audit log。
 - 学生 `/api/banks` 只返回已发布可见且含客观题的题库。
@@ -1194,10 +1230,10 @@ B5 完成时必须满足：
 
 ## 14. Open Questions For Next Stage
 
-B5.1 到 B5.6 已实现；进入正式 Admin UI 前仍需要确认：
+B5.1 到 B5.7 已实现；进入正式 Admin UI 前仍需要确认：
 
 1. 初始 `super_admin` 如何创建？
-   - 建议下一阶段实现 CLI seed script 或环境变量一次性 bootstrap，不开放 public registration。
+   - 已实现 `npm run admin:bootstrap`，通过环境变量一次性 bootstrap，不开放 public registration。
 2. `sourceDir` allowlist 放在哪里？
    - 已采用环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
 3. question quality flag 是否立即影响学生选题？
@@ -1209,8 +1245,8 @@ B5.1 到 B5.6 已实现；进入正式 Admin UI 前仍需要确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run 与 question review flags 已完成，下一步应先补齐非视觉管理能力与信息架构审核：
+当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run、question review flags、audit log read 与 super_admin bootstrap 已完成，下一步应先补齐管理端信息架构审核和剩余账号/导入能力：
 
-> **Admin bootstrap / Audit Log read / 管理端信息架构静态审核**
+> **管理端信息架构静态审核 / Admin User manage / true import mode**
 
 这会把最小可运营闭环从“后端 command/query 可用”推进到“能被真实管理员初始化、追踪和审核”，同时保持正式前端最后设计。

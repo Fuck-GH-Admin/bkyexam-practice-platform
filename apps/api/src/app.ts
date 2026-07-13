@@ -4,6 +4,8 @@ import Fastify from 'fastify';
 import {
   createAuditService,
   createMemoryAuditLogRepository,
+  type AuditLogReadRepository,
+  type AuditLogRepository,
   type AuditService,
 } from './admin/audit.js';
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
@@ -18,6 +20,7 @@ import { createMemoryPracticeSessionService, type PracticeSessionService } from 
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
+import { createAdminAuditLogRoutes } from './routes/adminAuditLogs.js';
 import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
 import { createAdminImportJobRoutes } from './routes/adminImportJobs.js';
 import { createAdminQuestionReviewRoutes } from './routes/adminQuestionReview.js';
@@ -47,6 +50,7 @@ interface BuildAppOptions {
   sessionService?: ReturnType<typeof createSessionService>;
   adminSessionService?: ReturnType<typeof createAdminSessionService>;
   auditService?: AuditService;
+  auditLogRepository?: AuditLogRepository & AuditLogReadRepository;
   logger?: boolean;
   cookieSecret?: string;
   cookieSecure?: boolean;
@@ -70,7 +74,8 @@ export function buildApp(options: BuildAppOptions = {}) {
     ?? createAdminSessionService(createMemoryAdminSessionRepository(), {
       ttlHours: options.adminSessionTtlHours ?? 8,
     });
-  const auditService = options.auditService ?? createAuditService(createMemoryAuditLogRepository());
+  const auditLogRepository = options.auditLogRepository ?? createMemoryAuditLogRepository();
+  const auditService = options.auditService ?? createAuditService(auditLogRepository);
 
   void app.register(cors, {
     origin: ['http://127.0.0.1:5173', 'http://localhost:5173'],
@@ -89,6 +94,10 @@ export function buildApp(options: BuildAppOptions = {}) {
     cookieSecure: options.cookieSecure ?? false,
     sessionTtlHours: options.adminSessionTtlHours ?? 8,
   });
+  void app.register(createAdminAuditLogRoutes({
+    repository: auditLogRepository,
+    sessionService: adminSessionService,
+  }));
   void app.register(createAdminBankMappingRoutes({
     repository: options.adminBankMappingRepository,
     sessionService: adminSessionService,

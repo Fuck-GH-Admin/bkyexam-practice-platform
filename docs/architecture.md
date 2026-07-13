@@ -68,7 +68,7 @@ repository
   -> feature state
 ```
 
-Admin 后端 contract 已在 [`admin-backend-contract.md`](admin-backend-contract.md) 中完成设计，其中 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run API 与 Question Review Flags API 已实现；Audit Log read、Admin User manage 与正式 Admin UI 仍未实现。详细规则见 [contracts.md](contracts.md)。
+Admin 后端 contract 已在 [`admin-backend-contract.md`](admin-backend-contract.md) 中完成设计，其中 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run API、Question Review Flags API、Audit Log read API 与 super_admin bootstrap CLI 已实现；Admin User manage、真正写入 import mode 与正式 Admin UI 仍未实现。详细规则见 [contracts.md](contracts.md)，管理端信息架构闸门见 [admin-console-ia.md](admin-console-ia.md)。
 
 ### PostgreSQL
 
@@ -99,7 +99,7 @@ questionbank/*.txt
 | Import | 源文件解析、规范化、批量导入 | `import/` |
 | Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
 
-管理端将成为第七个上下文，但尚未实现。
+管理端已成为第七个上下文，当前实现位于 `apps/api/src/admin/*` 与 `apps/api/src/routes/admin*.ts`；正式管理前端尚未实现。
 
 ## Practice Lifecycle
 
@@ -171,7 +171,7 @@ questionbank/*.txt
 5. Wrongbook 已通过 service 调 Practice 创建再练 session，但目录尚未迁入 `modules/wrongbook`。
 6. 学生端主要 response DTO 已共享，但 request parser、Auth/Catalog module 目录和通用 API helper 仍未完全收敛。
 7. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
-8. 管理平台已有后端 contract、Admin Auth/RBAC/Audit foundation、`/api/admin/auth/*`、题库 mapping read/write API、System Status API、Import Jobs dry-run API 与 Question Review Flags API，但还没有独立管理应用、管理员 bootstrap 或 audit log read API。
+8. 管理平台已有后端 contract、Admin Auth/RBAC/Audit foundation、`/api/admin/auth/*`、题库 mapping read/write API、System Status API、Import Jobs dry-run API、Question Review Flags API、Audit Log read API 与 super_admin bootstrap CLI，但还没有独立管理应用、Admin User manage 或真正写入 import mode。
 
 ## Target Physical Structure
 

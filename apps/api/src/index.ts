@@ -17,6 +17,7 @@ import { createPgWrongQuestionRepository } from './wrongQuestions/repository.js'
 
 const config = loadConfig();
 const pool = config.USE_DATABASE ? createPgPool(config.DATABASE_URL) : undefined;
+const auditLogRepository = pool ? createPgAuditLogRepository(pool) : undefined;
 const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
   adminAuthRepository: pool ? createPgAdminAuthRepository(pool) : undefined,
@@ -35,7 +36,8 @@ const app = buildApp({
   adminSessionService: pool
     ? createAdminSessionService(createPgAdminSessionRepository(pool), { ttlHours: config.ADMIN_SESSION_TTL_HOURS })
     : undefined,
-  auditService: pool ? createAuditService(createPgAuditLogRepository(pool)) : undefined,
+  auditLogRepository,
+  auditService: auditLogRepository ? createAuditService(auditLogRepository) : undefined,
   cookieSecret: config.COOKIE_SECRET,
   cookieSecure: config.COOKIE_SECURE,
   sessionTtlDays: config.SESSION_TTL_DAYS,

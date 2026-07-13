@@ -50,14 +50,14 @@ PostgreSQL / memory repository
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
-| Admin | Auth schemas, role/permission schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create schemas, Question Review list/update schemas |
+| Admin | Auth schemas, role/permission schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
 | Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未实现 shared schema：
 
-- Audit Log read、Admin User manage API。后端 contract 已在 [`admin-backend-contract.md`](./admin-backend-contract.md) 中完成设计，尚未迁入 `packages/shared`。
+- Admin User manage API。后端 contract 已在 [`admin-backend-contract.md`](./admin-backend-contract.md) 中完成设计，尚未迁入 `packages/shared`。
 - Readiness/DB health。
 
 ## Frozen V1 Semantics
@@ -184,5 +184,5 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Admin Auth、Bank Mapping read/write、System Status、Import Job 与 Question Review shared Zod schema/route 已实现；Admin 其余 backend contract（Audit Log read、Admin User manage）尚未迁入 shared，也尚未实现 route。
+- Admin Auth、Bank Mapping read/write、System Status、Import Job、Question Review 与 Audit Log read shared Zod schema/route 已实现；Admin 其余 backend contract（Admin User manage）尚未迁入 shared，也尚未实现 route。
 - Readiness/DB health 尚未定义。

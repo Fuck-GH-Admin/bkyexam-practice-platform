@@ -48,6 +48,53 @@ export const AdminLogoutResponseV1Schema = z.object({
 }).strict();
 export type AdminLogoutResponseV1 = z.infer<typeof AdminLogoutResponseV1Schema>;
 
+export const AdminAuditLogResultV1Schema = z.enum(['success', 'failure']);
+export type AdminAuditLogResultV1 = z.infer<typeof AdminAuditLogResultV1Schema>;
+
+export const AdminAuditLogActorV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  loginName: z.string().min(1),
+  displayName: z.string().min(1),
+}).strict();
+export type AdminAuditLogActorV1 = z.infer<typeof AdminAuditLogActorV1Schema>;
+
+export const AdminAuditLogEntryV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  actor: AdminAuditLogActorV1Schema.nullable(),
+  action: z.string().min(1),
+  resourceType: z.string().min(1),
+  resourceId: z.string().min(1),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+  metadata: z.object({}).catchall(z.unknown()),
+  result: AdminAuditLogResultV1Schema,
+  createdAt: z.string().datetime(),
+}).strict();
+export type AdminAuditLogEntryV1 = z.infer<typeof AdminAuditLogEntryV1Schema>;
+
+export const ListAdminAuditLogsRequestV1Schema = z.object({
+  actorAdminId: CaseInsensitiveUuidV1Schema.optional(),
+  action: z.string().min(1).optional(),
+  resourceType: z.string().min(1).optional(),
+  resourceId: z.string().min(1).optional(),
+  result: AdminAuditLogResultV1Schema.optional(),
+  createdFrom: z.string().datetime().optional(),
+  createdTo: z.string().datetime().optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminAuditLogsRequestV1 = z.infer<typeof ListAdminAuditLogsRequestV1Schema>;
+
+export const AdminAuditLogListResponseV1Schema = z.object({
+  auditLogs: z.array(AdminAuditLogEntryV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminAuditLogListResponseV1 = z.infer<typeof AdminAuditLogListResponseV1Schema>;
+
 export const AdminBankMappingStatusV1Schema = z.enum(['review', 'active', 'hidden', 'deprecated']);
 export type AdminBankMappingStatusV1 = z.infer<typeof AdminBankMappingStatusV1Schema>;
 

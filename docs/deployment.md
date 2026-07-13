@@ -136,6 +136,7 @@ The API currently reads configuration from environment variables through `apps/a
 - `SESSION_TTL_DAYS`: positive integer session lifetime in days, default `30`.
 - `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
 - `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
+- `ADMIN_BOOTSTRAP_LOGIN_NAME`, `ADMIN_BOOTSTRAP_DISPLAY_NAME`, `ADMIN_BOOTSTRAP_PASSWORD`: one-time CLI inputs for `npm run admin:bootstrap`; they are not read by the HTTP server.
 
 The API currently listens on `127.0.0.1`, which matches the intended Nginx reverse-proxy shape.
 
@@ -145,7 +146,7 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
-- administrator bootstrap/account lifecycle beyond the current Admin Auth/RBAC foundation;
+- administrator account lifecycle beyond the current one-time `super_admin` bootstrap and Admin Auth/RBAC foundation;
 - strong student identity policy;
 - secrets management;
 - PostgreSQL backup and restore drill;

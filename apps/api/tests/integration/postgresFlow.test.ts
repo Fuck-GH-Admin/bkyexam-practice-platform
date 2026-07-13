@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuditService, createPgAuditLogRepository } from '../../src/admin/audit.js';
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
 import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
+import { createAdminBootstrapService, createPgAdminBootstrapRepository } from '../../src/admin/bootstrap.js';
 import { createPgAdminImportJobRepository } from '../../src/admin/importJobs.js';
 import { createPgAdminQuestionReviewRepository } from '../../src/admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
@@ -27,6 +28,7 @@ const importFixtureDir = resolve(fileURLToPath(new URL('../import/fixtures/compa
 describe('PostgreSQL-backed API integration', () => {
   const databaseUrl = requireDedicatedTestDatabaseUrl(process.env.TEST_DATABASE_URL);
   const pool = createPgPool(databaseUrl);
+  const auditLogRepository = createPgAuditLogRepository(pool);
   const app = buildApp({
     authRepository: createPgStudentAuthRepository(pool),
     adminAuthRepository: createPgAdminAuthRepository(pool),
@@ -41,7 +43,8 @@ describe('PostgreSQL-backed API integration', () => {
     wrongQuestionRepository: createPgWrongQuestionRepository(pool),
     sessionService: createSessionService(createPgStudentSessionRepository(pool), { ttlDays: 1 }),
     adminSessionService: createAdminSessionService(createPgAdminSessionRepository(pool), { ttlHours: 8 }),
-    auditService: createAuditService(createPgAuditLogRepository(pool)),
+    auditLogRepository,
+    auditService: createAuditService(auditLogRepository),
     cookieSecret: 'postgres-integration-cookie-secret',
     logger: false,
   });
@@ -52,6 +55,14 @@ describe('PostgreSQL-backed API integration', () => {
       await runMigrations(client, migrationsDir);
       await resetAndSeedPostgresFixture(client);
       await seedIntegrationAdmin(client);
+      await createAdminBootstrapService(
+        createPgAdminBootstrapRepository(client),
+        createAuditService(createPgAuditLogRepository(client)),
+      ).bootstrapSuperAdmin({
+        loginName: 'integration-super@example.com',
+        displayName: 'Integration Super Admin',
+        password: 'secret123',
+      }, new Date('2026-07-14T10:00:00.000Z'));
     } finally {
       client.release();
     }
@@ -128,6 +139,50 @@ describe('PostgreSQL-backed API integration', () => {
         AND result = 'success'
     `, ['50000000-0000-4000-8000-000000000001']);
     expect(adminAuditState.rows[0]).toEqual({ audit_count: '1' });
+
+    const superAdminLogin = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/login',
+      payload: { loginName: 'integration-super@example.com', password: 'secret123' },
+    });
+    expect(superAdminLogin.statusCode).toBe(200);
+    expect(superAdminLogin.json()).toMatchObject({
+      admin: {
+        loginName: 'integration-super@example.com',
+        roles: ['super_admin'],
+        permissions: expect.arrayContaining(['audit_log:read', 'admin_user:manage']),
+      },
+    });
+    const superAdminCookie = extractCookie(superAdminLogin.headers['set-cookie']);
+
+    const operatorAuditForbidden = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-logs',
+      headers: { cookie: adminCookie },
+    });
+    expect(operatorAuditForbidden.statusCode).toBe(403);
+
+    const adminAuditLogList = await app.inject({
+      method: 'GET',
+      url: '/api/admin/audit-logs?action=admin_user.bootstrap&limit=5',
+      headers: { cookie: superAdminCookie },
+    });
+    expect(adminAuditLogList.statusCode).toBe(200);
+    expect(adminAuditLogList.json()).toMatchObject({
+      auditLogs: [expect.objectContaining({
+        actor: null,
+        action: 'admin_user.bootstrap',
+        resourceType: 'admin_user',
+        after: {
+          loginName: 'integration-super@example.com',
+          displayName: 'Integration Super Admin',
+          roles: ['super_admin'],
+        },
+        result: 'success',
+        createdAt: '2026-07-14T10:00:00.000Z',
+      })],
+      page: { limit: 5, offset: 0, hasMore: false },
+    });
 
     const createdImportJob = await app.inject({
       method: 'POST',

@@ -5,6 +5,20 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.7 — 2026-07-14
+
+- [x] 新增 `npm run admin:bootstrap`。
+- [x] 通过 `ADMIN_BOOTSTRAP_LOGIN_NAME`、`ADMIN_BOOTSTRAP_DISPLAY_NAME`、`ADMIN_BOOTSTRAP_PASSWORD` 创建第一个 `super_admin`。
+- [x] 已存在 `super_admin` 时拒绝重复 bootstrap。
+- [x] loginName 被非 super admin 占用时返回 `login_name_conflict`。
+- [x] bootstrap 成功写 `admin_user.bootstrap` audit log，且不输出明文密码。
+- [x] 新增 shared v1 Admin Audit Log schema。
+- [x] 实现 `GET /api/admin/audit-logs`。
+- [x] 复用 `audit_log:read` 权限守卫，覆盖 `401/403`。
+- [x] 支持 action/resource/actor/result/time/pagination filters。
+- [x] PostgreSQL integration 覆盖 bootstrap、Audit Log read 和权限边界。
+- [x] 新增 [`admin-console-ia.md`](./admin-console-ia.md)，先做管理端信息架构静态审核，不创建正式 Admin 前端。
+
 ## Completed Backend B5.6 — 2026-07-14
 
 - [x] 新增 migration `0007_question_quality_flags.sql`，建立 `question_quality_flags`。
@@ -229,8 +243,9 @@
 - [x] mapping 写入版本/并发控制与 audit log。
 - [x] import job table、dry-run 触发、进度、结果和错误摘要。
 - [x] 题目质检标记与学生端排除策略。
-- [ ] 初始 `super_admin` bootstrap / Admin User 管理。
-- [ ] Audit Log read API。
+- [x] 初始 `super_admin` bootstrap。
+- [x] Audit Log read API。
+- [ ] Admin User 管理。
 - [ ] 真正执行写入的 import mode。
 
 ### Frontend

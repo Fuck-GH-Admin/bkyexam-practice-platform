@@ -599,6 +599,91 @@ Errors：
 - `403`：缺少 `question_review:read/write`。
 - `404`：question 或 flag 不存在。
 
+## Admin Audit Logs
+
+Admin Audit Logs 是 B5.7 已实现的审计查询后端。写入仍由各管理写操作负责；读接口只提供管理端追踪、排障和审核使用，不面向学生端。
+
+### `GET /api/admin/audit-logs`
+
+Permission：`audit_log:read`
+
+Query：
+
+| Query | Type | Notes |
+| --- | --- | --- |
+| `actorAdminId` | uuid optional | 按管理员过滤。 |
+| `action` | string optional | 例如 `bank_mapping.update`、`import_job.create`、`question_review.flag_add`、`admin_user.bootstrap`。 |
+| `resourceType` | string optional | 例如 `bank_mapping`、`import_job`、`question`、`admin_user`。 |
+| `resourceId` | string optional | 资源 ID 或稳定资源标识。 |
+| `result` | `success | failure` optional | 按操作结果过滤。 |
+| `createdFrom` | ISO datetime optional | inclusive。 |
+| `createdTo` | ISO datetime optional | inclusive。 |
+| `limit` | integer 1..100 | 默认 20。 |
+| `offset` | integer >=0 | 默认 0。 |
+
+Response：
+
+```json
+{
+  "auditLogs": [
+    {
+      "id": "90000000-0000-4000-8000-000000000001",
+      "actor": {
+        "id": "50000000-0000-4000-8000-000000000001",
+        "loginName": "operator@example.com",
+        "displayName": "Operator"
+      },
+      "action": "bank_mapping.update",
+      "resourceType": "bank_mapping",
+      "resourceId": "10000000-0000-4000-8000-000000000001",
+      "before": { "visible": false, "status": "review" },
+      "after": { "visible": true, "status": "active" },
+      "metadata": { "ip": "127.0.0.1" },
+      "result": "success",
+      "createdAt": "2026-07-14T10:00:00.000Z"
+    }
+  ],
+  "page": {
+    "limit": 20,
+    "offset": 0,
+    "hasMore": false
+  }
+}
+```
+
+Rules：
+
+- 按 `createdAt DESC, id DESC` 排序。
+- 使用 `limit + 1` 判断 `hasMore`，不计算 total count。
+- `actor=null` 表示系统/匿名动作，例如初始 `admin_user.bootstrap`。
+- response 使用 `AdminAuditLogListResponseV1Schema` fail closed。
+
+Errors：
+
+- `401`：没有 `bky_admin_session`。
+- `403`：缺少 `audit_log:read`。
+- `400`：query 不合法。
+
+## Admin Bootstrap
+
+Admin Bootstrap 是 B5.7 已实现的 CLI 入口，用于创建第一个 `super_admin`。它不是 HTTP API，也不会开放 public registration。
+
+```powershell
+$env:DATABASE_URL="postgres://postgres:postgres@127.0.0.1:5432/bkyexam_practice"
+$env:ADMIN_BOOTSTRAP_LOGIN_NAME="root@example.com"
+$env:ADMIN_BOOTSTRAP_DISPLAY_NAME="Root Admin"
+$env:ADMIN_BOOTSTRAP_PASSWORD="<8+ chars password>"
+npm run admin:bootstrap
+```
+
+Rules：
+
+- 只在还没有任何 `super_admin` 时创建。
+- 如果已存在 `super_admin`，命令返回 `already_bootstrapped` 并以非 0 退出码结束。
+- 如果 loginName 已被非 super admin 占用，返回 `login_name_conflict`。
+- 密码只写入 scrypt hash；输出和 audit log 不包含明文密码。
+- 成功后写入 `admin_user.bootstrap` audit log。
+
 ## Admin System Status
 
 ### `GET /api/admin/system/status`
@@ -1164,9 +1249,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job 与 Admin Question Review route/shared schema 已实现；Audit Log read 和 Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

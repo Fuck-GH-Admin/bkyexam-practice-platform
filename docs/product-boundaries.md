@@ -43,6 +43,8 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流，建议后续创建 `apps/admin`。
 
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)。正式前端仍需等待 Admin User manage、Import true mode 决策和 IA checklist 审核。
+
 ### API / Data Platform
 
 服务对象：学生端、管理端和离线导入任务。
@@ -307,7 +309,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、Admin Question Review、通用 error 已迁入 shared v1；Admin 其余后端 contract（Audit Log read、Admin User manage）已完成设计，但 shared schema/route 尚未实现。
+- Auth、Catalog、Admin Auth、Admin Bank Mapping read/write、Admin System Status、Admin Import Job、Admin Question Review、Admin Audit Log、通用 error 已迁入 shared v1；Admin 其余后端 contract（Admin User manage）已完成设计，但 shared schema/route 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision

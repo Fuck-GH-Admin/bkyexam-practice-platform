@@ -6,6 +6,7 @@ import {
   AdminLogoutResponseV1Schema,
   AdminImportJobDetailResponseV1Schema,
   AdminImportJobListResponseV1Schema,
+  AdminAuditLogListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
@@ -15,6 +16,7 @@ import {
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
+  ListAdminAuditLogsRequestV1Schema,
   ListAdminQuestionReviewsRequestV1Schema,
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
@@ -72,7 +74,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
         loginName: 'operator@example.com',
         displayName: 'Operator',
         roles: ['operator'],
-        permissions: ['admin:self:read', 'bank_mapping:read', 'import_job:read'],
+        permissions: ['admin:self:read', 'bank_mapping:read', 'import_job:read', 'audit_log:read'],
       },
       expiresAt: '2026-07-13T18:00:00.000Z',
     });
@@ -182,7 +184,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
   it('parses admin system status contracts', () => {
     const status = AdminSystemStatusResponseV1Schema.parse({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 6, currentMigration: '0006_import_jobs.sql' },
+        database: { ok: true, migrationCount: 7, currentMigration: '0007_question_quality_flags.sql' },
       corpus: {
         classifications: 2941,
         questions: 89922,
@@ -207,7 +209,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
       },
     });
 
-    expect(status.database.currentMigration).toBe('0006_import_jobs.sql');
+    expect(status.database.currentMigration).toBe('0007_question_quality_flags.sql');
     expect(() => AdminSystemStatusResponseV1Schema.parse({
       ...status,
       corpus: { ...status.corpus, questions: -1 },
@@ -272,6 +274,63 @@ describe('v1 auth/catalog/error/health contracts', () => {
     expect(() => CreateAdminImportJobRequestV1Schema.parse({
       ...request,
       options: { ...request.options, batchSize: 0 },
+    })).toThrow();
+  });
+
+  it('parses admin audit log list contracts and filters', () => {
+    const adminId = '50000000-0000-4000-8000-000000000001';
+    const auditLogId = '90000000-0000-4000-8000-000000000001';
+
+    expect(ListAdminAuditLogsRequestV1Schema.parse({
+      actorAdminId: adminId.toUpperCase(),
+      action: 'bank_mapping.update',
+      resourceType: 'bank_mapping',
+      result: 'success',
+      createdFrom: '2026-07-13T00:00:00.000Z',
+      createdTo: '2026-07-14T00:00:00.000Z',
+      limit: '10',
+      offset: '5',
+    })).toEqual({
+      actorAdminId: adminId,
+      action: 'bank_mapping.update',
+      resourceType: 'bank_mapping',
+      result: 'success',
+      createdFrom: '2026-07-13T00:00:00.000Z',
+      createdTo: '2026-07-14T00:00:00.000Z',
+      limit: 10,
+      offset: 5,
+    });
+
+    expect(AdminAuditLogListResponseV1Schema.parse({
+      auditLogs: [{
+        id: auditLogId,
+        actor: { id: adminId, loginName: 'operator@example.com', displayName: 'Operator' },
+        action: 'bank_mapping.update',
+        resourceType: 'bank_mapping',
+        resourceId: bankId,
+        before: { visible: false },
+        after: { visible: true },
+        metadata: { ip: '127.0.0.1' },
+        result: 'success',
+        createdAt: '2026-07-13T10:00:00.000Z',
+      }],
+      page: { limit: 10, offset: 5, hasMore: false },
+    }).auditLogs[0]?.action).toBe('bank_mapping.update');
+
+    expect(() => AdminAuditLogListResponseV1Schema.parse({
+      auditLogs: [{
+        id: auditLogId,
+        actor: null,
+        action: '',
+        resourceType: 'system',
+        resourceId: 'bootstrap',
+        before: null,
+        after: null,
+        metadata: {},
+        result: 'success',
+        createdAt: '2026-07-13T10:00:00.000Z',
+      }],
+      page: { limit: 10, offset: 5, hasMore: false },
     })).toThrow();
   });
 
