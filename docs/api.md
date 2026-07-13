@@ -652,9 +652,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/通用 error/health DTO 已来自 shared v1；Admin contract 尚未迁移。
+- Practice/Wrongbook/Auth/Catalog/通用 error/health DTO 已来自 shared v1；Admin 后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin API 尚未定义。
+- Admin API 已在 [admin-backend-contract.md](admin-backend-contract.md) 完成后端 contract 设计，但 route/shared schema 尚未实现。

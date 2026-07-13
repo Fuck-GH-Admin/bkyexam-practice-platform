@@ -68,7 +68,7 @@ repository
   -> feature state
 ```
 
-Admin、Import Job 和 readiness/DB health contract 尚未迁入 shared。详细规则见 [contracts.md](contracts.md)。
+Admin 后端 contract 已在 [`admin-backend-contract.md`](admin-backend-contract.md) 中完成设计，但尚未实现 route/shared schema；Import Job 仅在 Admin contract 中定义，readiness/DB health 尚未迁入 shared。详细规则见 [contracts.md](contracts.md)。
 
 ### PostgreSQL
 
@@ -171,7 +171,7 @@ questionbank/*.txt
 5. Wrongbook 已通过 service 调 Practice 创建再练 session，但目录尚未迁入 `modules/wrongbook`。
 6. 学生端主要 response DTO 已共享，但 request parser、Auth/Catalog module 目录和通用 API helper 仍未完全收敛。
 7. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
-8. 管理平台没有独立应用、权限模型和 API namespace。
+8. 管理平台已有后端 contract 设计，但还没有独立应用、已实现的权限模型和 API namespace。
 
 ## Target Physical Structure
 

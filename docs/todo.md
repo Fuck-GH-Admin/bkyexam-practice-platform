@@ -5,6 +5,17 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B4 — 2026-07-13
+
+- [x] 新增 [`admin-backend-contract.md`](./admin-backend-contract.md)。
+- [x] 固定管理端第一版四个工作流：题库整理、导入任务、题目质检、系统状态。
+- [x] 明确管理员角色：`content_editor`、`operator`、`super_admin`。
+- [x] 明确管理端权限模型、独立 `bky_admin_session` 和 `/api/admin/*` namespace。
+- [x] 设计 Admin Auth、Bank Mapping、Import Job、Question Review、System Status、Audit Log API。
+- [x] 设计 B5 所需 migration：admin users/sessions/roles、audit logs、bank mapping version、import jobs、question quality flags。
+- [x] 明确第一版不直接编辑原始题目，采用 mapping override 与 quality flag。
+- [x] `npm run verify:docker` 通过。
+
 ## Completed Backend B3 — 2026-07-13
 
 - [x] 新增 shared v1 `auth.ts`，覆盖 login/me/logout response 和学生 DTO。
@@ -125,8 +136,8 @@
 
 ### Product Design
 
-- [ ] 确认管理员角色：content editor、operator、super admin。
-- [ ] 设计题库整理、导入任务、题目质检、系统状态四个工作流。
+- [x] 确认管理员角色：content editor、operator、super admin。
+- [x] 设计题库整理、导入任务、题目质检、系统状态四个工作流。
 - [ ] 用低保真界面验证工作流和所需后端 command。
 
 ### Backend

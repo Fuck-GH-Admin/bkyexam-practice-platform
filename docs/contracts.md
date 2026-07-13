@@ -53,10 +53,10 @@ PostgreSQL / memory repository
 | Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
-当前未覆盖：
+当前未实现 shared schema：
 
-- Admin API。
-- Import job API。
+- Admin API。后端 contract 已在 [`admin-backend-contract.md`](./admin-backend-contract.md) 中完成设计，尚未迁入 `packages/shared`。
+- Import job API 已在 Admin 后端 contract 中完成设计，尚未迁入 `packages/shared`。
 - Readiness/DB health。
 
 ## Frozen V1 Semantics
@@ -183,5 +183,5 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Admin contract 尚未定义。
-- Readiness/DB health 和 Import Job contract 尚未定义。
+- Admin backend contract 已定义，但 shared Zod schema 和 route 尚未实现。
+- Readiness/DB health 尚未定义；Import Job 已在 Admin 后端 contract 中定义，但 shared Zod schema 和 route 尚未实现。

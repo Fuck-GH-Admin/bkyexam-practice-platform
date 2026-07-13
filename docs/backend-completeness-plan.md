@@ -161,7 +161,7 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定，Admin/Import/readiness 尚未定义**。
+当前定位：**学生端主要 runtime contract 已稳定；Admin 后端 contract 已完成设计，但 route/shared schema 尚未实现；readiness/DB health 尚未定义。**
 
 ### 2.8 Verification
 
@@ -596,6 +596,8 @@ contracts/v1/health.ts
 
 ### Phase B4 — Admin Backend Contract Design
 
+状态：**已完成，2026-07-13。**
+
 目标：先设计，不急着 UI。
 
 新增文档：
@@ -616,6 +618,7 @@ docs/admin-backend-contract.md
 ```text
 POST   /api/admin/auth/login
 GET    /api/admin/me
+POST   /api/admin/auth/logout
 GET    /api/admin/bank-mappings
 GET    /api/admin/bank-mappings/:bankId
 PATCH  /api/admin/bank-mappings/:bankId
@@ -626,6 +629,7 @@ GET    /api/admin/import-jobs/:id
 GET    /api/admin/question-review
 PATCH  /api/admin/question-review/:questionId
 GET    /api/admin/system/status
+GET    /api/admin/audit-logs  # optional read endpoint; audit writes are mandatory
 ```
 
 同时设计 migrations：
@@ -637,7 +641,7 @@ admin_roles / admin_user_roles 或 role text
 audit_logs
 import_jobs
 question_quality_flags
-bank_mapping_versions 或 version column
+bank_mappings.version / updated_at / updated_by_admin_id
 ```
 
 验收：
@@ -647,6 +651,14 @@ bank_mapping_versions 或 version column
 - 明确 audit log。
 - 明确不会直接编辑原始题目，而是通过 override/flag 层。
 - 通过评审后再实现。
+
+实际落地：
+
+- 设计文档：[`admin-backend-contract.md`](./admin-backend-contract.md)。
+- 明确角色：`content_editor`、`operator`、`super_admin`。
+- 明确权限：bank mapping、import job、question review、system status、audit/admin user。
+- 明确 Admin Cookie：`bky_admin_session`，不复用学生 `bky_session`。
+- 明确 B5 实现顺序：admin identity/RBAC/audit foundation -> bank mapping read -> bank mapping write -> system status -> import jobs -> question review flags。
 
 ### Phase B5 — Admin Backend MVP Implementation
 
@@ -806,6 +818,6 @@ feat/refactor: split practice backend repository boundaries
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；完整平台后端还缺管理、正式身份、模块化、非客观题、运营导入和生产运维。**
+> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计；完整平台后端还缺管理实现、正式身份、模块化、非客观题、运营导入和生产运维。**
 
-最合理的下一步是先把后端边界拆清楚，再开始 Admin 后端 MVP。
+最合理的下一步是进入 Admin 后端 MVP：先实现 admin identity/RBAC/audit foundation，再实现题库 mapping read/write API。
