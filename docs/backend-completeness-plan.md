@@ -20,8 +20,8 @@
 | 学生客观题后端闭环 | **约 88–92%** | 已可内部试用；核心链路稳定。 |
 | 后端工程可验证性 | **约 80%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 50–58%** | 学生客观题稳了，但管理端、正式身份、全题型和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 55%** | 缺正式安全策略、监控、备份恢复、rate limit、CSRF、部署验收。 |
+| 完整平台后端 | **约 54–62%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态和 dry-run 导入任务，但 Question Review、正式身份、全题型和生产能力仍未完成。 |
+| 公开生产后端就绪 | **约 56%** | 缺正式安全策略、监控、备份恢复、rate limit、CSRF、部署验收和管理员 bootstrap。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -31,7 +31,7 @@
 
 已完成：
 
-- PostgreSQL schema 与四份 ordered SQL migration。
+- PostgreSQL schema 与六份 ordered SQL migration。
 - 原始题库解析：
   - classifications
   - questions
@@ -42,6 +42,8 @@
 - orphan options 明确跳过并计数。
 - 自动生成 `bank_mappings`。
 - 可见题库筛选。
+- 管理端 `import_jobs` 任务表。
+- Import Jobs dry-run API 可复用现有题库解析和 mapping 生成逻辑产出 summary。
 - 完整 corpus slow smoke。
 
 已验证数据：
@@ -161,17 +163,17 @@
 - Web response parse
 - 不合法 repository payload fail closed 为 `500`
 
-当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API 与 System Status API 已实现；Import Job、Question Review 尚未完成。**
+当前定位：**学生端主要 runtime contract 已稳定；Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API 与 Import Job dry-run API 已实现；Question Review 尚未完成。**
 
 ### 2.8 Verification
 
 已完成质量门：
 
 - `npm run verify:docker`
-- 345 Vitest
-- 297 API tests
+- 357 Vitest
+- 308 API tests
 - 31 Web tests
-- 17 Shared tests
+- 18 Shared tests
 - 3 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
@@ -193,19 +195,17 @@
 - 没有学校账号/邀请码/SSO 决策。
 - 没有找回账号。
 - 没有账号合并。
-- 没有 admin identity。
-- 没有 RBAC。
-- 没有权限审计。
+- Admin identity/RBAC/audit foundation 已有，但缺少初始 `super_admin` bootstrap、管理员账号管理和生产级安全策略。
 
 影响：
 
 - 不能公开生产。
-- 不能安全建设管理端。
-- 不能区分学生、内容运营、管理员。
+- 不能安全开放管理端给真实运营团队。
+- 学生身份与管理员身份虽已隔离，但账号生命周期仍不完整。
 
-### 3.2 管理端后端基本未实现
+### 3.2 管理端后端未完整实现
 
-当前已有的只是数据基础：
+当前已有：
 
 - `bank_mappings`
 - `visible`
@@ -213,49 +213,42 @@
 - mapping metadata
 - import CLI
 - question tables
+- Admin Auth/RBAC/session/audit foundation
+- Bank Mapping list/detail/update/bulk-status APIs
+- System Status API
+- Import Jobs dry-run APIs
 
 未完成：
 
-- `/api/admin/*`
-- 管理员登录
-- RBAC
-- 题库 mapping 列表/详情/编辑
-- 批量发布/隐藏
-- optimistic concurrency/version
-- audit log
-- import job table
-- 导入任务进度
-- 导入错误摘要
+- Question Review API / `question_quality_flags`
+- Audit Log read API
+- Admin User 管理 / bootstrap CLI
+- 真正执行写入的 import mode
 - 题目质检标记
 - 学生端排除异常题策略
+- 管理端前端
 
-这是完整平台后端最大的缺口。
+这是完整平台后端剩余最大的业务缺口。
 
-### 3.3 Catalog 仍偏学生读取，不是运营管理
+### 3.3 Catalog 已有管理 API，但运营工作流未完成
 
-已能给学生展示题库，但缺：
+已能给学生展示题库，也能通过 Admin API 编辑题库整理字段、发布/隐藏和做乐观并发控制，但仍缺：
 
-- 人工整理题库名称
-- 学科/标签/说明编辑
 - 发布流程
 - 审批流程
-- 可见性批量管理
 - 数据健康检查
 - 内容质量抽查
 - mapping 变更历史
 
-### 3.4 Import 仍是 CLI，不是平台任务系统
+### 3.4 Import 已有 dry-run 任务，但还不是完整平台任务系统
 
-已完成 CLI 导入与 smoke，但缺：
+已完成 CLI 导入、smoke、`import_jobs` 表、dry-run 触发、running lock、进度/summary/error 摘要和 source allowlist，但缺：
 
-- `import_jobs`
-- 后台触发
-- job 状态
-- job progress
-- job result summary
 - 错误下载/查看
 - 增量导入策略
-- 导入锁
+- 真正执行写入的 `mode=import`
+- retry/cancel 策略
+- 异步 worker/队列策略
 - 管理端可视化
 
 ### 3.5 非客观题/复杂题型流程未完成
@@ -362,14 +355,15 @@
 - Wrongbook
 - Auth
 - Catalog
+- Admin Auth / Bank Mapping / System Status / Import Job
 - 通用 error
 - Health
 
 未覆盖：
 
-- Admin
+- Question Review
+- Audit Log read API
 - Readiness/DB health
-- Import job
 - 部分 request schema 在 route 中仍手写
 
 ### 3.10 生产运维能力不足
@@ -406,15 +400,15 @@
 
 ## 4. 后端下一步规划
 
-本路线中 B1 到 B5.3 已按顺序执行完毕。当前下一步仍然不要直接开管理端大工程，也不要先做最终视觉；应继续完成管理端后端最小闭环。
+本路线中 B1 到 B5.5 已按顺序执行完毕。当前下一步仍然不要直接开管理端大工程，也不要先做最终视觉；应继续完成管理端后端最小闭环。
 
-当前建议继续做 **B5.5 Import Jobs**，再做 Question Review。
+当前建议继续做 **B5.6 Question Review Flags**。
 
 原因：
 
 1. 学生客观题主链路已经稳定，适合继续在稳定测试保护下补管理端能力。
-2. Bank Mapping read/write 与 System Status 已有 Auth/RBAC/Audit 基础，Import Jobs 是把 CLI 导入平台化的下一块关键能力。
-3. Import Jobs 稳定后，Question Review 会更容易复用任务状态、质量统计和审计边界。
+2. Bank Mapping read/write、System Status 与 Import Jobs 已有 Auth/RBAC/Audit 基础，Question Review 是管理端最小可运营闭环的最后一块后端业务能力。
+3. Question Review 稳定后，才更适合进入管理端信息架构审核、静态 wireframe 和最后的前端实现。
 
 ## 5. 推荐执行路线
 
@@ -665,7 +659,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
 
 目标：最小可运营闭环。
 
-状态：**进行中。B5.1/B5.2/B5.3/B5.4 已完成，2026-07-13。**
+状态：**进行中。B5.1/B5.2/B5.3/B5.4/B5.5 已完成，2026-07-13。**
 
 优先实现：
 
@@ -674,10 +668,10 @@ bank_mappings.version / updated_at / updated_by_admin_id
 3. bank mappings list/detail — **已完成**
 4. bank mappings update + batch visible/status — **已完成**
 5. system status — **已完成**
+6. import jobs — **已完成（dry-run first）**
 
 后实现：
 
-6. import jobs
 7. question review flags
 8. import error report
 
@@ -796,28 +790,60 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - repository payload 使用 shared schema fail closed。
   - PostgreSQL integration 覆盖真实 counts、migration summary、future table fallback。
 
-下一步：**B5.5 Import Jobs**。
+#### B5.5 实际落地
 
-### Phase B6 — Import Jobs And Data Health
+- 新增 migration `0006_import_jobs.sql`：
+  - `import_jobs` 表。
+  - `status + created_at`、`created_by_admin_id` 索引。
+  - 同一 `kind` 只允许一个 `running` job 的 partial unique lock。
+  - `kind/mode/status` check 约束。
+- 新增 shared v1 Admin Import Job schema：
+  - kind/mode/status/options/progress/summary/errorSummary。
+  - list/detail/create response。
+  - list query filter：`status`、`createdBy`、`limit`、`offset`。
+- 新增 Admin Import Job repository/service：
+  - memory/PostgreSQL 双路径。
+  - source directory allowlist：`ADMIN_IMPORT_ALLOWED_ROOTS`。
+  - `resetBeforeImport=true` 需要 `super_admin`。
+  - `mode=dry_run` 同步运行，复用 `loadQuestionBankData` + `generateBankMappings` 产出 summary。
+  - `mode=import` 暂不启用，明确返回 `422`。
+  - dry-run 成功写 `succeeded`，异常写 `failed` 和 `errorSummary`。
+- 新增 routes：
+  - `GET /api/admin/import-jobs`
+  - `POST /api/admin/import-jobs`
+  - `GET /api/admin/import-jobs/:id`
+- 已验证：
+  - `import_job:read/create` 权限守卫。
+  - 无管理员 session 返回 `401`。
+  - 无 allowlist / disallowed source 返回 `403`。
+  - 已有 running job 返回 `409`。
+  - `mode=import` 返回 `422`。
+  - 成功创建写 `import_job.create` audit log。
+  - PostgreSQL integration 覆盖 migration、创建、列表、详情、audit、System Status latest import job。
 
-目标：把 CLI 导入升级为平台任务。
+下一步：**B5.6 Question Review Flags**。
+
+### Phase B5.6 — Question Review Flags
+
+目标：补齐管理端题目质量标记后端，让内容运营可以记录异常题并选择性排除练习。
 
 后端能力：
 
-- create import job
-- job status
-- progress counters
-- result summary
-- error summary
-- import lock
-- retry/cancel 策略
-- data health check
+- migration `0007_question_quality_flags.sql`
+- shared v1 Question Review schema
+- `GET /api/admin/question-review`
+- `PATCH /api/admin/question-review/:questionId`
+- open/resolved/ignored 状态
+- severity、reason、note、excludedFromPractice
+- created/resolved admin attribution
+- System Status quality summary 使用真实表
+- 可选 practice exclusion rule，必须有显式测试
 
 注意：
 
-- 初期可以仍由 Node process 同步执行，不必先引入队列。
-- 不急着上复杂消息队列。
-- job table 和状态 API 先稳定。
+- 第一版仍不直接编辑原始题干/答案，只记录 quality flag。
+- 不做管理前端。
+- 是否立即影响学生选题必须由 `excludedFromPractice=true` 明确控制。
 
 ### Phase B7 — Student Learning Record And Statistics
 
@@ -887,24 +913,24 @@ review_items
 
 如果继续本规划，下一步建议执行：
 
-> **B5.5 Import Jobs。**
+> **B5.6 Question Review Flags。**
 
 具体第一阶段 commit 目标：
 
 ```text
-feat: add admin import jobs api
+feat: add admin question review api
 ```
 
 范围只包含：
 
-- migration `0006_import_jobs.sql`
-- shared v1 import job schema
-- `GET /api/admin/import-jobs`
-- `POST /api/admin/import-jobs`
-- `GET /api/admin/import-jobs/:id`
-- `import_job:read/create` 权限守卫
-- running lock
-- dry-run mode first
+- migration `0007_question_quality_flags.sql`
+- shared v1 question review schema
+- `GET /api/admin/question-review`
+- `PATCH /api/admin/question-review/:questionId`
+- `question_review:read/write` 权限守卫
+- open/resolved/ignored quality flag
+- optional `excludedFromPractice` rule behind explicit tests
+- System Status quality summary 接入真实表
 - route/unit/PostgreSQL integration 覆盖
 - 更新 architecture/todo/status/api docs
 - 全量 verify:docker
@@ -913,8 +939,9 @@ feat: add admin import jobs api
 
 - 不改 UI
 - 不创建 `apps/admin`
-- 不做完整异步 worker/队列
-- 不做 Question Review 写流程
+- 不编辑原始题干/选项/答案
+- 不做完整审核工作台
+- 不开启复杂审批流
 - 不改业务语义
 - 不引入微服务
 - 不引入队列
@@ -936,6 +963,6 @@ feat: add admin import jobs api
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write 与 System Status 已落地；完整平台后端还缺 Import Jobs、Question Review、正式身份、模块化、非客观题和生产运维。**
+> **学生客观题主链路已经完成并稳定；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status 与 Import Jobs dry-run 已落地；完整平台后端还缺 Question Review、管理员 bootstrap、正式身份、模块化、非客观题和生产运维。**
 
-最合理的下一步是继续 Admin 后端 MVP：先补 Import Jobs，再进入 Question Review。
+最合理的下一步是继续 Admin 后端 MVP：补 Question Review；前端仍应等管理后端 command/query 基本稳定后再进入设计审核。

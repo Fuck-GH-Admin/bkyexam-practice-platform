@@ -8,7 +8,7 @@
 
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
-> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs 与 System Status API。包括 `0005_admin_foundation.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、shared v1 Admin Auth/Bank Mapping/System Status schema、optimistic concurrency、audit log 和 PostgreSQL integration 测试。Import Job、Question Review 仍按本文后续章节实现。
+> B5 更新：2026-07-13 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API 与 Import Jobs dry-run API。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、shared v1 Admin Auth/Bank Mapping/System Status/Import Job schema、optimistic concurrency、audit log、import running lock、source allowlist 和 PostgreSQL integration 测试。Question Review 仍按本文后续章节实现。
 
 ## 1. 目标与非目标
 
@@ -1151,6 +1151,8 @@ Rules：
 
 ### B5.5 Import Jobs
 
+状态：**已完成，2026-07-13。**
+
 交付：
 
 - migration `0006_import_jobs.sql`
@@ -1158,7 +1160,11 @@ Rules：
 - `POST /api/admin/import-jobs`
 - `GET /api/admin/import-jobs/:id`
 - running lock
-- dry-run mode first
+- dry-run mode first；真实写入 import mode 仍保留但返回 `422`，等待后续显式开启
+- `ADMIN_IMPORT_ALLOWED_ROOTS` source allowlist
+- `resetBeforeImport=true` 需要 `super_admin`
+- `import_job.create` audit log
+- System Status 可读取 latest import job
 
 ### B5.6 Question Review Flags
 
@@ -1179,6 +1185,7 @@ B5 完成时必须满足：
 - 缺少权限返回 `403`。
 - 管理员可以查看题库 mapping。
 - 管理员可以编辑并发布/隐藏题库。
+- 管理员可以创建 dry-run import job、查看导入任务列表和详情。
 - 写操作有 optimistic concurrency。
 - 写操作写 audit log。
 - 学生 `/api/banks` 只返回已发布可见且含客观题的题库。
@@ -1202,8 +1209,8 @@ B5 实现前需要做最终确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做 Admin UI。Admin identity/RBAC/audit 与 bank mapping read/write 已完成，下一步应补：
+当前仍不应先做 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status 与 import jobs dry-run 已完成，下一步应补：
 
-> **System Status + Import Jobs + Question Review backend APIs**
+> **Question Review backend APIs**
 
-这会把最小可运营闭环继续向导入任务和题目质检推进，同时保持前端最后设计。
+这会把最小可运营闭环继续向题目质检推进，同时保持前端最后设计。

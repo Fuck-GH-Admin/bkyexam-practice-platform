@@ -9,6 +9,7 @@ const configSchema = z.object({
   COOKIE_SECURE: z.string().optional().transform((value) => value === 'true'),
   SESSION_TTL_DAYS: z.string().optional().transform((value) => parsePositiveInteger(value, 30)),
   ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
+  ADMIN_IMPORT_ALLOWED_ROOTS: z.string().optional().transform(parsePathList),
 });
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -16,6 +17,15 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePathList(value: string | undefined): string[] {
+  if (!value) return [];
+
+  return value
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {

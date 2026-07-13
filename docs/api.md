@@ -389,13 +389,119 @@ Rules：
 - 每个成功项独立写 `bank_mapping.update` audit log。
 - 单项失败会进入 `failed`，不影响其他项。
 
+## Admin Import Jobs
+
+Admin Import Jobs 是 B5.5 已实现的导入任务后端第一版。当前只启用 `mode=dry_run`：它会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；真正写入数据库的 `mode=import` 暂时返回 `422`。
+
+运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。
+
+### `GET /api/admin/import-jobs`
+
+Permission：`import_job:read`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `status` | `queued|running|succeeded|failed|cancelled` | optional |
+| `createdBy` | UUID | optional |
+| `limit` | integer 1..100 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "jobs": [
+    {
+      "id": "import-job-uuid",
+      "kind": "full_corpus_import",
+      "mode": "dry_run",
+      "status": "succeeded",
+      "sourceDir": "C:\\questionbank",
+      "options": {
+        "batchSize": 1000,
+        "resetBeforeImport": false,
+        "generateMappings": true
+      },
+      "progress": { "phase": "done", "current": 89922, "total": 89922 },
+      "summary": {
+        "classifications": 2941,
+        "questions": 89922,
+        "rawOptions": 180323,
+        "options": 154899,
+        "skippedOptions": 25424,
+        "bankMappings": 2662,
+        "questionTypes": { "single_choice": 30980 }
+      },
+      "errorSummary": [],
+      "createdBy": { "id": "admin-user-uuid", "displayName": "Operator" },
+      "createdAt": "2026-07-13T10:00:00.000Z",
+      "startedAt": "2026-07-13T10:00:00.000Z",
+      "finishedAt": "2026-07-13T10:00:01.000Z"
+    }
+  ],
+  "page": { "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+### `POST /api/admin/import-jobs`
+
+Permission：`import_job:create`
+
+Request：
+
+```json
+{
+  "kind": "full_corpus_import",
+  "mode": "dry_run",
+  "sourceDir": "C:\\questionbank",
+  "options": {
+    "batchSize": 1000,
+    "resetBeforeImport": false,
+    "generateMappings": true
+  }
+}
+```
+
+Rules：
+
+- 同一 `kind` 同时只能有一个 `running` job；冲突返回 `409`。
+- `sourceDir` 必须在 `ADMIN_IMPORT_ALLOWED_ROOTS` 内；否则返回 `403`。
+- `resetBeforeImport=true` 必须由 `super_admin` 执行；否则返回 `403`。
+- `mode=import` 暂未启用；返回 `422`。
+- 成功创建后写 `import_job.create` audit log；dry-run 过程中解析失败会把 job 标为 `failed` 并返回失败摘要。
+
+### `GET /api/admin/import-jobs/:jobId`
+
+Permission：`import_job:read`
+
+Response：
+
+```json
+{
+  "job": {
+    "...": "same shape as list item"
+  }
+}
+```
+
+Errors：
+
+- `400`：query、body 或 job id 无效。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：缺少 `import_job:read/create`、sourceDir 不在 allowlist，或非 super_admin 使用 `resetBeforeImport`。
+- `404`：job 不存在。
+- `409`：同类 job 已在运行。
+- `422`：请求 `mode=import`。
+
 ## Admin System Status
 
 ### `GET /api/admin/system/status`
 
 Permission：`system_status:read`
 
-这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量，以及未来 Import Job / Question Review 表存在时的简要状态。
+这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量、Import Job 简要状态，以及未来 Question Review 表存在时的简要状态。
 
 Response：
 
@@ -408,8 +514,8 @@ Response：
   },
   "database": {
     "ok": true,
-    "migrationCount": 5,
-    "currentMigration": "0005_admin_foundation.sql"
+    "migrationCount": 6,
+    "currentMigration": "0006_import_jobs.sql"
   },
   "corpus": {
     "classifications": 2941,
@@ -419,9 +525,13 @@ Response：
     "visibleBanks": 473
   },
   "imports": {
-    "tableExists": false,
+    "tableExists": true,
     "runningJobId": null,
-    "lastJob": null
+    "lastJob": {
+      "id": "import-job-uuid",
+      "status": "succeeded",
+      "finishedAt": "2026-07-13T10:00:01.000Z"
+    }
   },
   "quality": {
     "tableExists": false,
@@ -435,7 +545,7 @@ Response：
 Notes：
 
 - `visibleBanks` 与学生 `/api/banks` 口径一致：`visible=true`、`status=active` 且含客观题。
-- `imports.tableExists=false` 表示 Import Jobs migration 尚未落地。
+- `imports.tableExists=true` 表示 Import Jobs migration 已落地；`lastJob` 是最近创建的导入任务摘要。
 - `quality.tableExists=false` 表示 Question Review flags migration 尚未落地。
 
 Errors：
@@ -948,9 +1058,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin Bank Mapping read/write 与 Admin System Status route/shared schema 已实现；Import Job、Question Review 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth、Admin Bank Mapping read/write、Admin System Status 与 Admin Import Job route/shared schema 已实现；Question Review、Audit Log read 和 Admin User manage API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

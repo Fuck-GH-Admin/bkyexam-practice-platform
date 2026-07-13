@@ -8,6 +8,7 @@ import {
   auditLogs,
   bankMappings,
   classifications,
+  importJobs,
   practiceAttempts,
   practiceSessionDrafts,
   practiceSessionQuestions,
@@ -28,6 +29,7 @@ describe('database schema', () => {
     expect(getTableName(adminSessions)).toBe('admin_sessions');
     expect(getTableName(adminUserRoles)).toBe('admin_user_roles');
     expect(getTableName(auditLogs)).toBe('audit_logs');
+    expect(getTableName(importJobs)).toBe('import_jobs');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -86,6 +88,33 @@ describe('database schema', () => {
       'version',
       'updated_at',
       'updated_by_admin_id',
+    ]));
+  });
+
+  it('defines import job tracking with a one-running-job index', () => {
+    const tableConfig = getTableConfig(importJobs);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'kind',
+      'mode',
+      'status',
+      'source_dir',
+      'options',
+      'progress',
+      'summary',
+      'error_summary',
+      'created_by_admin_id',
+      'created_at',
+      'started_at',
+      'finished_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'import_jobs_status_created_at_idx',
+      'import_jobs_created_by_idx',
+      'import_jobs_one_running_kind_idx',
     ]));
   });
 

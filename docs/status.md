@@ -11,7 +11,7 @@
 - **学生客观题 MVP：可内部试用。**
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
-- **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API 与 System Status API 已实现，尚未开始前端。**
+- **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API 与 Import Jobs dry-run API 已实现，尚未开始前端。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -20,7 +20,7 @@
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 88%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练均可用；账户、统计、归档和部分 UX 未完成 |
 | 公开生产就绪度 | **约 55%** | 缺正式身份策略、远端 CI 首次验收、监控、备份、安全与部署验收 |
-| 完整产品愿景 | **约 63%** | 学生信息架构、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API 与 System Status API 已落地，但分母仍包含管理前端、导入/质检 API、全题型、运营与生产能力 |
+| 完整产品愿景 | **约 64%** | 学生信息架构、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API 与 Import Jobs dry-run API 已落地，但分母仍包含管理前端、题目质检 API、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -36,10 +36,10 @@ npm run verify:docker  PASS
 
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
-| `packages/shared` | 2 | 17 |
-| `apps/api` | 42 | 297 |
+| `packages/shared` | 2 | 18 |
+| `apps/api` | 44 | 308 |
 | `apps/web` | 2 | 31 |
-| **Total** | **46** | **345** |
+| **Total** | **48** | **357** |
 
 仓库内 Playwright smoke：
 
@@ -57,7 +57,7 @@ Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个
 | --- | ---: | ---: |
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
-该测试从空数据库执行五份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成学生登录、Admin Auth/RBAC/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行六份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成学生登录、Admin Auth/RBAC/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs 创建/list/detail/audit/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
 
 全量题库慢速 smoke：
 
@@ -82,14 +82,14 @@ npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 - shared TypeScript build：通过。
 - API TypeScript build：通过。
 - Web Vite build：通过。
-- Web bundle：约 `301.72 kB` JS（gzip `89.52 kB`）。
+- Web bundle：约 `303.21 kB` JS（gzip `89.86 kB`）。
 - Web CSS：约 `20.26 kB`（gzip `4.98 kB`）。
 
 主 JS 当前包含 Web 运行时 Zod response validation 和所有学生页面；内部 MVP 可以接受，下一轮 Web modularization 应引入 route-level code splitting。
 
 ## Verified Contract Boundary
 
-Practice/Wrongbook/Auth/Catalog/Error/Health v1 contract 已落到 `packages/shared/src/contracts/v1`：
+Practice/Wrongbook/Auth/Catalog/Admin/Error/Health v1 contract 已落到 `packages/shared/src/contracts/v1`：
 
 - API repository DTO 直接引用共享类型。
 - Fastify 在发送 Practice/Wrongbook/Auth/Catalog/Health 成功响应前执行共享 schema parse。
@@ -100,6 +100,7 @@ Practice/Wrongbook/Auth/Catalog/Error/Health v1 contract 已落到 `packages/sha
 - `completedCount` 的 v1 语义固定为 `answered_or_graded_questions`。
 - 会话卡片/page contract 固定 `origin`、active/completed timestamp、answered/review counters 和分页边界。
 - 学生 catalog contract 固定 `visible=true` 和非负 `questionCount`。
+- Admin contract 固定 Auth/RBAC、Bank Mapping read/write、System Status 与 Import Job dry-run 的 request/response 边界。
 
 详细规则见 [contracts.md](contracts.md)。
 
@@ -278,7 +279,7 @@ PracticeSessionService
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
-| Admin console | 后端基础进行中，前端未实现 | 26% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*`、Bank Mapping read/write API、System Status API、optimistic concurrency、audit | import/review API、管理应用、管理员 bootstrap、工作流 UI |
+| Admin console | 后端基础进行中，前端未实现 | 31% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*`、Bank Mapping read/write API、System Status API、Import Jobs dry-run API、optimistic concurrency、audit | Question Review API、真正写入 import mode、管理应用、管理员 bootstrap、工作流 UI |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
 | Operations | 可重复验证 | 70% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档 | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
 
@@ -287,14 +288,14 @@ PracticeSessionService
 ### P0 Before Public Production
 
 - 当前登录策略接近“用户名即身份”，不适合公开环境。
-- 已有 Admin Auth/RBAC/session/audit foundation，但没有完整管理业务 API、管理员账号管理 UI 和正式运营流程。
+- 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status 与 Import Jobs dry-run API，但仍缺 Question Review、管理员账号管理 UI 和正式运营流程。
 - 没有备份/恢复演练、监控和告警。
 - 没有对正式域名部署进行本轮验收。
 
 ### P1 Before Large Feature Expansion
 
 - `App.tsx` 和 Practice routes 仍偏大；Practice repository 已拆成模块，但 submit service、route validation 与错误映射仍待后续分离。
-- Auth、Catalog、Practice、Wrongbook、Error 与 Health DTO 已迁入 shared v1；request parser 仍未统一。
+- Auth、Catalog、Practice、Wrongbook、Admin、Error 与 Health DTO 已迁入 shared v1；request parser 仍未统一。
 - session 集合已有后端分页，但首页/历史尚无“加载更多”、放弃或归档 active session 的交互。
 - 轻量 History API router 尚无 route-level code splitting、navigation guard 与统一错误页。
 - `completedCount` 已在 v1 contract 固定为 answered/graded count，但字段名称仍容易误解；未来更名必须走显式版本迁移。

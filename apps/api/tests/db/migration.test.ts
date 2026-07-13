@@ -57,4 +57,16 @@ describe('initial database migration', () => {
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS version integer NOT NULL DEFAULT 1');
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS updated_by_admin_id uuid REFERENCES admin_users(id)');
   });
+
+  it('creates import job tracking with a one-running-job lock', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0006_import_jobs.sql'), 'utf8');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS import_jobs');
+    expect(sql).toContain("CHECK (kind IN ('full_corpus_import'))");
+    expect(sql).toContain("CHECK (mode IN ('dry_run', 'import'))");
+    expect(sql).toContain("CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled'))");
+    expect(sql).toContain('import_jobs_status_created_at_idx');
+    expect(sql).toContain('import_jobs_one_running_kind_idx');
+    expect(sql).toContain("WHERE status = 'running'");
+  });
 });

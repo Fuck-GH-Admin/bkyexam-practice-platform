@@ -223,3 +223,105 @@ export const AdminSystemStatusResponseV1Schema = z.object({
   }).strict(),
 }).strict();
 export type AdminSystemStatusResponseV1 = z.infer<typeof AdminSystemStatusResponseV1Schema>;
+
+export const AdminImportJobKindV1Schema = z.enum(['full_corpus_import']);
+export type AdminImportJobKindV1 = z.infer<typeof AdminImportJobKindV1Schema>;
+
+export const AdminImportJobModeV1Schema = z.enum(['dry_run', 'import']);
+export type AdminImportJobModeV1 = z.infer<typeof AdminImportJobModeV1Schema>;
+
+export const AdminImportJobStatusV1Schema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']);
+export type AdminImportJobStatusV1 = z.infer<typeof AdminImportJobStatusV1Schema>;
+
+export const AdminImportJobOptionsV1Schema = z.object({
+  batchSize: z.number().int().min(1).max(10_000).default(1_000),
+  resetBeforeImport: z.boolean().default(false),
+  generateMappings: z.boolean().default(true),
+}).strict();
+export type AdminImportJobOptionsV1 = z.infer<typeof AdminImportJobOptionsV1Schema>;
+
+export const AdminImportJobProgressV1Schema = z.object({
+  phase: z.string().min(1),
+  current: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+}).strict();
+export type AdminImportJobProgressV1 = z.infer<typeof AdminImportJobProgressV1Schema>;
+
+export const AdminImportJobSummaryV1Schema = z.object({
+  classifications: z.number().int().nonnegative().optional(),
+  questions: z.number().int().nonnegative().optional(),
+  rawOptions: z.number().int().nonnegative().optional(),
+  options: z.number().int().nonnegative().optional(),
+  skippedOptions: z.number().int().nonnegative().optional(),
+  bankMappings: z.number().int().nonnegative().optional(),
+  questionTypes: z.object({}).catchall(z.number().int().nonnegative()).optional(),
+}).strict();
+export type AdminImportJobSummaryV1 = z.infer<typeof AdminImportJobSummaryV1Schema>;
+
+export const AdminImportJobErrorSummaryV1Schema = z.array(z.object({
+  message: z.string().min(1),
+}).catchall(z.unknown()).strict());
+export type AdminImportJobErrorSummaryV1 = z.infer<typeof AdminImportJobErrorSummaryV1Schema>;
+
+export const AdminImportJobActorV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  displayName: z.string().min(1),
+}).strict();
+export type AdminImportJobActorV1 = z.infer<typeof AdminImportJobActorV1Schema>;
+
+export const AdminImportJobV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  kind: AdminImportJobKindV1Schema,
+  mode: AdminImportJobModeV1Schema,
+  status: AdminImportJobStatusV1Schema,
+  sourceDir: z.string().min(1),
+  options: AdminImportJobOptionsV1Schema,
+  progress: AdminImportJobProgressV1Schema,
+  summary: AdminImportJobSummaryV1Schema,
+  errorSummary: AdminImportJobErrorSummaryV1Schema,
+  createdBy: AdminImportJobActorV1Schema.nullable(),
+  createdAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
+  finishedAt: z.string().datetime().nullable(),
+}).strict();
+export type AdminImportJobV1 = z.infer<typeof AdminImportJobV1Schema>;
+
+export const ListAdminImportJobsRequestV1Schema = z.object({
+  status: AdminImportJobStatusV1Schema.optional(),
+  createdBy: CaseInsensitiveUuidV1Schema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminImportJobsRequestV1 = z.infer<typeof ListAdminImportJobsRequestV1Schema>;
+
+export const CreateAdminImportJobRequestV1Schema = z.object({
+  kind: AdminImportJobKindV1Schema,
+  sourceDir: z.string().min(1),
+  mode: AdminImportJobModeV1Schema,
+  options: AdminImportJobOptionsV1Schema.default({
+    batchSize: 1_000,
+    resetBeforeImport: false,
+    generateMappings: true,
+  }),
+}).strict();
+export type CreateAdminImportJobRequestV1 = z.infer<typeof CreateAdminImportJobRequestV1Schema>;
+
+export const AdminImportJobListResponseV1Schema = z.object({
+  jobs: z.array(AdminImportJobV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminImportJobListResponseV1 = z.infer<typeof AdminImportJobListResponseV1Schema>;
+
+export const AdminImportJobDetailResponseV1Schema = z.object({
+  job: AdminImportJobV1Schema,
+}).strict();
+export type AdminImportJobDetailResponseV1 = z.infer<typeof AdminImportJobDetailResponseV1Schema>;
+
+export const CreateAdminImportJobResponseV1Schema = z.object({
+  job: AdminImportJobV1Schema,
+}).strict();
+export type CreateAdminImportJobResponseV1 = z.infer<typeof CreateAdminImportJobResponseV1Schema>;

@@ -134,6 +134,8 @@ The API currently reads configuration from environment variables through `apps/a
 - `COOKIE_SECRET`: signs cookie data and defaults to `dev-cookie-secret-change-me` for local development. Set a long random value in production.
 - `COOKIE_SECURE`: accepts `true` to require HTTPS-only cookies. Defaults to `false`; set to `true` behind production HTTPS.
 - `SESSION_TTL_DAYS`: positive integer session lifetime in days, default `30`.
+- `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
+- `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
 
 The API currently listens on `127.0.0.1`, which matches the intended Nginx reverse-proxy shape.
 
@@ -143,7 +145,7 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
-- real administrator identity and authorization;
+- administrator bootstrap/account lifecycle beyond the current Admin Auth/RBAC foundation;
 - strong student identity policy;
 - secrets management;
 - PostgreSQL backup and restore drill;

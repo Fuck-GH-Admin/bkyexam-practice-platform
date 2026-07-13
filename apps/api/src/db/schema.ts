@@ -139,6 +139,33 @@ export const auditLogs = pgTable(
   ],
 );
 
+export const importJobs = pgTable(
+  'import_jobs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    kind: text('kind').notNull(),
+    mode: text('mode').notNull(),
+    status: text('status').notNull(),
+    sourceDir: text('source_dir').notNull(),
+    options: jsonb('options').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    progress: jsonb('progress').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    summary: jsonb('summary').$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+    errorSummary: jsonb('error_summary').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    createdByAdminId: uuid('created_by_admin_id').references(() => adminUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('import_jobs_status_created_at_idx').on(table.status, table.createdAt.desc()),
+    index('import_jobs_created_by_idx').on(table.createdByAdminId, table.createdAt.desc()),
+    uniqueIndex('import_jobs_one_running_kind_idx').on(table.kind).where(sql`${table.status} = 'running'`),
+    check('import_jobs_kind_check', sql`${table.kind} IN ('full_corpus_import')`),
+    check('import_jobs_mode_check', sql`${table.mode} IN ('dry_run', 'import')`),
+    check('import_jobs_status_check', sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')`),
+  ],
+);
+
 export const bankMappings = pgTable(
   'bank_mappings',
   {

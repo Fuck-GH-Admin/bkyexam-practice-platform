@@ -4,12 +4,17 @@ import {
   AdminLoginRequestV1Schema,
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
+  AdminImportJobDetailResponseV1Schema,
+  AdminImportJobListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
   BulkUpdateAdminBankMappingStatusRequestV1Schema,
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
+  CreateAdminImportJobRequestV1Schema,
+  CreateAdminImportJobResponseV1Schema,
   ListAdminBankMappingsRequestV1Schema,
+  ListAdminImportJobsRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
@@ -173,7 +178,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
   it('parses admin system status contracts', () => {
     const status = AdminSystemStatusResponseV1Schema.parse({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 5, currentMigration: '0005_admin_foundation.sql' },
+      database: { ok: true, migrationCount: 6, currentMigration: '0006_import_jobs.sql' },
       corpus: {
         classifications: 2941,
         questions: 89922,
@@ -182,9 +187,13 @@ describe('v1 auth/catalog/error/health contracts', () => {
         visibleBanks: 473,
       },
       imports: {
-        tableExists: false,
+        tableExists: true,
         runningJobId: null,
-        lastJob: null,
+        lastJob: {
+          id: '60000000-0000-4000-8000-000000000001',
+          status: 'succeeded',
+          finishedAt: '2026-07-13T10:00:01.000Z',
+        },
       },
       quality: {
         tableExists: false,
@@ -194,10 +203,71 @@ describe('v1 auth/catalog/error/health contracts', () => {
       },
     });
 
-    expect(status.database.currentMigration).toBe('0005_admin_foundation.sql');
+    expect(status.database.currentMigration).toBe('0006_import_jobs.sql');
     expect(() => AdminSystemStatusResponseV1Schema.parse({
       ...status,
       corpus: { ...status.corpus, questions: -1 },
+    })).toThrow();
+  });
+
+  it('parses admin import job contracts with defaults and summary boundaries', () => {
+    const jobId = '60000000-0000-4000-8000-000000000001';
+    const createdBy = '50000000-0000-4000-8000-000000000001';
+    const request = CreateAdminImportJobRequestV1Schema.parse({
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      sourceDir: 'C:\\questionbank',
+    });
+    expect(request.options).toEqual({
+      batchSize: 1000,
+      resetBeforeImport: false,
+      generateMappings: true,
+    });
+    expect(ListAdminImportJobsRequestV1Schema.parse({
+      status: 'succeeded',
+      createdBy: createdBy.toUpperCase(),
+      limit: '10',
+      offset: '5',
+    })).toEqual({
+      status: 'succeeded',
+      createdBy,
+      limit: 10,
+      offset: 5,
+    });
+
+    const job = {
+      id: jobId,
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'succeeded',
+      sourceDir: 'C:\\questionbank',
+      options: request.options,
+      progress: { phase: 'done', current: 2, total: 2 },
+      summary: {
+        classifications: 1,
+        questions: 2,
+        rawOptions: 3,
+        options: 2,
+        skippedOptions: 1,
+        bankMappings: 1,
+        questionTypes: { single_choice: 2 },
+      },
+      errorSummary: [],
+      createdBy: { id: createdBy, displayName: 'Operator' },
+      createdAt: '2026-07-13T10:00:00.000Z',
+      startedAt: '2026-07-13T10:00:00.000Z',
+      finishedAt: '2026-07-13T10:00:01.000Z',
+    };
+
+    expect(CreateAdminImportJobResponseV1Schema.parse({ job }).job.summary.questions).toBe(2);
+    expect(AdminImportJobListResponseV1Schema.parse({
+      jobs: [job],
+      page: { limit: 20, offset: 0, hasMore: false },
+    }).jobs[0]?.id).toBe(jobId);
+    expect(AdminImportJobDetailResponseV1Schema.parse({ job }).job.createdBy?.id).toBe(createdBy);
+    expect(() => CreateAdminImportJobRequestV1Schema.parse({
+      ...request,
+      options: { ...request.options, batchSize: 0 },
     })).toThrow();
   });
 

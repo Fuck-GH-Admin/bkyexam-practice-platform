@@ -1,6 +1,7 @@
 import { createAuditService, createPgAuditLogRepository } from './admin/audit.js';
 import { createPgAdminAuthRepository } from './admin/auth.js';
 import { createPgAdminBankMappingRepository } from './admin/bankMappings.js';
+import { createPgAdminImportJobRepository } from './admin/importJobs.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from './admin/session.js';
 import { createPgAdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createPgStudentSessionRepository, createSessionService } from './auth/session.js';
@@ -19,6 +20,8 @@ const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
   adminAuthRepository: pool ? createPgAdminAuthRepository(pool) : undefined,
   adminBankMappingRepository: pool ? createPgAdminBankMappingRepository(pool) : undefined,
+  adminImportJobRepository: pool ? createPgAdminImportJobRepository(pool) : undefined,
+  adminImportAllowedRoots: config.ADMIN_IMPORT_ALLOWED_ROOTS,
   adminSystemStatusRepository: pool ? createPgAdminSystemStatusRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,

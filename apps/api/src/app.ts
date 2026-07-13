@@ -8,6 +8,7 @@ import {
 } from './admin/audit.js';
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
+import type { AdminImportJobRepository } from './admin/importJobs.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
@@ -17,6 +18,7 @@ import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
 import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
+import { createAdminImportJobRoutes } from './routes/adminImportJobs.js';
 import { createAdminSystemStatusRoutes } from './routes/adminSystemStatus.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
@@ -31,6 +33,8 @@ interface BuildAppOptions {
   authRepository?: StudentAuthRepository;
   adminAuthRepository?: AdminAuthRepository;
   adminBankMappingRepository?: AdminBankMappingRepository;
+  adminImportJobRepository?: AdminImportJobRepository;
+  adminImportAllowedRoots?: readonly string[];
   adminSystemStatusRepository?: AdminSystemStatusRepository;
   bankRepository?: BankRepository;
   practiceRepository?: PracticeRepository;
@@ -86,6 +90,12 @@ export function buildApp(options: BuildAppOptions = {}) {
     repository: options.adminBankMappingRepository,
     sessionService: adminSessionService,
     auditService,
+  }));
+  void app.register(createAdminImportJobRoutes({
+    repository: options.adminImportJobRepository,
+    sessionService: adminSessionService,
+    auditService,
+    allowedRoots: options.adminImportAllowedRoots,
   }));
   void app.register(createAdminSystemStatusRoutes({
     repository: options.adminSystemStatusRepository,

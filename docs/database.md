@@ -77,6 +77,56 @@ Indexes:
 - `bank_mappings_subject_category_idx` on `subject_category`.
 - `bank_mappings_visible_idx` on `visible`.
 
+### `admin_users`, `admin_sessions`, `admin_user_roles`
+
+Store administrator identity, server-side sessions, and role membership.
+
+- `admin_users`: login name, display name, password hash, active/disabled status, timestamps, and last login timestamp.
+- `admin_sessions`: token hash, expiry, revocation timestamp, and `admin_user_id` FK.
+- `admin_user_roles`: `(admin_user_id, role)` membership for `content_editor`, `operator`, and `super_admin`.
+
+Indexes:
+
+- `admin_sessions_admin_user_id_idx` on `admin_user_id`.
+- `admin_sessions_expires_at_idx` on `expires_at`.
+- `admin_user_roles_role_idx` on `role`.
+
+### `audit_logs`
+
+Stores admin-side business audit events.
+
+- `actor_admin_id`: nullable FK to `admin_users`.
+- `action`: event name such as `admin.auth.login`, `bank_mapping.update`, or `import_job.create`.
+- `resource_type` / `resource_id`: audited resource identity.
+- `before`, `after`, `metadata`: JSON payloads.
+- `result`: `success` or `failure`.
+- `created_at`: event timestamp.
+
+Indexes:
+
+- `audit_logs_actor_created_at_idx` on `(actor_admin_id, created_at DESC)`.
+- `audit_logs_resource_idx` on `(resource_type, resource_id, created_at DESC)`.
+- `audit_logs_action_created_at_idx` on `(action, created_at DESC)`.
+
+### `import_jobs`
+
+Stores admin-triggered import task state.
+
+- `id`: UUID primary key.
+- `kind`: currently `full_corpus_import`.
+- `mode`: `dry_run` or future `import`.
+- `status`: `queued`, `running`, `succeeded`, `failed`, or `cancelled`.
+- `source_dir`: normalized source directory.
+- `options`, `progress`, `summary`, `error_summary`: JSON payloads for task execution.
+- `created_by_admin_id`: nullable FK to `admin_users`.
+- `created_at`, `started_at`, `finished_at`: task timestamps.
+
+Indexes and constraints:
+
+- `import_jobs_status_created_at_idx` on `(status, created_at DESC)`.
+- `import_jobs_created_by_idx` on `(created_by_admin_id, created_at DESC)`.
+- `import_jobs_one_running_kind_idx` allows only one `running` job for each `kind`.
+
 ### `students`
 
 Stores student identities.
@@ -222,6 +272,10 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 
 `apps/api/src/db/migrations/0004_practice_session_history.sql` adds `practice_sessions.origin`, backfills existing sessions as `bank`, repairs missing completion timestamps on existing completed rows, adds the origin check, and creates the composite active/history paging indexes.
 
+`apps/api/src/db/migrations/0005_admin_foundation.sql` adds administrator identity/session/audit foundations. It creates `admin_users`, `admin_sessions`, `admin_user_roles`, and `audit_logs`, and extends `bank_mappings` with `version`, `updated_at`, and `updated_by_admin_id` for optimistic concurrency and audit ownership.
+
+`apps/api/src/db/migrations/0006_import_jobs.sql` adds Admin Import Jobs. It creates `import_jobs`, indexes status/creator paging, and enforces a partial unique lock so only one same-kind job can be `running` at a time.
+
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
 Run API migrations with:
@@ -239,7 +293,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 all four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-13 all six migrations, including Admin foundation and Import Jobs, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

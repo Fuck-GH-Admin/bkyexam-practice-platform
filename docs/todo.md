@@ -5,6 +5,24 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B5.5 — 2026-07-13
+
+- [x] 新增 migration `0006_import_jobs.sql`，建立 `import_jobs`。
+- [x] 新增 shared v1 Admin Import Job schema。
+- [x] 实现 `GET /api/admin/import-jobs`。
+- [x] 实现 `POST /api/admin/import-jobs`。
+- [x] 实现 `GET /api/admin/import-jobs/:jobId`。
+- [x] 复用 `import_job:read/create` 权限守卫，覆盖 `401/403`。
+- [x] 支持 `ADMIN_IMPORT_ALLOWED_ROOTS` source allowlist。
+- [x] 支持同类 `running` job lock，冲突返回 `409`。
+- [x] 先启用 `mode=dry_run`；`mode=import` 明确返回 `422`。
+- [x] dry-run 写入 progress、summary、errorSummary。
+- [x] `resetBeforeImport=true` 需要 `super_admin`。
+- [x] 成功创建写 `import_job.create` audit log。
+- [x] System Status 可返回 latest import job。
+- [x] PostgreSQL integration 覆盖 Admin Import Jobs。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B5.4 — 2026-07-13
 
 - [x] 新增 shared v1 Admin System Status schema。
@@ -192,9 +210,9 @@
 
 - [x] 管理员 identity、session 和 RBAC。
 - [x] `/api/admin/bank-mappings` 列表、详情。
-- [ ] `/api/admin/bank-mappings` 更新、批量状态。
-- [ ] mapping 写入版本/并发控制与 audit log。
-- [ ] import job table、触发、进度、结果和错误摘要。
+- [x] `/api/admin/bank-mappings` 更新、批量状态。
+- [x] mapping 写入版本/并发控制与 audit log。
+- [x] import job table、dry-run 触发、进度、结果和错误摘要。
 - [ ] 题目质检标记与学生端排除策略。
 
 ### Frontend

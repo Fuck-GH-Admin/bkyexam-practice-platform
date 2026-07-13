@@ -12,13 +12,13 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
-- Practice/Wrongbook/Auth/Catalog/Admin Auth v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API 和 Admin System Status API。
+- Practice/Wrongbook/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API 和 Import Jobs dry-run API。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
-- 完整管理平台、导入/质检 API、管理员账号 bootstrap 和管理端 UI。
+- 完整管理平台、题目质检 API、真正写入的 import mode、管理员账号 bootstrap 和管理端 UI。
 - 正式学生账户、档案、学习统计和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
@@ -104,6 +104,8 @@ USE_DATABASE=true
 COOKIE_SECRET=replace-with-a-long-random-secret
 COOKIE_SECURE=false
 SESSION_TTL_DAYS=30
+ADMIN_SESSION_TTL_HOURS=8
+ADMIN_IMPORT_ALLOWED_ROOTS=C:\path\to\questionbank
 ```
 
 PowerShell 示例：
@@ -112,6 +114,7 @@ PowerShell 示例：
 $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 $env:USE_DATABASE="true"
 $env:COOKIE_SECRET="local-development-secret"
+$env:ADMIN_IMPORT_ALLOWED_ROOTS="C:\path\to\questionbank"
 ```
 
 初始化数据库：

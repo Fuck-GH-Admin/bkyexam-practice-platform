@@ -1,8 +1,10 @@
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuditService, createPgAuditLogRepository } from '../../src/admin/audit.js';
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
 import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
+import { createPgAdminImportJobRepository } from '../../src/admin/importJobs.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
 import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
 import { hashPassword } from '../../src/auth/password.js';
@@ -19,6 +21,7 @@ import { createPgWrongQuestionRepository } from '../../src/wrongQuestions/reposi
 import { fixtureIds, resetAndSeedPostgresFixture } from './postgresFixture.js';
 
 const migrationsDir = fileURLToPath(new URL('../../src/db/migrations/', import.meta.url));
+const importFixtureDir = resolve(fileURLToPath(new URL('../import/fixtures/compact-qtype/', import.meta.url)));
 
 describe('PostgreSQL-backed API integration', () => {
   const databaseUrl = requireDedicatedTestDatabaseUrl(process.env.TEST_DATABASE_URL);
@@ -27,6 +30,8 @@ describe('PostgreSQL-backed API integration', () => {
     authRepository: createPgStudentAuthRepository(pool),
     adminAuthRepository: createPgAdminAuthRepository(pool),
     adminBankMappingRepository: createPgAdminBankMappingRepository(pool),
+    adminImportJobRepository: createPgAdminImportJobRepository(pool),
+    adminImportAllowedRoots: [importFixtureDir],
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
@@ -101,7 +106,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 5, currentMigration: '0005_admin_foundation.sql' },
+      database: { ok: true, migrationCount: 6, currentMigration: '0006_import_jobs.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -109,7 +114,7 @@ describe('PostgreSQL-backed API integration', () => {
         bankMappings: 2,
         visibleBanks: 1,
       },
-      imports: { tableExists: false, runningJobId: null, lastJob: null },
+      imports: { tableExists: true, runningJobId: null, lastJob: null },
       quality: { tableExists: false, openFlags: 0, blockingFlags: 0, excludedQuestions: 0 },
     });
 
@@ -121,6 +126,85 @@ describe('PostgreSQL-backed API integration', () => {
         AND result = 'success'
     `, ['50000000-0000-4000-8000-000000000001']);
     expect(adminAuditState.rows[0]).toEqual({ audit_count: '1' });
+
+    const createdImportJob = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: adminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir: importFixtureDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+    });
+    expect(createdImportJob.statusCode).toBe(200);
+    expect(createdImportJob.json()).toMatchObject({
+      job: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        status: 'succeeded',
+        sourceDir: importFixtureDir,
+        progress: { phase: 'done', current: 2, total: 2 },
+        summary: {
+          classifications: 1,
+          questions: 2,
+          rawOptions: 1,
+          options: 1,
+          skippedOptions: 0,
+          bankMappings: 1,
+          questionTypes: { single_choice: 1, yes_no: 1 },
+        },
+        createdBy: {
+          id: '50000000-0000-4000-8000-000000000001',
+          displayName: 'Integration Operator',
+        },
+      },
+    });
+    const importJobId = createdImportJob.json().job.id as string;
+
+    const importJobList = await app.inject({
+      method: 'GET',
+      url: '/api/admin/import-jobs?status=succeeded',
+      headers: { cookie: adminCookie },
+    });
+    expect(importJobList.statusCode).toBe(200);
+    expect(importJobList.json()).toMatchObject({
+      jobs: [{ id: importJobId, status: 'succeeded' }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    const importJobDetail = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${importJobId}`,
+      headers: { cookie: adminCookie },
+    });
+    expect(importJobDetail.statusCode).toBe(200);
+    expect(importJobDetail.json().job.id).toBe(importJobId);
+
+    const importJobAuditState = await pool.query<{ audit_count: string }>(`
+      SELECT COUNT(*) AS audit_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND action = 'import_job.create'
+        AND resource_type = 'import_job'
+        AND result = 'success'
+    `, ['50000000-0000-4000-8000-000000000001']);
+    expect(importJobAuditState.rows[0]).toEqual({ audit_count: '1' });
+
+    const adminSystemStatusAfterImport = await app.inject({
+      method: 'GET',
+      url: '/api/admin/system/status',
+      headers: { cookie: adminCookie },
+    });
+    expect(adminSystemStatusAfterImport.statusCode).toBe(200);
+    expect(adminSystemStatusAfterImport.json()).toMatchObject({
+      imports: {
+        tableExists: true,
+        runningJobId: null,
+        lastJob: { id: importJobId, status: 'succeeded', finishedAt: expect.any(String) },
+      },
+    });
 
     const adminBankMappings = await app.inject({
       method: 'GET',
