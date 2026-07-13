@@ -1,6 +1,6 @@
 # System Status
 
-状态日期：**2026-07-11**
+状态日期：**2026-07-13**
 
 本文记录“已经被代码和真实环境证明的能力”，不是愿望清单。后续每个里程碑完成后应更新本页。
 
@@ -10,6 +10,7 @@
 
 - **学生客观题 MVP：可内部试用。**
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
+- **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **管理平台：尚未开始实现。**
 - **完整生产产品：尚未达到。**
 
@@ -25,7 +26,7 @@
 
 ## Verified Automated Checks
 
-2026-07-11 在 Node.js `24.11.1` 上完成：
+2026-07-13 在 Node.js `24.11.1` 上完成：
 
 ```text
 npm run verify:docker  PASS
@@ -99,6 +100,35 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 - 会话卡片/page contract 固定 `origin`、active/completed timestamp、answered/review counters 和分页边界。
 
 详细规则见 [contracts.md](contracts.md)。
+
+## Verified Backend Module Boundary
+
+2026-07-13 完成 Phase B1：Practice 后端无行为变化拆分。
+
+当前实际结构：
+
+```text
+apps/api/src/modules/practice/
+  contracts.ts          # DTO aliases、PracticeRepository、CompletedSessionError
+  grading.ts            # objective grading rules
+  answerCodec.ts        # submit/draft answer serialization and parsing
+  resultMapper.ts       # GradeResult -> response DTO
+  memoryRepository.ts   # route-test friendly in-memory repository
+  pgRepository.ts       # PostgreSQL SQL and transaction implementation
+  repository.ts         # module barrel
+
+apps/api/src/practice/
+  grading.ts            # compatibility barrel
+  repository.ts         # compatibility barrel
+```
+
+保持不变：
+
+- 现有 import path 仍可使用 `../practice/repository.js` 与 `../practice/grading.js`。
+- HTTP contract 未变。
+- shared v1 schema 未变。
+- PostgreSQL transaction 语义未变。
+- Web 行为与 API response 未变。
 
 ## Verified Corpus And Database
 
@@ -234,7 +264,7 @@ Practice/Wrongbook v1 contract 已落到 `packages/shared/src/contracts/v1`：
 
 ### P1 Before Large Feature Expansion
 
-- `App.tsx`、Practice repository 和 Practice routes 过大。
+- `App.tsx` 和 Practice routes 仍偏大；Practice repository 已拆成模块，但 submit service、route validation 与错误映射仍待后续分离。
 - Auth 与 Catalog DTO 仍在各端手写；Practice/Wrongbook 重复 DTO 已迁入 shared v1。
 - session 集合已有后端分页，但首页/历史尚无“加载更多”、放弃或归档 active session 的交互。
 - 轻量 History API router 尚无 route-level code splitting、navigation guard 与统一错误页。

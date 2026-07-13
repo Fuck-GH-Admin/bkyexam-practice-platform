@@ -2,6 +2,20 @@
 
 路线图按依赖和风险排序，不再继续使用已失真的 Phase 3B/3C/3D 清单。
 
+后端完成度、未达成目标与下一步执行计划详见
+[`backend-completeness-plan.md`](./backend-completeness-plan.md)。
+
+## Completed Backend B1 — 2026-07-13
+
+- [x] 将 Practice DTO aliases、`PracticeRepository` 和 `CompletedSessionError` 提取到 `apps/api/src/modules/practice/contracts.ts`。
+- [x] 将 answer serialization/parsing 提取到 `answerCodec.ts`。
+- [x] 将客观题判分规则迁移到 `modules/practice/grading.ts`，并保留旧 `practice/grading.ts` compatibility barrel。
+- [x] 将 in-memory Practice repository 提取到 `memoryRepository.ts`。
+- [x] 将 PostgreSQL Practice repository、SQL mapper 与 transaction helper 提取到 `pgRepository.ts`。
+- [x] 保留旧 `practice/repository.ts` compatibility barrel，避免一次性修改 route/test import。
+- [x] 保持 HTTP contract、shared v1 schema、SQL transaction 语义与 Web 行为不变。
+- [x] `npm run verify:docker` 通过。
+
 ## Completed Stabilization — 2026-07-10/11
 
 - [x] 建立独立稳定化 worktree。

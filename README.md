@@ -161,6 +161,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [产品与模块边界](docs/product-boundaries.md)
 - [学生信息架构 v1](docs/student-information-architecture.md)
 - [架构](docs/architecture.md)
+- [后端完成度与下一步计划](docs/backend-completeness-plan.md)
 - [版本化 API Contract](docs/contracts.md)
 - [API](docs/api.md)
 - [数据库](docs/database.md)

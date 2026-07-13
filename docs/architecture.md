@@ -164,8 +164,8 @@ questionbank/*.txt
 这些问题不会阻止当前闭环运行，但已经影响继续开发：
 
 1. `apps/web/src/App.tsx` 已移出 practice UI、router 与 session card/page，但仍承担 app shell、API 调用、auth、catalog、wrongbook 和跨页面状态。
-2. `apps/api/src/practice/repository.ts` 同时包含 contract、memory repository、PostgreSQL SQL、事务和部分业务编排。
-3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射。
+2. Practice repository 已拆入 `apps/api/src/modules/practice/`，但 PostgreSQL repository 仍承载较多 SQL 与事务编排，submission service 尚未独立。
+3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射和 request validation。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
 5. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
 6. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
@@ -228,6 +228,32 @@ packages/
 ```
 
 暂不创建共享 UI 包。只有学生端和管理端已经出现真实重复、视觉系统稳定后，才考虑 `packages/ui`。
+
+## Current Practice Backend Module Shape
+
+Phase B1 后，Practice 后端已经从单个大 repository 文件拆为以下模块：
+
+```text
+apps/api/src/modules/practice/
+  contracts.ts
+  grading.ts
+  answerCodec.ts
+  resultMapper.ts
+  memoryRepository.ts
+  pgRepository.ts
+  repository.ts
+
+apps/api/src/practice/
+  grading.ts      # compatibility barrel
+  repository.ts   # compatibility barrel
+```
+
+迁移规则：
+
+- 新代码优先引用 `src/modules/practice/*`。
+- 旧 route/test 可继续通过 `src/practice/repository.ts` 和 `src/practice/grading.ts` 兼容入口运行。
+- 本阶段不改变 HTTP contract、shared schema、SQL transaction 语义或 Web 行为。
+- 下一阶段如果处理 Wrongbook/Practice 边界，应在此结构上增加 service 层，而不是回到跨上下文直接写表。
 
 ## Refactor Rules
 
