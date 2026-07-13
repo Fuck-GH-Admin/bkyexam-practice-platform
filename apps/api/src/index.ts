@@ -3,6 +3,7 @@ import { createPgStudentAuthRepository } from './auth/studentAuth.js';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPgPool } from './db/client.js';
+import { createPgPracticeSessionService } from './modules/practice/sessionService.js';
 import { createPgPracticeRepository } from './practice/repository.js';
 import { createPgBankRepository } from './repositories/bankRepository.js';
 import { createPgWrongQuestionRepository } from './wrongQuestions/repository.js';
@@ -13,6 +14,7 @@ const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,
+  practiceSessionService: pool ? createPgPracticeSessionService(pool) : undefined,
   wrongQuestionRepository: pool ? createPgWrongQuestionRepository(pool) : undefined,
   sessionService: pool
     ? createSessionService(createPgStudentSessionRepository(pool), { ttlDays: config.SESSION_TTL_DAYS })

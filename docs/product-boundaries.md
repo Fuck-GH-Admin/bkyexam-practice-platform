@@ -256,7 +256,7 @@ mastered -> active  # 再次答错时自动恢复
 - 错题详情 contract。
 - 从错题集合创建再练输入。
 
-当前再练 session 最终由 Practice 创建；长期应通过 service 调用，而不是 Wrongbook repository 直接写 Practice 表。
+当前再练 session 已通过 `WrongQuestionService -> PracticeSessionService` 创建；Wrongbook repository 不直接写 Practice 表。
 
 ### Import
 

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type {
   PracticeOptionV1,
   WrongQuestionDetailV1,
@@ -11,15 +10,20 @@ export type WrongQuestionItem = WrongQuestionItemV1;
 export type WrongQuestionOption = PracticeOptionV1;
 export type WrongQuestionDetail = WrongQuestionDetailV1;
 
+export interface WrongQuestionReviewCandidate {
+  questionId: string;
+  bankId: string;
+}
+
 export interface WrongQuestionRepository {
   list(input: { studentId: string; bankId?: string; includeMastered: boolean }): Promise<WrongQuestionItem[]>;
   getDetail(input: { studentId: string; id: string }): Promise<WrongQuestionDetail | null>;
-  createReviewSession(input: {
+  listReviewCandidates(input: {
     studentId: string;
     bankId?: string;
     includeMastered: boolean;
     limit: number;
-  }): Promise<{ sessionId: string; questionCount: number } | null>;
+  }): Promise<WrongQuestionReviewCandidate[]>;
   markMastered(input: { studentId: string; id: string }): Promise<boolean>;
 }
 
@@ -84,14 +88,13 @@ export function createMemoryWrongQuestionRepository(): WrongQuestionRepository {
       };
     },
 
-    async createReviewSession({ studentId, bankId, includeMastered, limit }) {
-      const selected = items
+    async listReviewCandidates({ studentId, bankId, includeMastered, limit }) {
+      return items
         .filter((item) => item.studentId === studentId)
         .filter((item) => !bankId || item.bankId === bankId)
         .filter((item) => includeMastered || !item.mastered)
-        .slice(0, limit);
-      if (selected.length === 0) return null;
-      return { sessionId: randomUUID(), questionCount: selected.length };
+        .slice(0, limit)
+        .map((item) => ({ questionId: item.questionId, bankId: item.bankId }));
     },
 
     async markMastered({ studentId, id }) {
@@ -191,7 +194,7 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
       return mapWrongQuestionDetailRow(row, optionResult.rows);
     },
 
-    async createReviewSession({ studentId, bankId, includeMastered, limit }) {
+    async listReviewCandidates({ studentId, bankId, includeMastered, limit }) {
       const params: unknown[] = [studentId, limit];
       const filters = ['student_id = $1'];
       if (!includeMastered) filters.push('mastered = false');
@@ -210,29 +213,7 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
         `,
         params,
       )) as QueryRows<{ question_id: string; bank_id: string }>;
-      const selected = selectedResult.rows;
-      if (selected.length === 0) return null;
-
-      const sessionId = randomUUID();
-      const sessionResult = (await client.query(
-        `
-          INSERT INTO practice_sessions (id, student_id, bank_id, mode, question_limit, question_count, completed_count, correct_count, status, origin)
-          VALUES ($1, $2, $3, 'sequential', $4, $4, 0, 0, 'active', 'wrongbook')
-          RETURNING id
-        `,
-        [sessionId, studentId, selected[0].bank_id, selected.length],
-      )) as QueryRows<{ id: string }>;
-
-      const values = selected.map((_, index) => `($1, $${index + 2}, ${index + 1})`).join(', ');
-      await client.query(
-        `
-          INSERT INTO practice_session_questions (session_id, question_id, sort)
-          VALUES ${values}
-        `,
-        [sessionResult.rows[0].id, ...selected.map((item) => item.question_id)],
-      );
-
-      return { sessionId: sessionResult.rows[0].id, questionCount: selected.length };
+      return selectedResult.rows.map((row) => ({ questionId: row.question_id, bankId: row.bank_id }));
     },
 
     async markMastered({ studentId, id }) {

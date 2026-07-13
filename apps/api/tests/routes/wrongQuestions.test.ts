@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { createSessionService } from '../../src/auth/session';
 import { buildApp } from '../../src/app';
 import type { WrongQuestionItem, WrongQuestionRepository } from '../../src/wrongQuestions/repository';
+import type { WrongQuestionService } from '../../src/wrongQuestions/service';
 
 type SessionService = ReturnType<typeof createSessionService>;
 
@@ -44,7 +45,8 @@ function fakeWrongQuestionRepository(
 ) {
   const listRequests: Parameters<WrongQuestionRepository['list']>[0][] = [];
   const detailRequests: Parameters<WrongQuestionRepository['getDetail']>[0][] = [];
-  const createReviewSessionRequests: Parameters<WrongQuestionRepository['createReviewSession']>[0][] = [];
+  const listReviewCandidateRequests: Parameters<WrongQuestionRepository['listReviewCandidates']>[0][] = [];
+  const createReviewSessionRequests: Parameters<WrongQuestionService['createReviewSession']>[0][] = [];
   const markMasteredRequests: Parameters<WrongQuestionRepository['markMastered']>[0][] = [];
   const repository: WrongQuestionRepository = {
     async list(input) {
@@ -62,19 +64,36 @@ function fakeWrongQuestionRepository(
         analysis: '解析文本',
       };
     },
-    async createReviewSession(input) {
-      createReviewSessionRequests.push(input);
-      return options.reviewSessionResult === false
-        ? null
-        : { sessionId: '66666666-6666-4666-8666-666666666666', questionCount: 2 };
+    async listReviewCandidates(input) {
+      listReviewCandidateRequests.push(input);
+      return options.reviewSessionResult === false ? [] : [
+        { questionId, bankId },
+        { questionId: '77777777-7777-4777-8777-777777777777', bankId },
+      ];
     },
     async markMastered(input) {
       markMasteredRequests.push(input);
       return options.markMasteredResult ?? true;
     },
   };
+  const wrongQuestionService: WrongQuestionService = {
+    async createReviewSession(input) {
+      createReviewSessionRequests.push(input);
+      return options.reviewSessionResult === false
+        ? null
+        : { sessionId: '66666666-6666-4666-8666-666666666666', questionCount: 2 };
+    },
+  };
 
-  return { repository, listRequests, detailRequests, createReviewSessionRequests, markMasteredRequests };
+  return {
+    repository,
+    wrongQuestionService,
+    listRequests,
+    detailRequests,
+    listReviewCandidateRequests,
+    createReviewSessionRequests,
+    markMasteredRequests,
+  };
 }
 
 describe('wrong question routes', () => {
@@ -229,8 +248,12 @@ describe('wrong question routes', () => {
   });
 
   it('creates a filtered wrong-question review session for the current student', async () => {
-    const { repository, createReviewSessionRequests } = fakeWrongQuestionRepository();
-    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+    const { repository, wrongQuestionService, createReviewSessionRequests } = fakeWrongQuestionRepository();
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      wrongQuestionRepository: repository,
+      wrongQuestionService,
+    });
 
     const response = await app.inject({
       method: 'POST',
@@ -263,8 +286,12 @@ describe('wrong question routes', () => {
   });
 
   it('returns 404 when no wrong questions match the review-session filters', async () => {
-    const { repository } = fakeWrongQuestionRepository({ reviewSessionResult: false });
-    const app = buildApp({ sessionService: fakeLoggedInSessionService(), wrongQuestionRepository: repository });
+    const { repository, wrongQuestionService } = fakeWrongQuestionRepository({ reviewSessionResult: false });
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      wrongQuestionRepository: repository,
+      wrongQuestionService,
+    });
 
     const response = await app.inject({
       method: 'POST',

@@ -164,8 +164,8 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 281 Vitest
-- 240 API tests
+- 285 Vitest
+- 244 API tests
 - 31 Web tests
 - 10 Shared tests
 - 3 Playwright browser smoke
@@ -333,7 +333,7 @@
 
 ### 3.8 Wrongbook 与 Practice 边界不够好
 
-当前：
+原先：
 
 - Wrongbook repository 直接 insert `practice_sessions` 和 `practice_session_questions`。
 
@@ -343,10 +343,11 @@
 - 后续如果 Practice 创建规则变复杂，Wrongbook 会绕过规则。
 - Admin/Stats/Attempt 逻辑可能分叉。
 
-目标：
+当前已完成：
 
-- Wrongbook service 请求 Practice service 创建再练 session。
-- Practice 统一负责 session 创建、锁题、origin、约束和事件。
+- Wrongbook repository 只负责 `listReviewCandidates`。
+- Wrongbook service 请求 Practice session service 创建再练 session。
+- Practice 统一负责 session 创建、锁题、origin 和约束。
 
 ### 3.9 Contract 未完全覆盖后端
 
@@ -487,9 +488,11 @@ apps/api/src/practice/
 
 ### Phase B2 — Wrongbook Calls Practice Service
 
+状态：**已完成，2026-07-13。**
+
 目标：修复 bounded context 跨表写入。
 
-当前问题：
+原问题：
 
 ```text
 WrongbookRepository
@@ -518,9 +521,26 @@ WrongbookService
 验收：
 
 - Wrongbook repository 不再直接写 Practice 表。
-- Practice session 创建规则只有一处。
-- `npm run verify:docker` 通过。
+- Practice session 创建规则位于 `PracticeSessionService`。
+- `npm run verify:docker` 已通过。
 - commit 一次。
+
+实际落地：
+
+```text
+apps/api/src/wrongQuestions/service.ts
+apps/api/src/modules/practice/sessionService.ts
+```
+
+当前调用链：
+
+```text
+POST /api/wrong-questions/review-sessions
+  -> WrongQuestionService.createReviewSession()
+  -> WrongQuestionRepository.listReviewCandidates()
+  -> PracticeSessionService.createSessionFromQuestionIds()
+  -> practice_sessions / practice_session_questions
+```
 
 ### Phase B3 — Shared Contract Expansion
 

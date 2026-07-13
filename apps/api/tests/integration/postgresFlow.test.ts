@@ -6,6 +6,7 @@ import { buildApp } from '../../src/app.js';
 import { createPgPool } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { requireDedicatedTestDatabaseUrl } from '../../src/db/testDatabaseSafety.js';
+import { createPgPracticeSessionService } from '../../src/modules/practice/sessionService.js';
 import { createPgPracticeRepository } from '../../src/practice/repository.js';
 import { createPgBankRepository } from '../../src/repositories/bankRepository.js';
 import { createPgWrongQuestionRepository } from '../../src/wrongQuestions/repository.js';
@@ -20,6 +21,7 @@ describe('PostgreSQL-backed API integration', () => {
     authRepository: createPgStudentAuthRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
+    practiceSessionService: createPgPracticeSessionService(pool),
     wrongQuestionRepository: createPgWrongQuestionRepository(pool),
     sessionService: createSessionService(createPgStudentSessionRepository(pool), { ttlDays: 1 }),
     cookieSecret: 'postgres-integration-cookie-secret',

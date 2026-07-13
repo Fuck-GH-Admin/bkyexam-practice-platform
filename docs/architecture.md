@@ -95,7 +95,7 @@ questionbank/*.txt
 | Identity | 学生身份、密码占位、Cookie session | `auth/`, `routes/auth.ts` |
 | Catalog | 学生可见题库、分类与映射 | `repositories/bankRepository.ts`, `routes/banks.ts`, `mapping/` |
 | Practice | 会话、题目锁定、草稿、进度、存疑、提交、判分 | `practice/`, `routes/practice.ts` |
-| Wrongbook | 错题列表、详情、掌握状态、再练会话 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
+| Wrongbook | 错题列表、详情、掌握状态、再练编排 | `wrongQuestions/`, `routes/wrongQuestions.ts` |
 | Import | 源文件解析、规范化、批量导入 | `import/` |
 | Platform | 配置、数据库连接、迁移、HTTP 装配 | `config.ts`, `db/`, `app.ts`, `index.ts` |
 
@@ -157,7 +157,8 @@ questionbank/*.txt
 - 重复答错增加 `wrong_count`，更新最近答案，并重新设为未掌握。
 - 列表只返回摘要字段。
 - 详情按需 join 题干、选项、规范化参考答案和解析。
-- “再练本组”复用普通 `practice_sessions`，不另建一套练习引擎。
+- “再练本组”由 `WrongQuestionService` 选出错题候选，再调用 `PracticeSessionService.createSessionFromQuestionIds` 创建普通 `practice_sessions`，不另建一套练习引擎。
+- Wrongbook repository 只读/更新 wrongbook 所属数据，不直接写 `practice_sessions` 或 `practice_session_questions`。
 
 ## Current Structural Debt
 
@@ -167,9 +168,10 @@ questionbank/*.txt
 2. Practice repository 已拆入 `apps/api/src/modules/practice/`，但 PostgreSQL repository 仍承载较多 SQL 与事务编排，submission service 尚未独立。
 3. `apps/api/src/routes/practice.ts` 体积较大，手写重复鉴权/UUID/错误映射和 request validation。
 4. Catalog 的 memory repository 在 route 文件中，而 PostgreSQL repository 位于通用 `repositories/`，边界不一致。
-5. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
-6. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
-7. 管理平台没有独立应用、权限模型和 API namespace。
+5. Wrongbook 已通过 service 调 Practice 创建再练 session，但目录尚未迁入 `modules/wrongbook`。
+6. Practice/Wrongbook DTO 已共享，但 Auth、Catalog 与通用 error contract 仍在各端重复或手写。
+7. 当前轻量 router 可恢复页面，但尚无 route-level code splitting、统一 navigation guard 或共享 API/error 层。
+8. 管理平台没有独立应用、权限模型和 API namespace。
 
 ## Target Physical Structure
 
@@ -239,6 +241,7 @@ apps/api/src/modules/practice/
   grading.ts
   answerCodec.ts
   resultMapper.ts
+  sessionService.ts
   memoryRepository.ts
   pgRepository.ts
   repository.ts
@@ -253,7 +256,7 @@ apps/api/src/practice/
 - 新代码优先引用 `src/modules/practice/*`。
 - 旧 route/test 可继续通过 `src/practice/repository.ts` 和 `src/practice/grading.ts` 兼容入口运行。
 - 本阶段不改变 HTTP contract、shared schema、SQL transaction 语义或 Web 行为。
-- 下一阶段如果处理 Wrongbook/Practice 边界，应在此结构上增加 service 层，而不是回到跨上下文直接写表。
+- Wrongbook 再练已通过 `WrongQuestionService -> PracticeSessionService` 创建 Practice session；后续新增错题策略时应继续走 service 边界，不回到跨上下文直接写表。
 
 ## Refactor Rules
 

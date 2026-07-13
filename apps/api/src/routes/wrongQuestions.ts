@@ -7,15 +7,17 @@ import {
 } from '@bkyexam-practice/shared';
 import type { SessionStudent } from '../auth/session.js';
 import type { WrongQuestionRepository } from '../wrongQuestions/repository.js';
+import type { WrongQuestionService } from '../wrongQuestions/service.js';
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface WrongQuestionRoutesOptions {
   wrongQuestionRepository: WrongQuestionRepository;
+  wrongQuestionService: WrongQuestionService;
   requireStudent: (request: FastifyRequest) => Promise<SessionStudent | null>;
 }
 
-export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStudent }: WrongQuestionRoutesOptions) {
+export function createWrongQuestionRoutes({ wrongQuestionRepository, wrongQuestionService, requireStudent }: WrongQuestionRoutesOptions) {
   return async function registerWrongQuestionRoutes(app: FastifyInstance) {
     app.get('/api/wrong-questions', async (request, reply) => {
       const student = await requireStudent(request);
@@ -55,7 +57,7 @@ export function createWrongQuestionRoutes({ wrongQuestionRepository, requireStud
         return reply.status(400).send({ error: 'limit must be an integer from 1 through 100' });
       }
 
-      const session = await wrongQuestionRepository.createReviewSession({
+      const session = await wrongQuestionService.createReviewSession({
         studentId: student.id,
         ...(bankId ? { bankId } : {}),
         includeMastered: body.includeMastered === true,

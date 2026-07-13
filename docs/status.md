@@ -37,9 +37,9 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 10 |
-| `apps/api` | 31 | 240 |
+| `apps/api` | 33 | 244 |
 | `apps/web` | 2 | 31 |
-| **Total** | **35** | **281** |
+| **Total** | **37** | **285** |
 
 仓库内 Playwright smoke：
 
@@ -113,6 +113,7 @@ apps/api/src/modules/practice/
   grading.ts            # objective grading rules
   answerCodec.ts        # submit/draft answer serialization and parsing
   resultMapper.ts       # GradeResult -> response DTO
+  sessionService.ts     # explicit question-id session creation boundary
   memoryRepository.ts   # route-test friendly in-memory repository
   pgRepository.ts       # PostgreSQL SQL and transaction implementation
   repository.ts         # module barrel
@@ -129,6 +130,32 @@ apps/api/src/practice/
 - shared v1 schema 未变。
 - PostgreSQL transaction 语义未变。
 - Web 行为与 API response 未变。
+
+2026-07-13 完成 Phase B2：Wrongbook 再练不再由 Wrongbook repository 直接写 Practice 表。
+
+当前边界：
+
+```text
+WrongQuestionRepository
+  -> listReviewCandidates()
+
+WrongQuestionService
+  -> PracticeSessionService.createSessionFromQuestionIds({
+       mode: 'sequential',
+       origin: 'wrongbook'
+     })
+
+PracticeSessionService
+  -> INSERT practice_sessions
+  -> INSERT practice_session_questions
+```
+
+保持不变：
+
+- `/api/wrong-questions/review-sessions` response 未变。
+- `origin=wrongbook` 未变。
+- ownership boundary 未变。
+- PostgreSQL integration 仍覆盖错题再练 session 创建与读取。
 
 ## Verified Corpus And Database
 
@@ -269,7 +296,7 @@ apps/api/src/practice/
 - session 集合已有后端分页，但首页/历史尚无“加载更多”、放弃或归档 active session 的交互。
 - 轻量 History API router 尚无 route-level code splitting、navigation guard 与统一错误页。
 - `completedCount` 已在 v1 contract 固定为 answered/graded count，但字段名称仍容易误解；未来更名必须走显式版本迁移。
-- Wrongbook repository 直接创建 Practice 表记录，长期应改为 service 间协作。
+- Wrongbook 再练已改为 service 间协作；后续仍应把 wrongbook 目录迁入 `modules/wrongbook` 并继续拆 route validation。
 
 ### P2 Quality Debt
 

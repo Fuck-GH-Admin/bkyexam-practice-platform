@@ -146,23 +146,23 @@ describe('createPgWrongQuestionRepository', () => {
     await expect(repository.getDetail({ studentId: 'student-1', id: 'wrong-2' })).resolves.toBeNull();
   });
 
-  it('creates a practice session from matching wrong questions', async () => {
+  it('lists wrong-question review candidates without writing practice tables', async () => {
     const client = new FakeQueryClient([
       { rows: [{ question_id: 'question-1', bank_id: 'bank-1' }, { question_id: 'question-2', bank_id: 'bank-1' }] },
-      { rows: [{ id: 'session-1' }] },
-      { rows: [] },
     ]);
     const repository = createPgWrongQuestionRepository(client);
 
-    const result = await repository.createReviewSession({ studentId: 'student-1', includeMastered: false, limit: 20 });
+    const result = await repository.listReviewCandidates({ studentId: 'student-1', includeMastered: false, limit: 20 });
 
+    expect(client.calls).toHaveLength(1);
     expect(client.calls[0].sql).toContain('FROM wrong_questions');
     expect(client.calls[0].sql).toContain('mastered = false');
     expect(client.calls[0].sql).toContain('LIMIT $2');
-    expect(client.calls[1].sql).toContain('INSERT INTO practice_sessions');
-    expect(client.calls[1].sql).toContain("'wrongbook'");
-    expect(client.calls[2].sql).toContain('INSERT INTO practice_session_questions');
-    expect(result).toEqual({ sessionId: 'session-1', questionCount: 2 });
+    expect(client.calls[0].sql).not.toContain('INSERT INTO practice_sessions');
+    expect(result).toEqual([
+      { questionId: 'question-1', bankId: 'bank-1' },
+      { questionId: 'question-2', bankId: 'bank-1' },
+    ]);
   });
 
   it('marks a current student wrong question mastered and returns true when a row is updated', async () => {

@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B2 — 2026-07-13
+
+- [x] 新增 `WrongQuestionService`，由 service 编排错题再练创建。
+- [x] 新增 `PracticeSessionService.createSessionFromQuestionIds`，统一负责显式题目列表创建 Practice session。
+- [x] 将 `WrongQuestionRepository.createReviewSession` 改为 `listReviewCandidates`。
+- [x] Wrongbook repository 不再直接写 `practice_sessions` 或 `practice_session_questions`。
+- [x] 保持 `/api/wrong-questions/review-sessions` response、`origin=wrongbook` 与 ownership boundary 不变。
+- [x] 增加 service/repository 回归测试。
+- [x] `npm run verify:docker` 通过。
+
 ## Completed Backend B1 — 2026-07-13
 
 - [x] 将 Practice DTO aliases、`PracticeRepository` 和 `CompletedSessionError` 提取到 `apps/api/src/modules/practice/contracts.ts`。
@@ -83,13 +93,13 @@
 
 - [ ] 建立 `modules/auth`、`modules/catalog`、`modules/practice`、`modules/wrongbook`。
 - [ ] 拆分 `practice/repository.ts`：
-  - contract/DTO
-  - memory repository
-  - PostgreSQL repository
-  - answer codec
-  - submission service
+  - [x] contract/DTO
+  - [x] memory repository
+  - [x] PostgreSQL repository
+  - [x] answer codec
+  - [ ] submission service
 - [ ] 拆分 practice route validation 与错误映射。
-- [ ] 把 Wrongbook 创建再练 session 改为 service 调用 Practice。
+- [x] 把 Wrongbook 创建再练 session 改为 service 调用 Practice。
 - [ ] 将 `db/config/http` 移到 platform 层。
 
 完成标准：
