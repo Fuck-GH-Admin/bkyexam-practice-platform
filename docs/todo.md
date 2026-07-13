@@ -18,6 +18,16 @@
 - [x] 覆盖 route/unit/schema/migration/PostgreSQL integration 测试。
 - [x] 不创建默认本地管理员账号。
 
+## Completed Backend B5.2 — 2026-07-13
+
+- [x] 新增 shared v1 Admin Bank Mapping read schema。
+- [x] 实现 `GET /api/admin/bank-mappings`，支持 status、visible、subject、keyword、qGroup、parentId、hasObjectiveQuestions、limit、offset。
+- [x] 实现 `GET /api/admin/bank-mappings/:bankId`，返回 parentName、questionTypeCounts 和 studentPreview。
+- [x] 实现 Admin Bank Mapping memory/PostgreSQL repository。
+- [x] 复用 `bank_mapping:read` 权限守卫，覆盖 `401/403/400/404`。
+- [x] PostgreSQL integration 覆盖 Admin Bank Mapping list/detail。
+- [x] 不创建正式 Admin 前端。
+
 ## Completed Backend B4 — 2026-07-13
 
 - [x] 新增 [`admin-backend-contract.md`](./admin-backend-contract.md)。
@@ -156,8 +166,9 @@
 ### Backend
 
 - [x] 管理员 identity、session 和 RBAC。
-- [ ] `/api/admin/bank-mappings` 列表、详情、更新、批量状态。
-- [ ] mapping 版本/并发控制与 audit log。
+- [x] `/api/admin/bank-mappings` 列表、详情。
+- [ ] `/api/admin/bank-mappings` 更新、批量状态。
+- [ ] mapping 写入版本/并发控制与 audit log。
 - [ ] import job table、触发、进度、结果和错误摘要。
 - [ ] 题目质检标记与学生端排除策略。
 

@@ -4,6 +4,9 @@ import {
   AdminLoginRequestV1Schema,
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
+  AdminBankMappingDetailResponseV1Schema,
+  AdminBankMappingListResponseV1Schema,
+  ListAdminBankMappingsRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
@@ -64,6 +67,72 @@ describe('v1 auth/catalog/error/health contracts', () => {
     expect(response.admin.roles).toEqual(['operator']);
     expect(AdminLogoutResponseV1Schema.parse({ success: true })).toEqual({ success: true });
     expect(() => AdminLoginRequestV1Schema.parse({ loginName: 'operator@example.com' })).toThrow();
+  });
+
+  it('parses admin bank mapping list and detail contracts', () => {
+    const query = ListAdminBankMappingsRequestV1Schema.parse({
+      status: 'active',
+      visible: 'true',
+      hasObjectiveQuestions: 'false',
+      qGroup: '8',
+      limit: '20',
+      offset: '0',
+    });
+    expect(query).toMatchObject({
+      status: 'active',
+      visible: true,
+      hasObjectiveQuestions: false,
+      qGroup: 8,
+      limit: 20,
+      offset: 0,
+    });
+
+    const listItem = {
+      bankId,
+      rawName: 'Raw Bank',
+      bankName: 'Admin Bank',
+      subjectCategory: '信息技术',
+      subjectName: 'C++',
+      parentId: null,
+      qGroup: 8,
+      visible: true,
+      status: 'active',
+      difficulty: 'mixed',
+      examPurpose: 'exam',
+      questionTypes: ['single_choice'],
+      audience: 'unknown',
+      keywords: ['C++'],
+      description: 'Admin-visible mapping.',
+      notes: '',
+      questionCount: 10,
+      descendantQuestionCount: 12,
+      objectiveQuestionCount: 9,
+      version: 1,
+      updatedAt: '2026-07-13T10:00:00.000Z',
+      updatedBy: null,
+    };
+
+    expect(AdminBankMappingListResponseV1Schema.parse({
+      bankMappings: [listItem],
+      page: { limit: 20, offset: 0, hasMore: false },
+    }).bankMappings[0]?.bankId).toBe(bankId);
+
+    expect(AdminBankMappingDetailResponseV1Schema.parse({
+      bankMapping: {
+        ...listItem,
+        parentName: null,
+        questionTypeCounts: { single_choice: 9 },
+        studentPreview: {
+          visibleInStudentCatalog: true,
+          reason: 'visible active bank with objective questions',
+        },
+      },
+    }).bankMapping.questionTypeCounts).toEqual({ single_choice: 9 });
+
+    expect(() => AdminBankMappingListResponseV1Schema.parse({
+      bankMappings: [{ ...listItem, status: 'published' }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    })).toThrow();
   });
 
   it('requires student catalog banks to be visible and counter-safe', () => {

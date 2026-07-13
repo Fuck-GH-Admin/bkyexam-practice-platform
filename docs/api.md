@@ -206,6 +206,94 @@ Response：
 }
 ```
 
+## Admin Bank Mappings
+
+Admin Bank Mapping read APIs 是 B5.2 已实现的管理端读模型。它们只读 `bank_mappings` 与统计数据，不修改题库；写入、发布、批量状态变更放到 B5.3。
+
+### `GET /api/admin/bank-mappings`
+
+Permission：`bank_mapping:read`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `status` | `review|active|hidden|deprecated` | optional |
+| `visible` | `true|false` | optional |
+| `subjectCategory` | string | optional |
+| `subjectName` | string | optional |
+| `keyword` | string | optional |
+| `qGroup` | integer | optional |
+| `parentId` | UUID | optional |
+| `hasObjectiveQuestions` | `true|false` | optional |
+| `limit` | integer 1..100 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "bankMappings": [
+    {
+      "bankId": "bank-uuid",
+      "rawName": "数据库集成测试题库",
+      "bankName": "数据库集成测试题库",
+      "subjectCategory": "质量保障",
+      "subjectName": "PostgreSQL",
+      "parentId": null,
+      "qGroup": 100,
+      "visible": true,
+      "status": "active",
+      "difficulty": "mixed",
+      "examPurpose": "integration",
+      "questionTypes": ["single_choice", "multiple_choice", "yes_no"],
+      "audience": "developers",
+      "keywords": ["integration", "postgres"],
+      "description": "用于真实 PostgreSQL integration profile 的最小题库。",
+      "notes": "",
+      "questionCount": 4,
+      "descendantQuestionCount": 4,
+      "objectiveQuestionCount": 4,
+      "version": 1,
+      "updatedAt": "2026-07-13T10:00:00.000Z",
+      "updatedBy": null
+    }
+  ],
+  "page": { "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+### `GET /api/admin/bank-mappings/:bankId`
+
+Permission：`bank_mapping:read`
+
+Response：
+
+```json
+{
+  "bankMapping": {
+    "...": "same fields as list item",
+    "parentName": null,
+    "questionTypeCounts": {
+      "single_choice": 2,
+      "multiple_choice": 1,
+      "yes_no": 1
+    },
+    "studentPreview": {
+      "visibleInStudentCatalog": true,
+      "reason": "visible active bank with objective questions"
+    }
+  }
+}
+```
+
+Errors：
+
+- `400`：query 或 bank id 无效。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：管理员缺少 `bank_mapping:read`。
+- `404`：mapping 不存在。
+
 ## Banks
 
 ### `GET /api/banks`
@@ -711,9 +799,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Auth/Catalog/Admin Auth/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
+- Practice/Wrongbook/Auth/Catalog/Admin Auth/Admin Bank Mapping read/通用 error/health DTO 已来自 shared v1；Admin 其余后端 contract 已完成设计，尚未迁入 shared v1。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth route/shared schema 已实现；Admin Bank Mapping、Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。
+- Admin Auth 与 Admin Bank Mapping read route/shared schema 已实现；Admin Bank Mapping write、Import Job、Question Review、System Status 和 Audit Log read API 仍只在 [admin-backend-contract.md](admin-backend-contract.md) 中完成设计。

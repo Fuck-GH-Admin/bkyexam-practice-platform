@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CanonicalUuidV1Schema, CaseInsensitiveUuidV1Schema } from './common.js';
 
 export const AdminRoleV1Schema = z.enum(['content_editor', 'operator', 'super_admin']);
 export type AdminRoleV1 = z.infer<typeof AdminRoleV1Schema>;
@@ -46,3 +47,82 @@ export const AdminLogoutResponseV1Schema = z.object({
   success: z.literal(true),
 }).strict();
 export type AdminLogoutResponseV1 = z.infer<typeof AdminLogoutResponseV1Schema>;
+
+export const AdminBankMappingStatusV1Schema = z.enum(['review', 'active', 'hidden', 'deprecated']);
+export type AdminBankMappingStatusV1 = z.infer<typeof AdminBankMappingStatusV1Schema>;
+
+const AdminQueryBooleanV1Schema = z.union([
+  z.boolean(),
+  z.enum(['true', 'false']).transform((value) => value === 'true'),
+]);
+
+export const ListAdminBankMappingsRequestV1Schema = z.object({
+  status: AdminBankMappingStatusV1Schema.optional(),
+  visible: AdminQueryBooleanV1Schema.optional(),
+  subjectCategory: z.string().min(1).optional(),
+  subjectName: z.string().min(1).optional(),
+  keyword: z.string().min(1).optional(),
+  qGroup: z.coerce.number().int().optional(),
+  parentId: CaseInsensitiveUuidV1Schema.optional(),
+  hasObjectiveQuestions: AdminQueryBooleanV1Schema.optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminBankMappingsRequestV1 = z.infer<typeof ListAdminBankMappingsRequestV1Schema>;
+
+export const AdminBankMappingUpdatedByV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  displayName: z.string().min(1),
+}).strict();
+export type AdminBankMappingUpdatedByV1 = z.infer<typeof AdminBankMappingUpdatedByV1Schema>;
+
+export const AdminBankMappingListItemV1Schema = z.object({
+  bankId: CanonicalUuidV1Schema,
+  rawName: z.string().min(1),
+  bankName: z.string().min(1),
+  subjectCategory: z.string().min(1),
+  subjectName: z.string().min(1),
+  parentId: CanonicalUuidV1Schema.nullable(),
+  qGroup: z.number().int(),
+  visible: z.boolean(),
+  status: AdminBankMappingStatusV1Schema,
+  difficulty: z.string().min(1),
+  examPurpose: z.string().min(1),
+  questionTypes: z.array(z.string()),
+  audience: z.string().min(1),
+  keywords: z.array(z.string()),
+  description: z.string(),
+  notes: z.string(),
+  questionCount: z.number().int().nonnegative(),
+  descendantQuestionCount: z.number().int().nonnegative(),
+  objectiveQuestionCount: z.number().int().nonnegative(),
+  version: z.number().int().positive(),
+  updatedAt: z.string().datetime(),
+  updatedBy: AdminBankMappingUpdatedByV1Schema.nullable(),
+}).strict();
+export type AdminBankMappingListItemV1 = z.infer<typeof AdminBankMappingListItemV1Schema>;
+
+export const AdminBankMappingDetailV1Schema = AdminBankMappingListItemV1Schema.extend({
+  parentName: z.string().min(1).nullable(),
+  questionTypeCounts: z.object({}).catchall(z.number().int().nonnegative()),
+  studentPreview: z.object({
+    visibleInStudentCatalog: z.boolean(),
+    reason: z.string().min(1),
+  }).strict(),
+}).strict();
+export type AdminBankMappingDetailV1 = z.infer<typeof AdminBankMappingDetailV1Schema>;
+
+export const AdminBankMappingListResponseV1Schema = z.object({
+  bankMappings: z.array(AdminBankMappingListItemV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminBankMappingListResponseV1 = z.infer<typeof AdminBankMappingListResponseV1Schema>;
+
+export const AdminBankMappingDetailResponseV1Schema = z.object({
+  bankMapping: AdminBankMappingDetailV1Schema,
+}).strict();
+export type AdminBankMappingDetailResponseV1 = z.infer<typeof AdminBankMappingDetailResponseV1Schema>;

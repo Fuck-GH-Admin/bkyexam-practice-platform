@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createAuditService, createPgAuditLogRepository } from '../../src/admin/audit.js';
 import { createPgAdminAuthRepository } from '../../src/admin/auth.js';
+import { createPgAdminBankMappingRepository } from '../../src/admin/bankMappings.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
 import { hashPassword } from '../../src/auth/password.js';
 import { createPgStudentSessionRepository, createSessionService } from '../../src/auth/session.js';
@@ -24,6 +25,7 @@ describe('PostgreSQL-backed API integration', () => {
   const app = buildApp({
     authRepository: createPgStudentAuthRepository(pool),
     adminAuthRepository: createPgAdminAuthRepository(pool),
+    adminBankMappingRepository: createPgAdminBankMappingRepository(pool),
     bankRepository: createPgBankRepository(pool),
     practiceRepository: createPgPracticeRepository(pool),
     practiceSessionService: createPgPracticeSessionService(pool),
@@ -97,6 +99,61 @@ describe('PostgreSQL-backed API integration', () => {
         AND result = 'success'
     `, ['50000000-0000-4000-8000-000000000001']);
     expect(adminAuditState.rows[0]).toEqual({ audit_count: '1' });
+
+    const adminBankMappings = await app.inject({
+      method: 'GET',
+      url: '/api/admin/bank-mappings?status=active&visible=true&hasObjectiveQuestions=true',
+      headers: { cookie: adminCookie },
+    });
+    expect(adminBankMappings.statusCode).toBe(200);
+    expect(adminBankMappings.json()).toMatchObject({
+      bankMappings: [{
+        bankId: fixtureIds.bank,
+        rawName: '数据库集成测试题库',
+        bankName: '数据库集成测试题库',
+        subjectCategory: '质量保障',
+        subjectName: 'PostgreSQL',
+        parentId: null,
+        qGroup: 100,
+        visible: true,
+        status: 'active',
+        difficulty: 'mixed',
+        examPurpose: 'integration',
+        questionTypes: ['single_choice', 'multiple_choice', 'yes_no'],
+        audience: 'developers',
+        keywords: ['integration', 'postgres'],
+        questionCount: 4,
+        descendantQuestionCount: 4,
+        objectiveQuestionCount: 4,
+        version: 1,
+        updatedAt: expect.any(String),
+        updatedBy: null,
+      }],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    const adminBankMappingDetail = await app.inject({
+      method: 'GET',
+      url: `/api/admin/bank-mappings/${fixtureIds.bank}`,
+      headers: { cookie: adminCookie },
+    });
+    expect(adminBankMappingDetail.statusCode).toBe(200);
+    expect(adminBankMappingDetail.json()).toMatchObject({
+      bankMapping: {
+        bankId: fixtureIds.bank,
+        parentName: null,
+        objectiveQuestionCount: 4,
+        questionTypeCounts: {
+          multiple_choice: 1,
+          single_choice: 2,
+          yes_no: 1,
+        },
+        studentPreview: {
+          visibleInStudentCatalog: true,
+          reason: 'visible active bank with objective questions',
+        },
+      },
+    });
 
     const studentMeWithAdminCookie = await app.inject({
       method: 'GET',

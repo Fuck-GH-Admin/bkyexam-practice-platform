@@ -6,6 +6,7 @@ import {
   createMemoryAuditLogRepository,
   type AuditService,
 } from './admin/audit.js';
+import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
@@ -14,6 +15,7 @@ import { createMemoryPracticeSessionService, type PracticeSessionService } from 
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
+import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
 import { createBankRoutes, createMemoryBankRepository, type BankRepository } from './routes/banks.js';
 import { registerHealthRoutes } from './routes/health.js';
@@ -26,6 +28,7 @@ import { createWrongQuestionService, type WrongQuestionService } from './wrongQu
 interface BuildAppOptions {
   authRepository?: StudentAuthRepository;
   adminAuthRepository?: AdminAuthRepository;
+  adminBankMappingRepository?: AdminBankMappingRepository;
   bankRepository?: BankRepository;
   practiceRepository?: PracticeRepository;
   practiceSessionService?: PracticeSessionService;
@@ -76,6 +79,10 @@ export function buildApp(options: BuildAppOptions = {}) {
     cookieSecure: options.cookieSecure ?? false,
     sessionTtlHours: options.adminSessionTtlHours ?? 8,
   });
+  void app.register(createAdminBankMappingRoutes({
+    repository: options.adminBankMappingRepository,
+    sessionService: adminSessionService,
+  }));
   void app.register(createBankRoutes(bankRepository));
   void app.register(createPracticeRoutes({
     practiceRepository,

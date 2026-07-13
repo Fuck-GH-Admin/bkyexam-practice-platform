@@ -1,5 +1,6 @@
 import { createAuditService, createPgAuditLogRepository } from './admin/audit.js';
 import { createPgAdminAuthRepository } from './admin/auth.js';
+import { createPgAdminBankMappingRepository } from './admin/bankMappings.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from './admin/session.js';
 import { createPgStudentSessionRepository, createSessionService } from './auth/session.js';
 import { createPgStudentAuthRepository } from './auth/studentAuth.js';
@@ -16,6 +17,7 @@ const pool = config.USE_DATABASE ? createPgPool(config.DATABASE_URL) : undefined
 const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
   adminAuthRepository: pool ? createPgAdminAuthRepository(pool) : undefined,
+  adminBankMappingRepository: pool ? createPgAdminBankMappingRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,
   practiceRepository: pool ? createPgPracticeRepository(pool) : undefined,
   practiceSessionService: pool ? createPgPracticeSessionService(pool) : undefined,

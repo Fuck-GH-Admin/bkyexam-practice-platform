@@ -664,14 +664,14 @@ bank_mappings.version / updated_at / updated_by_admin_id
 
 目标：最小可运营闭环。
 
-状态：**进行中。B5.1 已完成，2026-07-13。**
+状态：**进行中。B5.1/B5.2 已完成，2026-07-13。**
 
 优先实现：
 
 1. admin identity + RBAC — **已完成**
 2. audit log foundation — **已完成**
-3. bank mappings list/detail/update
-4. batch visible/status
+3. bank mappings list/detail — **已完成**
+4. bank mappings update + batch visible/status
 5. system status
 
 后实现：
@@ -727,7 +727,31 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - PostgreSQL integration 覆盖 admin auth/session/audit。
   - 不创建默认本地管理员账号。
 
-下一步：**B5.2 Bank Mapping Read APIs**。
+#### B5.2 实际落地
+
+- 新增 shared v1 Admin Bank Mapping schema：
+  - list request/query
+  - list item/response
+  - detail response
+  - bank status enum
+- 新增 Admin Bank Mapping repository：
+  - memory repository
+  - PostgreSQL repository
+  - 递归统计 descendant objective question count
+  - detail 返回 `questionTypeCounts` 与 `studentPreview`
+- 新增 routes：
+  - `GET /api/admin/bank-mappings`
+  - `GET /api/admin/bank-mappings/:bankId`
+- 已验证：
+  - `bank_mapping:read` 权限守卫。
+  - 无管理员 session 返回 `401`。
+  - 缺少权限返回 `403`。
+  - 无效 query / bank id 返回 `400`。
+  - 不存在 mapping 返回 `404`。
+  - PostgreSQL integration 覆盖 list/detail。
+  - repository payload 使用 shared schema fail closed。
+
+下一步：**B5.3 Bank Mapping Write APIs**。
 
 ### Phase B6 — Import Jobs And Data Health
 
