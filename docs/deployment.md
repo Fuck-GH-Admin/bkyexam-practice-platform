@@ -16,7 +16,9 @@ PostgreSQL
   `-- stores imported question bank and student practice data
 ```
 
-Production health check: `https://exam.acgbot.cc.cd/api/health`.
+Production liveness check: `https://exam.acgbot.cc.cd/api/health`.
+
+Production readiness check: `https://exam.acgbot.cc.cd/api/health/readiness`.
 
 The expected early production size is fewer than 100 users on a 2 core, 2 GB server.
 
@@ -137,6 +139,11 @@ The API currently reads configuration from environment variables through `apps/a
 - `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
 - `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
 - `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. Even when enabled, `resetBeforeImport=true` remains blocked.
+- `RATE_LIMIT_ENABLED`: set to `true` to enable the in-memory minimum API rate limiter; default `false`.
+- `RATE_LIMIT_WINDOW_MS`: positive integer rate-limit window in milliseconds, default `60000`.
+- `RATE_LIMIT_MAX`: positive integer request count per client/method/route/window, default `600`.
+- `CSRF_ORIGIN_CHECK_ENABLED`: set to `true` to reject unsafe Cookie requests from origins outside the allowlist; default `false`.
+- `CSRF_ALLOWED_ORIGINS`: semicolon-separated allowed browser origins for CSRF origin checks; defaults to local Vite origins.
 - `ADMIN_BOOTSTRAP_LOGIN_NAME`, `ADMIN_BOOTSTRAP_DISPLAY_NAME`, `ADMIN_BOOTSTRAP_PASSWORD`: one-time CLI inputs for `npm run admin:bootstrap`; they are not read by the HTTP server.
 
 The API currently listens on `127.0.0.1`, which matches the intended Nginx reverse-proxy shape.
@@ -151,7 +158,7 @@ The deployment shape is documented, but the current codebase is not yet publicly
 - strong student identity policy;
 - secrets management;
 - PostgreSQL backup and restore drill;
-- structured logs, metrics, alerts, and database-aware readiness;
-- rate limits, security headers, and CSRF decision;
+- structured logs beyond Fastify defaults, metrics, and alerts;
+- rate-limit/CSRF production policy tuning beyond the current configurable minimum implementation;
 - first successful remote run and branch protection for the repository CI workflow;
 - one repeatable deployment/rollback procedure on the target host.

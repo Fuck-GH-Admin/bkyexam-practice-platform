@@ -18,10 +18,10 @@
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 80%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；仍缺更多异常 fixture 与远端 CI 首次验收。 |
+| 后端工程可验证性 | **约 82%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
 | 完整平台后端 | **约 70–77%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览、趋势、目标、反馈与长期复习标记 API 已落地，但正式身份、全题型、管理前端和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 59%** | 已补第一个 `super_admin` bootstrap、Admin User manage API 和 gated true import，但仍缺正式安全策略、监控、备份恢复、rate limit、CSRF 和部署验收。 |
+| 公开生产后端就绪 | **约 61%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check；仍缺监控、备份恢复、部署验收和正式安全策略闭环。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -184,6 +184,7 @@
 - Catalog bank list schema
 - Common error schema
 - Health response schema
+- Readiness response schema
 - submitted answer primitive
 - UUID / opaque option ID primitive
 - `completedCount` 语义常量：
@@ -199,8 +200,8 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 425 Vitest
-- 369 API tests
+- 432 Vitest
+- 376 API tests
 - 31 Web tests
 - 25 Shared tests
 - 3 Playwright browser smoke
@@ -415,25 +416,23 @@
 - Admin Question Review
 - 通用 error
 - Health
+- Readiness/DB health
 
 未覆盖：
 
-- Admin User manage
-- Readiness/DB health
 - 部分 request schema 在 route 中仍手写
+- metrics/alert payload
 
 ### 3.11 生产运维能力不足
 
 缺：
 
-- DB readiness health
-- structured logging
-- request id / trace id
+- structured logging beyond Fastify defaults
+- trace id propagation beyond request id
 - metrics
 - alerting
-- rate limit
-- CSRF
-- secure headers
+- rate limit 策略细化与分布式存储
+- CSRF 策略正式启用决策与前端配合
 - backup restore drill
 - migration rollback plan
 - secrets management
@@ -642,8 +641,9 @@ contracts/v1/health.ts
 - Catalog bank list response 由 API 与 Web 双侧 parse。
 - Web API helper 对非 2xx response 使用 `ApiErrorResponseV1Schema`。
 - `/api/health` response 使用 `HealthResponseV1Schema`。
+- `/api/health/readiness` response 使用 `ReadinessResponseV1Schema`。
 - route 回归覆盖 Auth/Catalog 不合法 repository payload fail-closed。
-- readiness/DB health 不在本阶段完成，后续放到 Production Backend Readiness。
+- B9.1 已补 readiness/DB health、request id 和基础 guardrail。
 
 ### Phase B4 — Admin Backend Contract Design
 
@@ -1096,23 +1096,47 @@ review_items
 - deployment verification
 - remote CI and branch protection
 
+### Phase B9.1 — Backend Readiness Guardrails
+
+状态：**已完成，2026-07-14。**
+
+实际落地：
+
+- shared v1 `ReadinessResponseV1Schema` 与可选 `requestId` error contract。
+- `GET /api/health/readiness`：`USE_DATABASE=false` 时 database dependency 为 `disabled`；PostgreSQL runtime 执行 `SELECT 1`；失败返回 `503`。
+- 所有响应写入 `x-request-id`，并复用合法客户端传入值。
+- 未捕获异常统一返回结构化 `{ error, requestId }`，避免泄漏内部错误。
+- 基础安全 headers：`x-content-type-options`、`x-frame-options`、`referrer-policy`、`cross-origin-resource-policy`。
+- 可配置最小 rate limit：`RATE_LIMIT_ENABLED`、`RATE_LIMIT_WINDOW_MS`、`RATE_LIMIT_MAX`。
+- 可配置 CSRF origin check：`CSRF_ORIGIN_CHECK_ENABLED`、`CSRF_ALLOWED_ORIGINS`，只拦截带学生/管理员 Cookie 的 unsafe method。
+- route/unit/shared/PostgreSQL integration 覆盖。
+
+仍保留不做：
+
+- 不接入 Prometheus/metrics。
+- 不做告警。
+- 不做备份恢复演练。
+- 不做部署回滚自动化。
+- 不把内存 rate limit 当作多实例生产最终方案。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9 Production Backend Readiness 前置项。**
+> **B9.2 Production Operations Drill**，或补正式身份安全策略。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add backend readiness guardrails
+docs: add production operations drill
 ```
 
 范围建议只包含：
 
-- readiness health / DB health contract。
-- request id / structured error 基础。
-- rate limit / CSRF 策略草案与最小实现候选。
+- PostgreSQL backup / restore drill 文档和脚本。
+- migration rollback / forward-fix 运行手册。
+- production deploy checklist validation。
+- 远端 CI 首次验收和 branch protection 记录。
 - 全量 `npm run verify:docker`。
 
 不做：
@@ -1145,6 +1169,6 @@ feat: add backend readiness guardrails
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；完整平台后端还缺正式身份、模块化、非客观题、推荐策略/完整长期档案、管理前端和生产运维。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check 已落地；完整平台后端还缺正式身份、模块化、非客观题、推荐策略/完整长期档案、管理前端、监控告警和备份恢复演练。**
 
-最合理的下一步是继续后端闭环：优先转入生产安全与运维前置项；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：优先做生产运维演练或正式身份安全策略；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

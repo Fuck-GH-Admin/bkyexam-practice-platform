@@ -32,6 +32,7 @@ import {
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
   HealthResponseV1Schema,
+  ReadinessResponseV1Schema,
   GetLearningDashboardRequestV1Schema,
   GetLearningTrendsRequestV1Schema,
   LearningDashboardResponseV1Schema,
@@ -501,11 +502,33 @@ describe('v1 auth/catalog/error/health contracts', () => {
 
   it('parses common error and health responses', () => {
     expect(ApiErrorResponseV1Schema.parse({ error: 'Unauthenticated' })).toEqual({ error: 'Unauthenticated' });
+    expect(ApiErrorResponseV1Schema.parse({
+      error: 'Unexpected error',
+      requestId: 'req-123',
+    })).toEqual({ error: 'Unexpected error', requestId: 'req-123' });
     expect(() => ApiErrorResponseV1Schema.parse({ error: '' })).toThrow();
     expect(HealthResponseV1Schema.parse({ ok: true, service: 'bkyexam-practice-api' })).toEqual({
       ok: true,
       service: 'bkyexam-practice-api',
     });
+    expect(ReadinessResponseV1Schema.parse({
+      ok: true,
+      service: 'bkyexam-practice-api',
+      checkedAt: '2026-07-14T10:00:00.000Z',
+      dependencies: {
+        api: { ok: true, status: 'ok', latencyMs: 0 },
+        database: { ok: true, status: 'disabled', message: 'Database disabled for this runtime' },
+      },
+    }).dependencies.database.status).toBe('disabled');
+    expect(() => ReadinessResponseV1Schema.parse({
+      ok: true,
+      service: 'bkyexam-practice-api',
+      checkedAt: '2026-07-14T10:00:00.000Z',
+      dependencies: {
+        api: { ok: true, status: 'ok' },
+        database: { ok: false, status: 'down', message: 'query failed' },
+      },
+    })).toThrow('readiness ok must match dependency health');
   });
 
   it('parses learning dashboard contracts and counter boundaries', () => {

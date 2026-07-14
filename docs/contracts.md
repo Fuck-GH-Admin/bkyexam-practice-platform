@@ -54,12 +54,12 @@ PostgreSQL / memory repository
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
-| Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema` |
+| Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未实现 shared schema：
 
-- Readiness/DB health。
+- Production metrics/alert payload。
 
 ## Frozen V1 Semantics
 
@@ -157,9 +157,10 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 
 ### Error And Health
 
-- 通用 error response 固定为 `{ "error": "non-empty message" }`。
+- 通用 error response 固定为 `{ "error": "non-empty message", "requestId"?: "optional request id" }`。
 - `/api/health` 当前 response 固定为 `{ "ok": true, "service": "bkyexam-practice-api" }`。
-- 当前 health 只代表 Fastify 进程可响应，不代表 PostgreSQL readiness。
+- `/api/health` 只代表 Fastify 进程可响应，不代表 PostgreSQL readiness。
+- `/api/health/readiness` 使用 `ReadinessResponseV1Schema`，固定 `api` 与 `database` dependency；database status 可为 `ok|disabled|down`，整体 `ok` 必须与 dependency 状态一致。
 
 ## Versioning Rules
 
@@ -203,5 +204,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
-- Readiness/DB health 尚未定义。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。

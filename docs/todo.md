@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.1 — 2026-07-14
+
+- [x] 新增 shared v1 Readiness schema。
+- [x] 新增 `GET /api/health/readiness`，支持 DB disabled/ok/down 三态。
+- [x] PostgreSQL runtime readiness 使用 `SELECT 1`，失败返回 `503`。
+- [x] 所有响应写入 `x-request-id`，支持复用客户端 request id。
+- [x] 未捕获异常返回结构化 `{ error, requestId }`。
+- [x] 增加基础安全 headers。
+- [x] 增加可配置内存级 rate limit。
+- [x] 增加可配置 CSRF Origin/Referer guard。
+- [x] route/shared/config/PostgreSQL integration 覆盖。
+- [x] 不新增前端页面，不提前做最终视觉。
+
 ## Completed Backend B7.4 — 2026-07-14
 
 - [x] 新增 migration `0009_question_bookmarks.sql`。
@@ -379,8 +392,10 @@
 - [ ] 正式域名、TLS、Cloudflare 和 proxy 验收。
 - [ ] secrets 管理与 Cookie security。
 - [ ] PostgreSQL 备份、恢复和迁移回滚方案。
-- [ ] structured logging、metrics、health、alerts。
-- [ ] rate limit、CSRF 策略、安全 headers。
+- [x] readiness health、request id、结构化未捕获错误和基础安全 headers。
+- [x] 可配置最小 rate limit 与 CSRF origin check。
+- [ ] structured logging、metrics、alerts。
+- [ ] rate limit、CSRF 生产策略细化与多实例方案。
 - [ ] 数据保留、账户删除和隐私规则。
 - [ ] 小范围真实用户试用与问题回收。
 

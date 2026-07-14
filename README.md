@@ -108,6 +108,11 @@ SESSION_TTL_DAYS=30
 ADMIN_SESSION_TTL_HOURS=8
 ADMIN_IMPORT_ALLOWED_ROOTS=C:\path\to\questionbank
 ADMIN_IMPORT_ENABLE_WRITE=false
+RATE_LIMIT_ENABLED=false
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=600
+CSRF_ORIGIN_CHECK_ENABLED=false
+CSRF_ALLOWED_ORIGINS=http://127.0.0.1:5173;http://localhost:5173
 ```
 
 PowerShell 示例：
@@ -118,6 +123,8 @@ $env:USE_DATABASE="true"
 $env:COOKIE_SECRET="local-development-secret"
 $env:ADMIN_IMPORT_ALLOWED_ROOTS="C:\path\to\questionbank"
 $env:ADMIN_IMPORT_ENABLE_WRITE="false" # 改为 true 后允许 /api/admin/import-jobs mode=import 写入；resetBeforeImport 仍关闭
+$env:RATE_LIMIT_ENABLED="false" # 改为 true 后启用内存级最小 rate limit
+$env:CSRF_ORIGIN_CHECK_ENABLED="false" # 改为 true 后校验 Cookie unsafe request 的 Origin/Referer
 ```
 
 初始化数据库：
@@ -156,6 +163,7 @@ npm run dev:web
 - API：`http://127.0.0.1:3000`
 - Web：`http://127.0.0.1:5173`
 - Health：`http://127.0.0.1:3000/api/health`
+- Readiness：`http://127.0.0.1:3000/api/health/readiness`
 
 `USE_DATABASE=false` 只适合轻量本地启动和 route 单元测试。真实题库、持久化学生会话、草稿和错题本需要 `USE_DATABASE=true`。
 

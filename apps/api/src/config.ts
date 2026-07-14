@@ -11,6 +11,13 @@ const configSchema = z.object({
   ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
   ADMIN_IMPORT_ALLOWED_ROOTS: z.string().optional().transform(parsePathList),
   ADMIN_IMPORT_ENABLE_WRITE: z.string().optional().transform((value) => value === 'true'),
+  RATE_LIMIT_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  RATE_LIMIT_WINDOW_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 60_000)),
+  RATE_LIMIT_MAX: z.string().optional().transform((value) => parsePositiveInteger(value, 600)),
+  CSRF_ORIGIN_CHECK_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  CSRF_ALLOWED_ORIGINS: z.string().optional().transform((value) => (
+    value ? parsePathList(value) : ['http://127.0.0.1:5173', 'http://localhost:5173']
+  )),
 });
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {

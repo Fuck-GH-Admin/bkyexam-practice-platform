@@ -25,9 +25,12 @@ type SubmittedAnswer = string[] | boolean | string;
 
 ```json
 {
-  "error": "Human-readable message"
+  "error": "Human-readable message",
+  "requestId": "optional-request-id"
 }
 ```
+
+手写业务错误目前通常只返回 `error`。未捕获异常和平台 guardrail 错误会额外返回 `requestId`，并且所有响应都会带 `x-request-id` header；客户端传入合法 `x-request-id` 时会复用该值，否则由 Fastify 生成。
 
 常见状态：
 
@@ -35,6 +38,22 @@ type SubmittedAnswer = string[] | boolean | string;
 - `401`：未登录、session 过期或已撤销。
 - `404`：资源不存在、不属于当前学生，或题目不在该 session。
 - `409`：尝试修改已经 completed 的 practice session。
+- `429`：启用 rate limit 后请求过多。
+
+### Platform Guardrails
+
+所有 API 响应默认附加：
+
+- `x-request-id`
+- `x-content-type-options: nosniff`
+- `x-frame-options: DENY`
+- `referrer-policy: no-referrer`
+- `cross-origin-resource-policy: same-site`
+
+可选 guardrail：
+
+- `RATE_LIMIT_ENABLED=true` 时启用内存级最小 rate limit，默认窗口 `RATE_LIMIT_WINDOW_MS=60000`、上限 `RATE_LIMIT_MAX=600`。
+- `CSRF_ORIGIN_CHECK_ENABLED=true` 时，对带 `bky_session` 或 `bky_admin_session` Cookie 的 unsafe method 检查 `Origin`/`Referer`，允许列表来自 `CSRF_ALLOWED_ORIGINS`。
 
 ### Versioned Runtime Contract
 
@@ -70,7 +89,50 @@ Response：
 }
 ```
 
-该接口目前只证明 Fastify 进程可响应，不包含 PostgreSQL readiness。
+该接口只证明 Fastify 进程可响应，不包含 PostgreSQL readiness。
+
+### `GET /api/health/readiness`
+
+Response when ready：
+
+```json
+{
+  "ok": true,
+  "service": "bkyexam-practice-api",
+  "checkedAt": "2026-07-14T10:00:00.000Z",
+  "dependencies": {
+    "api": {
+      "ok": true,
+      "status": "ok",
+      "latencyMs": 0
+    },
+    "database": {
+      "ok": true,
+      "status": "ok",
+      "latencyMs": 3
+    }
+  }
+}
+```
+
+当 `USE_DATABASE=false` 时，database dependency 返回 `status=disabled` 且整体仍为 ready；当 PostgreSQL `SELECT 1` readiness query 失败时返回 `503`：
+
+```json
+{
+  "ok": false,
+  "service": "bkyexam-practice-api",
+  "checkedAt": "2026-07-14T10:00:00.000Z",
+  "dependencies": {
+    "api": { "ok": true, "status": "ok", "latencyMs": 0 },
+    "database": {
+      "ok": false,
+      "status": "down",
+      "latencyMs": 25,
+      "message": "Database readiness query failed"
+    }
+  }
+}
+```
 
 ## Auth
 
@@ -1779,7 +1841,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

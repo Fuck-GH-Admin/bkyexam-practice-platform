@@ -17,6 +17,7 @@ import { buildApp } from '../../src/app.js';
 import { createPgPool } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { requireDedicatedTestDatabaseUrl } from '../../src/db/testDatabaseSafety.js';
+import { createPgReadinessProbe } from '../../src/health/readiness.js';
 import { createPgLearningDashboardRepository } from '../../src/learning/repository.js';
 import { createPgPracticeSessionService } from '../../src/modules/practice/sessionService.js';
 import { createPgPracticeRepository } from '../../src/practice/repository.js';
@@ -56,6 +57,7 @@ describe('PostgreSQL-backed API integration', () => {
     auditLogRepository,
     auditService: createAuditService(auditLogRepository),
     cookieSecret: 'postgres-integration-cookie-secret',
+    readinessProbe: createPgReadinessProbe(pool),
     logger: false,
   });
 
@@ -85,6 +87,22 @@ describe('PostgreSQL-backed API integration', () => {
   });
 
   it('persists auth, drafts, whole-session grading, wrongbook, and ownership boundaries', async () => {
+    const readiness = await app.inject({
+      method: 'GET',
+      url: '/api/health/readiness',
+      headers: { 'x-request-id': 'integration-readiness' },
+    });
+    expect(readiness.statusCode).toBe(200);
+    expect(readiness.headers['x-request-id']).toBe('integration-readiness');
+    expect(readiness.json()).toMatchObject({
+      ok: true,
+      service: 'bkyexam-practice-api',
+      dependencies: {
+        api: { ok: true, status: 'ok' },
+        database: { ok: true, status: 'ok', latencyMs: expect.any(Number) },
+      },
+    });
+
     const login = await app.inject({
       method: 'POST',
       url: '/api/auth/login',

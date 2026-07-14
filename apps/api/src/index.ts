@@ -11,6 +11,7 @@ import { createPgStudentAuthRepository } from './auth/studentAuth.js';
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPgPool } from './db/client.js';
+import { createPgReadinessProbe } from './health/readiness.js';
 import { createPgLearningDashboardRepository } from './learning/repository.js';
 import { createPgPracticeSessionService } from './modules/practice/sessionService.js';
 import { createPgPracticeRepository } from './practice/repository.js';
@@ -48,6 +49,16 @@ const app = buildApp({
   cookieSecure: config.COOKIE_SECURE,
   sessionTtlDays: config.SESSION_TTL_DAYS,
   adminSessionTtlHours: config.ADMIN_SESSION_TTL_HOURS,
+  readinessProbe: pool ? createPgReadinessProbe(pool) : undefined,
+  rateLimit: {
+    enabled: config.RATE_LIMIT_ENABLED,
+    windowMs: config.RATE_LIMIT_WINDOW_MS,
+    max: config.RATE_LIMIT_MAX,
+  },
+  csrfOriginCheck: {
+    enabled: config.CSRF_ORIGIN_CHECK_ENABLED,
+    allowedOrigins: config.CSRF_ALLOWED_ORIGINS,
+  },
 });
 
 if (pool) {

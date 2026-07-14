@@ -17,8 +17,14 @@ import { createAdminSessionService, createMemoryAdminSessionRepository } from '.
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
 import type { StudentAuthRepository } from './auth/studentAuth.js';
+import type { ReadinessProbe } from './health/readiness.js';
 import { createMemoryLearningDashboardRepository, type LearningDashboardRepository } from './learning/repository.js';
 import { createMemoryPracticeSessionService, type PracticeSessionService } from './modules/practice/sessionService.js';
+import {
+  registerBackendGuardrails,
+  type CsrfOriginCheckOptions,
+  type RateLimitOptions,
+} from './platform/guardrails.js';
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
@@ -64,10 +70,17 @@ interface BuildAppOptions {
   cookieSecure?: boolean;
   sessionTtlDays?: number;
   adminSessionTtlHours?: number;
+  readinessProbe?: ReadinessProbe;
+  rateLimit?: RateLimitOptions;
+  csrfOriginCheck?: CsrfOriginCheckOptions;
 }
 
 export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? process.env.NODE_ENV !== 'test' });
+  registerBackendGuardrails(app, {
+    rateLimit: options.rateLimit,
+    csrfOriginCheck: options.csrfOriginCheck,
+  });
   const bankRepository = options.bankRepository ?? createMemoryBankRepository();
   const learningRepository = options.learningRepository ?? createMemoryLearningDashboardRepository();
   const practiceRepository = options.practiceRepository ?? createMemoryPracticeRepository();
@@ -148,7 +161,9 @@ export function buildApp(options: BuildAppOptions = {}) {
     wrongQuestionService,
     requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
   }));
-  void app.register(registerHealthRoutes);
+  void app.register(registerHealthRoutes, {
+    readinessProbe: options.readinessProbe,
+  });
 
   return app;
 }
