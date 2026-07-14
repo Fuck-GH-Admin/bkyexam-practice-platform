@@ -50,6 +50,12 @@ const app = buildApp({
   cookieSecret: config.COOKIE_SECRET,
   cookieSecure: config.COOKIE_SECURE,
   sessionTtlDays: config.SESSION_TTL_DAYS,
+  studentAuthOptions: {
+    legacyPasswordlessLoginEnabled: config.STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED,
+    maxFailedLoginCount: config.STUDENT_LOGIN_MAX_FAILURES,
+    failureWindowMinutes: config.STUDENT_LOGIN_FAILURE_WINDOW_MINUTES,
+    lockMinutes: config.STUDENT_LOGIN_LOCK_MINUTES,
+  },
   adminSessionTtlHours: config.ADMIN_SESSION_TTL_HOURS,
   readinessProbe: pool ? createPgReadinessProbe(pool) : undefined,
   rateLimit: {

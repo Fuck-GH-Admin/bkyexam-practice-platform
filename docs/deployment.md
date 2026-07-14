@@ -136,6 +136,10 @@ The API currently reads configuration from environment variables through `apps/a
 - `COOKIE_SECRET`: signs cookie data and defaults to `dev-cookie-secret-change-me` for local development. Set a long random value in production.
 - `COOKIE_SECURE`: accepts `true` to require HTTPS-only cookies. Defaults to `false`; set to `true` behind production HTTPS.
 - `SESSION_TTL_DAYS`: positive integer session lifetime in days, default `30`.
+- `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED`: explicit migration/development escape hatch for old no-password accounts, default `false`; keep `false` in public production.
+- `STUDENT_LOGIN_MAX_FAILURES`: relaxed student login failure threshold, default `10`.
+- `STUDENT_LOGIN_FAILURE_WINDOW_MINUTES`: student login failure counting window, default `30`.
+- `STUDENT_LOGIN_LOCK_MINUTES`: temporary lock duration after threshold, default `15`.
 - `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
 - `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
 - `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. Even when enabled, `resetBeforeImport=true` remains blocked.
@@ -154,8 +158,8 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
-- operational policy and UI for administrator/student account lifecycle; backend Admin User manage API, Admin Student Manage API, and one-time `super_admin` bootstrap already exist;
-- student identity implementation; the policy, data model, and Admin Student Manage APIs are fixed in [`identity-security-strategy.md`](identity-security-strategy.md), but password login enforcement is not yet implemented;
+- operational policy and UI for administrator/student account lifecycle; backend Admin User manage API, Admin Student Manage API, student password login enforcement, student password change API, and one-time `super_admin` bootstrap already exist;
+- old-account migration runbook/CLI for setting temporary passwords while preserving historical practice/wrongbook/learning data;
 - secrets management;
 - PostgreSQL backup and restore drill;
 - external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;

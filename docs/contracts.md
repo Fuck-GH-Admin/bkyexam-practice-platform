@@ -1,6 +1,6 @@
 # Versioned API Contracts
 
-状态日期：**2026-07-14**
+状态日期：**2026-07-15**
 
 本页描述跨 API、学生端和 repository 使用的稳定数据边界。当前版本号是代码命名空间中的 `v1`，不会额外写入每个 HTTP response。
 
@@ -51,7 +51,7 @@ PostgreSQL / memory repository
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
 | Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, `LearningGoalsResponseV1Schema`, `LearningReviewMarkListResponseV1Schema`, `LearningReviewMarkResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend/goal/feedback/review-mark schemas |
-| Auth | `AuthStudentV1Schema` with `className/groupName`, login/me/logout response schemas, optional `passwordResetRequired` |
+| Auth | `AuthStudentV1Schema` with `className/groupName`, password-required login request, login/me/logout response schemas, student password change request/response schemas, optional `passwordResetRequired` |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
 | Error/Health/Observability | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema`, `MetricsResponseV1Schema` |
@@ -59,7 +59,6 @@ PostgreSQL / memory repository
 
 当前未实现 shared schema：
 
-- student self password change / force-change flow。
 - Production alert payload。
 
 ## Frozen V1 Semantics

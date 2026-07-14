@@ -5,6 +5,22 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.7 Password Login Enforcement — 2026-07-15
+
+- [x] shared v1 `AuthLoginRequestV1Schema` 正式要求 `password`。
+- [x] shared v1 新增 `ChangeStudentPasswordRequestV1Schema` / `ChangeStudentPasswordResponseV1Schema`。
+- [x] `POST /api/auth/login` 默认要求密码，未知学生不再公网自动创建。
+- [x] `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=false` 作为默认；显式开启时仅用于旧账号迁移/本地开发。
+- [x] 密码错误递增 `failed_login_count`，默认 10 次 / 30 分钟窗口后锁定 15 分钟。
+- [x] 成功登录清空失败计数、窗口和锁定状态，并更新 `last_login_at`。
+- [x] `POST /api/auth/password/change` 校验当前密码、写入新 hash、清空 `passwordResetRequired` 与失败/锁定状态。
+- [x] route/unit/shared/PostgreSQL integration 覆盖无密码默认失败、legacy 兼容、临时密码登录、改密与旧密码失效。
+- [x] 不新增正式前端，不删除旧账号或历史学习数据。
+
+后续代码阶段：
+
+- [ ] B9.8 Production Gate Hardening / Migration Runbook。
+
 ## Completed Backend B9.5 — 2026-07-15
 
 - [x] 新增 migration `0010_student_identity_security.sql`。
@@ -15,10 +31,6 @@
 - [x] student session 查询排除 disabled student。
 - [x] route/unit/shared/PostgreSQL integration 覆盖学生身份安全字段。
 - [x] 不新增前端页面，不提前做最终视觉。
-
-后续代码阶段：
-
-- [ ] B9.7 Password Login Enforcement。
 
 ## Completed Backend B9.6 Admin Student Manage API — 2026-07-15
 

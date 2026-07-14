@@ -13,7 +13,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
-- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型与 Admin Student Manage API；学生密码登录 enforcement、完整监控告警、远端 CI 保护和正式部署验收仍未完成。**
+- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、Admin Student Manage API 与学生密码登录 enforcement；完整监控告警、远端 CI 保护、旧账号迁移 runbook 和正式部署验收仍未完成。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -21,8 +21,8 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 93%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；账户、归档和部分 UX 未完成 |
-| 公开生产就绪度 | **约 71%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档和学生身份安全数据模型；仍缺学生密码登录 enforcement、远端 CI 首次验收、外部监控告警和正式部署验收 |
-| 完整产品愿景 | **约 75%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI 与学生身份安全数据模型已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
+| 公开生产就绪度 | **约 74%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档和学生身份安全数据模型；仍缺远端 CI 首次验收、外部监控告警、旧账号迁移 runbook 和正式部署验收 |
+| 完整产品愿景 | **约 77%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型与学生密码登录 enforcement 已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -39,9 +39,9 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 55 | 395 |
+| `apps/api` | 55 | 407 |
 | `apps/web` | 2 | 31 |
-| **Total** | **59** | **452** |
+| **Total** | **59** | **464** |
 
 仓库内 Playwright smoke：
 
@@ -59,7 +59,7 @@ Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个
 | --- | ---: | ---: |
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
-该测试从空数据库执行十份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成 readiness/DB health、metrics smoke、学生身份安全字段、学生登录、Admin Auth/RBAC/audit、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run 创建/list/detail/error-report/audit/status summary、true import mode 写入/幂等/失败回滚/reset gate、Admin Question Review flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、学习概览统计、学习趋势/streak、学习目标与错题复习反馈、题目收藏/长期复习标记、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行十份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成 readiness/DB health、metrics smoke、学生身份安全字段、无密码默认失败、密码登录、临时密码登录、学生改密、Admin Auth/RBAC/audit、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run 创建/list/detail/error-report/audit/status summary、true import mode 写入/幂等/失败回滚/reset gate、Admin Question Review flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、学习概览统计、学习趋势/streak、学习目标与错题复习反馈、题目收藏/长期复习标记、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
 
 隔离 backup/restore drill：
 
@@ -92,7 +92,7 @@ npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 - shared TypeScript build：通过。
 - API TypeScript build：通过。
 - Web Vite build：通过。
-- Web bundle：约 `320.22 kB` JS（gzip `92.73 kB`）。
+- Web bundle：约 `320.47 kB` JS（gzip `92.79 kB`）。
 - Web CSS：约 `20.26 kB`（gzip `4.98 kB`）。
 
 主 JS 当前包含 Web 运行时 Zod response validation 和所有学生页面；内部 MVP 可以接受，下一轮 Web modularization 应引入 route-level code splitting。
@@ -103,7 +103,7 @@ Practice/Wrongbook/Learning/Auth/Catalog/Admin/Error/Health/Observability v1 con
 
 - API repository DTO 直接引用共享类型。
 - Fastify 在发送 Practice/Wrongbook/Learning/Auth/Catalog/Health/Metrics 成功响应前执行共享 schema parse。
-- Auth v1 contract 已支持学生 `className/groupName` 和顶层 `passwordResetRequired`。
+- Auth v1 contract 已支持学生 `className/groupName`、顶层 `passwordResetRequired`、正式密码登录 request 和学生改密 request/response。
 - `/api/health/readiness` 使用 shared readiness schema parse，并在 PostgreSQL profile 中执行真实 `SELECT 1`。
 - `/api/health/metrics` 使用 shared metrics schema parse，覆盖 HTTP total requests、状态桶、per-route 计数、平均耗时和进程内存摘要。
 - 所有响应带 `x-request-id`；未捕获错误和 guardrail 错误返回结构化 `requestId`。
@@ -294,7 +294,7 @@ PracticeSessionService
 | --- | --- | ---: | --- | --- |
 | Corpus parser/import | 稳定 | 90% | 全量解析、事务导入、幂等 upsert、smoke | 进度事件、错误报告 UI、增量策略 |
 | Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选、v1 runtime contract | 管理编辑、审批、审计、质量抽查 |
-| Student identity/session | 管理 API 已落地 | 74% | 固定用户名、Cookie session、恢复/退出、v1 runtime contract、`className/groupName`、`passwordResetRequired`、账号状态、失败计数/临时锁定字段、旧账号保留、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit | 密码登录 enforcement、学生改密、找回、身份合并 |
+| Student identity/session | 正式密码主链路已落地 | 82% | 固定用户名、密码登录、Cookie session、恢复/退出、v1 runtime contract、`className/groupName`、`passwordResetRequired`、学生改密、账号状态、失败计数/临时锁定、旧账号保留、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit | 旧账号批量临时密码迁移 runbook、找回、身份合并、正式改密前端 |
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Learning analytics | 后端 MVP+ | 68% | 学习概览 API、最近题库、题型正确率、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏/长期复习标记、v1 runtime contract | 前端展示、推荐策略、完整长期学习档案 |
@@ -307,7 +307,7 @@ PracticeSessionService
 
 ### P0 Before Public Production
 
-- 当前登录实现仍接近“用户名即身份”，不适合公开环境；B9.4 已冻结正式身份策略，B9.5 已落地学生身份安全数据模型，B9.6 已落地 Admin Student Manage，但学生密码登录 enforcement 尚未实现。
+- 学生密码登录 enforcement 已落地；公开生产前仍需旧账号批量临时密码迁移 runbook、正式改密前端入口、远端 CI/branch protection 和部署参数验收。
 - 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API 与 super_admin bootstrap，但仍缺正式运营 UI、导入 reset/队列化和完整审核流程。
 - 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、隔离 backup/restore drill、结构化 request log 和 metrics smoke endpoint；仍没有真实生产数据量级恢复演练、外部监控和告警。
 - 没有对正式域名部署进行本轮验收。

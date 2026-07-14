@@ -17,7 +17,7 @@ import type { AdminStudentRepository } from './admin/adminStudents.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
-import type { StudentAuthRepository } from './auth/studentAuth.js';
+import type { StudentAuthRepository, StudentAuthServiceOptions } from './auth/studentAuth.js';
 import type { ReadinessProbe } from './health/readiness.js';
 import { createMemoryLearningDashboardRepository, type LearningDashboardRepository } from './learning/repository.js';
 import { createMemoryPracticeSessionService, type PracticeSessionService } from './modules/practice/sessionService.js';
@@ -77,6 +77,7 @@ interface BuildAppOptions {
   cookieSecret?: string;
   cookieSecure?: boolean;
   sessionTtlDays?: number;
+  studentAuthOptions?: StudentAuthServiceOptions;
   adminSessionTtlHours?: number;
   readinessProbe?: ReadinessProbe;
   metricsRegistry?: MetricsRegistry;
@@ -119,6 +120,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     repository: options.authRepository,
     sessionService,
     cookieSecure: options.cookieSecure ?? false,
+    studentAuthOptions: options.studentAuthOptions,
   });
   void app.register(registerAdminAuthRoutes, {
     repository: options.adminAuthRepository,

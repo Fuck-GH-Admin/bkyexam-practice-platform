@@ -2,7 +2,7 @@
 
 状态日期：**2026-07-15**
 
-本文冻结正式身份与账号安全方向。它是 B9.4 的策略文件，不表示所有能力已经实现；当前代码仍处于“学生用户名即身份”的 MVP 状态。后续代码阶段必须按本文拆成小切片实现，并在每一阶段通过 shared contract、route test、PostgreSQL integration 和 `npm run verify:docker` 后再提交。
+本文冻结正式身份与账号安全方向。它是 B9.4 的策略文件；B9.5/B9.6/B9.7 已把数据模型、管理员学生账号管理和学生密码登录 enforcement 落地。后续代码阶段仍必须按本文拆成小切片实现，并在每一阶段通过 shared contract、route test、PostgreSQL integration 和 `npm run verify:docker` 后再提交。
 
 ## 1. 决策摘要
 
@@ -22,7 +22,7 @@
 当前已实现：
 
 - `students.login_name` 唯一。
-- `students.password_hash` 已存在，但 PostgreSQL 学生登录仍允许首次使用 `loginName` 自动创建学生。
+- `students.password_hash` 已存在；B9.7 后默认不再允许公网首次使用 `loginName` 自动创建学生。
 - B9.5 已扩展 `students`：`class_name`、`group_name`、`status`、`password_reset_required`、失败计数、临时锁定、`last_login_at` 和 `created_by_admin_id`。
 - B9.5 已把 `202502040201`–`202502040230` 的默认 `className` 规则落入 migration 与登录创建 helper。
 - Auth shared contract 已支持 `className/groupName/passwordResetRequired`。
@@ -31,14 +31,15 @@
 - B9.6 已实现 Admin Student Manage API：list/detail/create/bulk-create/update/reset-password/revoke-sessions。
 - B9.6 已把 `student_account:read/write/reset_password/revoke_session` 纳入 RBAC，`operator` 可执行日常学生账号运营。
 - 管理员重置密码会写入 hash、设置 `passwordResetRequired=true`、清空失败/锁定状态，并可撤销学生现有 session。
+- B9.7 已实现 `POST /api/auth/login` 默认密码登录、显式 legacy passwordless 开关、失败计数/临时锁定、成功清空失败状态和 `POST /api/auth/password/change`。
 - `x-request-id`、secure headers、可配置 rate limit/CSRF origin check、readiness、metrics smoke 已实现。
 
 当前不能公开生产的原因：
 
-- 学生登录仍处在兼容旧账号阶段；未默认强制 `password`。
-- 学生临时密码登录后的 force-change 流程尚未完成。
-- 登录失败锁定字段已落入学生身份模型，但失败计数递增/解锁流程尚未启用。
-- 旧账号保留策略已落入数据模型，但正式 password enforcement 尚未实现。
+- 旧账号保留策略已落入数据模型，但批量临时密码迁移 runbook/CLI 尚未完成。
+- 正式学生改密前端尚未设计；当前只有后端 API。
+- 管理员登录失败锁定、生产部署参数和外部监控告警仍未完成。
+- 远端 CI / branch protection 与正式部署验收尚未确认。
 
 ## 3. 学生账号生命周期
 
@@ -146,17 +147,18 @@ STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=false
 
 ### 5.1 学生登录
 
-建议规则：
+已实现规则：
 
-- 同一 `loginName` 在 15 分钟窗口内失败 10 次，锁定 10 分钟。
+- 同一 `loginName` 在默认 30 分钟窗口内失败 10 次，锁定 15 分钟。
+- 默认可通过 `STUDENT_LOGIN_MAX_FAILURES`、`STUDENT_LOGIN_FAILURE_WINDOW_MINUTES`、`STUDENT_LOGIN_LOCK_MINUTES` 调整。
 - 成功登录后清空失败计数和锁定状态。
-- 被锁定时返回通用 `401` 或 `423` 需后续 contract 决策；不暴露“账号存在与否”细节。
+- 缺少密码返回 `400 Student password is required`；凭据错误返回 `401`；被锁定时返回 `423 Student account locked`。
 - 同 IP 继续依赖现有平台级 rate limit。
 
 建议错误文案：
 
 ```json
-{ "error": "Invalid credentials" }
+{ "error": "Invalid login credentials" }
 ```
 
 锁定时也不要泄露过多细节；前端可统一提示“登录失败次数较多，请稍后再试或联系管理员”。
@@ -215,13 +217,13 @@ student_password_events
 
 ### 7.1 学生 Auth
 
-当前：
+已实现：
 
 ```http
 POST /api/auth/login
 ```
 
-目标 request：
+正式 request：
 
 ```json
 {
@@ -230,7 +232,7 @@ POST /api/auth/login
 }
 ```
 
-目标 response 增加组织字段：
+response 包含组织字段：
 
 ```json
 {
@@ -390,6 +392,8 @@ student_account:revoke_session
 
 ### B9.7 — Password Login Enforcement
 
+状态：**已完成，2026-07-15。**
+
 目标：
 
 - `POST /api/auth/login` 正式要求 `password`。
@@ -404,6 +408,13 @@ student_account:revoke_session
 - 临时密码登录返回 `passwordResetRequired=true`。
 - 修改密码后正常进入系统。
 - `npm run verify:docker`。
+
+已落地补充：
+
+- 正式 shared contract 要求登录 `password`，并新增 `POST /api/auth/password/change` contract。
+- `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=false` 为默认；显式开启时仅用于本地开发或迁移窗口。
+- 密码错误写入 `failed_login_count` / `failed_login_window_started_at` / `locked_until`；成功登录或成功改密清空失败状态。
+- PostgreSQL integration 已覆盖无密码默认失败、临时密码登录、改密、旧密码失效和旧 session 后续重置撤销。
 
 ## 10. 明确不做
 

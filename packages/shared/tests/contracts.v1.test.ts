@@ -38,8 +38,11 @@ import {
   RevokeAdminStudentSessionsResponseV1Schema,
   UpdateAdminStudentRequestV1Schema,
   UpdateAdminUserRequestV1Schema,
+  AuthLoginRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
+  ChangeStudentPasswordRequestV1Schema,
+  ChangeStudentPasswordResponseV1Schema,
   CatalogBankListResponseV1Schema,
   HealthResponseV1Schema,
   MetricsResponseV1Schema,
@@ -75,6 +78,15 @@ const reviewMarkId = '80000000-0000-4000-8000-000000000001';
 
 describe('v1 auth/catalog/error/health contracts', () => {
   it('parses auth responses with optional student ids and strict logout success', () => {
+    expect(AuthLoginRequestV1Schema.parse({
+      loginName: 'alice',
+      password: 'secret123',
+    })).toEqual({
+      loginName: 'alice',
+      password: 'secret123',
+    });
+    expect(() => AuthLoginRequestV1Schema.parse({ loginName: 'alice' })).toThrow();
+
     expect(AuthLoginResponseV1Schema.parse({
       student: { loginName: 'alice', displayName: 'Alice' },
     })).toEqual({
@@ -107,6 +119,21 @@ describe('v1 auth/catalog/error/health contracts', () => {
 
     expect(AuthLogoutResponseV1Schema.parse({ success: true })).toEqual({ success: true });
     expect(() => AuthLogoutResponseV1Schema.parse({ success: false })).toThrow();
+    expect(ChangeStudentPasswordRequestV1Schema.parse({
+      currentPassword: 'temporary123',
+      newPassword: 'newsecret123',
+    })).toEqual({
+      currentPassword: 'temporary123',
+      newPassword: 'newsecret123',
+    });
+    expect(() => ChangeStudentPasswordRequestV1Schema.parse({
+      currentPassword: 'temporary123',
+      newPassword: 'short',
+    })).toThrow();
+    expect(ChangeStudentPasswordResponseV1Schema.parse({
+      success: true,
+      passwordResetRequired: false,
+    })).toEqual({ success: true, passwordResetRequired: false });
   });
 
   it('parses admin auth contracts with explicit roles and permissions', () => {

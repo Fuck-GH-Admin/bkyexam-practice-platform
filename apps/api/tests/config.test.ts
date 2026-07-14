@@ -20,6 +20,10 @@ describe('loadConfig', () => {
     expect(config.COOKIE_SECRET).toBe('dev-cookie-secret-change-me');
     expect(config.COOKIE_SECURE).toBe(false);
     expect(config.SESSION_TTL_DAYS).toBe(30);
+    expect(config.STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED).toBe(false);
+    expect(config.STUDENT_LOGIN_MAX_FAILURES).toBe(10);
+    expect(config.STUDENT_LOGIN_FAILURE_WINDOW_MINUTES).toBe(30);
+    expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(15);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(8);
     expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(false);
     expect(config.RATE_LIMIT_ENABLED).toBe(false);
@@ -34,6 +38,10 @@ describe('loadConfig', () => {
       COOKIE_SECRET: 'production-secret',
       COOKIE_SECURE: 'true',
       SESSION_TTL_DAYS: '14',
+      STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED: 'true',
+      STUDENT_LOGIN_MAX_FAILURES: '5',
+      STUDENT_LOGIN_FAILURE_WINDOW_MINUTES: '45',
+      STUDENT_LOGIN_LOCK_MINUTES: '20',
       ADMIN_SESSION_TTL_HOURS: '6',
       ADMIN_IMPORT_ENABLE_WRITE: 'true',
       RATE_LIMIT_ENABLED: 'true',
@@ -46,6 +54,10 @@ describe('loadConfig', () => {
     expect(config.COOKIE_SECRET).toBe('production-secret');
     expect(config.COOKIE_SECURE).toBe(true);
     expect(config.SESSION_TTL_DAYS).toBe(14);
+    expect(config.STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED).toBe(true);
+    expect(config.STUDENT_LOGIN_MAX_FAILURES).toBe(5);
+    expect(config.STUDENT_LOGIN_FAILURE_WINDOW_MINUTES).toBe(45);
+    expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(20);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(6);
     expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(true);
     expect(config.RATE_LIMIT_ENABLED).toBe(true);

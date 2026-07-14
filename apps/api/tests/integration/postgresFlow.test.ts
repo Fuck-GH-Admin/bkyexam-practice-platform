@@ -77,6 +77,20 @@ describe('PostgreSQL-backed API integration', () => {
         displayName: 'Integration Super Admin',
         password: 'secret123',
       }, new Date('2026-07-14T10:00:00.000Z'));
+      await seedIntegrationStudent(
+        client,
+        '60000000-0000-4000-8000-000000000101',
+        'integration-alice',
+        'Integration Alice',
+        'alice-secret123',
+      );
+      await seedIntegrationStudent(
+        client,
+        '60000000-0000-4000-8000-000000000102',
+        'integration-bob',
+        'Integration Bob',
+        'bob-secret123',
+      );
     } finally {
       client.release();
     }
@@ -123,10 +137,18 @@ describe('PostgreSQL-backed API integration', () => {
     });
     expect(metrics.json().http.totalRequests).toBeGreaterThanOrEqual(1);
 
-    const login = await app.inject({
+    const passwordlessLogin = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
       payload: { loginName: 'integration-alice' },
+    });
+    expect(passwordlessLogin.statusCode).toBe(400);
+    expect(passwordlessLogin.json()).toEqual({ error: 'Student password is required' });
+
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { loginName: 'integration-alice', password: 'alice-secret123' },
     });
     expect(login.statusCode).toBe(200);
     const aliceCookie = extractCookie(login.headers['set-cookie']);
@@ -369,6 +391,36 @@ describe('PostgreSQL-backed API integration', () => {
       passwordResetRequired: true,
     });
     const managedStudentCookie = extractCookie(managedStudentLogin.headers['set-cookie']);
+
+    const managedStudentPasswordChange = await app.inject({
+      method: 'POST',
+      url: '/api/auth/password/change',
+      headers: { cookie: managedStudentCookie },
+      payload: {
+        currentPassword: 'temporary123',
+        newPassword: 'permanent123',
+      },
+    });
+    expect(managedStudentPasswordChange.statusCode).toBe(200);
+    expect(managedStudentPasswordChange.json()).toEqual({ success: true, passwordResetRequired: false });
+
+    const managedStudentMeAfterPasswordChange = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: managedStudentCookie },
+    });
+    expect(managedStudentMeAfterPasswordChange.statusCode).toBe(200);
+    expect(managedStudentMeAfterPasswordChange.json()).toMatchObject({
+      student: { loginName: '202502040201' },
+      passwordResetRequired: false,
+    });
+
+    const managedStudentOldPasswordLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { loginName: '202502040201', password: 'temporary123' },
+    });
+    expect(managedStudentOldPasswordLogin.statusCode).toBe(401);
 
     const bulkCreatedStudents = await app.inject({
       method: 'POST',
@@ -1203,7 +1255,7 @@ describe('PostgreSQL-backed API integration', () => {
     const bobLogin = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { loginName: 'integration-bob' },
+      payload: { loginName: 'integration-bob', password: 'bob-secret123' },
     });
     const bobCookie = extractCookie(bobLogin.headers['set-cookie']);
     const bobSessionRead = await app.inject({
@@ -1720,6 +1772,35 @@ async function seedIntegrationAdmin(client: { query: (sql: string, params?: read
       '50000000-0000-4000-8000-000000000001',
       '50000000-0000-4000-8000-000000000002',
     ],
+  );
+}
+
+async function seedIntegrationStudent(
+  client: { query: (sql: string, params?: readonly unknown[]) => Promise<unknown> },
+  studentId: string,
+  loginName: string,
+  displayName: string,
+  password: string,
+) {
+  const passwordHash = await hashPassword(password);
+  const now = new Date('2026-07-14T10:00:00.000Z');
+  await client.query(
+    `
+      INSERT INTO students (
+        id,
+        login_name,
+        display_name,
+        password_hash,
+        status,
+        password_reset_required,
+        password_changed_at,
+        failed_login_count,
+        created_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, 'active', false, $5, 0, $5, $5)
+    `,
+    [studentId, loginName, displayName, passwordHash, now],
   );
 }
 

@@ -174,6 +174,7 @@ Postflight:
   db:smoke: PASS/FAIL
   admin_login: PASS/FAIL
   student_login: PASS/FAIL
+  student_password_change: PASS/FAIL
   create_practice_session: PASS/FAIL
   rollback_plan_confirmed: YES/NO
 ```

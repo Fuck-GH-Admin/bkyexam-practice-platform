@@ -36,6 +36,7 @@ type SubmittedAnswer = string[] | boolean | string;
 
 - `400`：参数或 body 无效。
 - `401`：未登录、session 过期或已撤销。
+- `423`：账号或资源被临时锁定。
 - `404`：资源不存在、不属于当前学生，或题目不在该 session。
 - `409`：尝试修改已经 completed 的 practice session。
 - `429`：启用 rate limit 后请求过多。
@@ -186,18 +187,18 @@ Response：
 
 ### `POST /api/auth/login`
 
-创建或验证学生身份，并创建服务端 session。
+验证学生身份，并创建服务端 session。
 
 Request：
 
 ```json
 {
   "loginName": "alice",
-  "password": "optional"
+  "password": "student-password"
 }
 ```
 
-当前 PostgreSQL 实现仍允许首次使用用户名时自动创建学生，这是内部 MVP 行为。正式身份策略已在 [`identity-security-strategy.md`](identity-security-strategy.md) 冻结：后续生产模式将改为管理员批量创建学生，学生用用户名/学号 + 密码登录，旧账号保留但不继续依赖无密码登录。
+B9.7 后默认不再开放公网首次登录自动建号；学生账号应由 Admin Student Manage API 单个/批量创建，学生使用 `loginName + password` 登录。只有显式设置 `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=true` 时才允许旧无密码账号在迁移窗口继续登录；公开生产必须保持默认 `false`。
 
 Response：
 
@@ -217,7 +218,7 @@ Response：
 
 - `className/groupName` 是 B9.5 新增的轻量组织字段；未知时为 `null` 或省略。
 - `202502040201`–`202502040230` 当前默认归入 `2班`。
-- `passwordResetRequired=true` 表示管理员重置或临时密码登录后应先修改密码；修改密码接口仍属于后续 B9.7。
+- `passwordResetRequired=true` 表示管理员重置或临时密码登录后应先调用 `POST /api/auth/password/change` 修改密码。
 
 Cookie：
 
@@ -230,8 +231,46 @@ Cookie：
 
 Errors：
 
-- `400`：缺少 `loginName` 或字段类型错误。
+- `400`：缺少 `loginName`、缺少 `password` 或字段类型错误。
 - `401`：凭据验证失败。
+- `403`：学生账号已禁用。
+- `423`：学生账号因失败次数过多被临时锁定。
+
+### `POST /api/auth/password/change`
+
+学生已登录后修改自己的密码；临时密码登录后也使用该接口清空 `passwordResetRequired`。
+
+Request：
+
+```json
+{
+  "currentPassword": "temporary-password",
+  "newPassword": "new-student-password"
+}
+```
+
+Rules：
+
+- 需要有效 `bky_session`。
+- `currentPassword` 必须匹配当前密码。
+- `newPassword` 最少 8 字符，且不能等于 `currentPassword`。
+- 成功后写入新 password hash，设置 `passwordResetRequired=false`，清空失败计数与临时锁定；当前 session 保持有效。
+
+Response：
+
+```json
+{
+  "success": true,
+  "passwordResetRequired": false
+}
+```
+
+Errors：
+
+- `400`：请求体无效、新密码过短或新旧密码相同。
+- `401`：未登录、session 无效或当前密码错误。
+- `403`：学生账号已禁用。
+- `423`：学生账号因失败次数过多被临时锁定。
 
 ### `GET /api/auth/me`
 
