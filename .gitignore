@@ -26,6 +26,7 @@ questionbank/
 data/
 corpus/
 exports/
+artifacts/
 
 # Tooling output
 coverage/

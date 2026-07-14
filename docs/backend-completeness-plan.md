@@ -1115,28 +1115,50 @@ review_items
 
 - 不接入 Prometheus/metrics。
 - 不做告警。
-- 不做备份恢复演练。
+- 不在 B9.1 做备份恢复演练；该项已由 B9.2 处理。
 - 不做部署回滚自动化。
 - 不把内存 rate limit 当作多实例生产最终方案。
+
+### Phase B9.2 — Production Operations Drill
+
+状态：**已完成，2026-07-14。**
+
+实际落地：
+
+- 新增 `npm run ops:backup-restore:docker`。
+- 脚本在隔离 `postgres-test` 上执行全部 migration。
+- 写入最小运维 fixture，覆盖题库、学生、题目、选项、attempt、wrongbook、learning goals、question bookmarks。
+- 使用容器内 `pg_dump` 生成 backup。
+- 创建 `bkyexam_restore_test` 并恢复 backup。
+- 比较源库和恢复库关键表行数。
+- 演练产物写入 `artifacts/ops/backup-restore-drill/<timestamp>/`，并通过 `.gitignore` 排除。
+- 新增 [`production-operations.md`](production-operations.md)，固定生产 backup、restore drill、migration rollback/forward-fix、deployment checklist、remote CI/branch protection gate。
+
+仍保留不做：
+
+- 不实际接入远端 CI branch protection；仅固定验收清单。
+- 不做真实生产数据量级恢复压测。
+- 不做自动化蓝绿/回滚发布系统。
+- 不做监控/告警接入。
 
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.2 Production Operations Drill**，或补正式身份安全策略。
+> **B9.3 Observability / CI Gate**，或补正式身份安全策略。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-docs: add production operations drill
+feat: add observability smoke and ci gate evidence
 ```
 
 范围建议只包含：
 
-- PostgreSQL backup / restore drill 文档和脚本。
-- migration rollback / forward-fix 运行手册。
-- production deploy checklist validation。
-- 远端 CI 首次验收和 branch protection 记录。
+- structured logging 策略落地到可检索字段。
+- metrics/alerts 最小方案或 smoke endpoint。
+- 远端 CI 首次验收和 branch protection 实际记录。
+- 生产部署 checklist evidence 文件模板。
 - 全量 `npm run verify:docker`。
 
 不做：

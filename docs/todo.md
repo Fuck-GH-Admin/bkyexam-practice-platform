@@ -5,6 +5,17 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.2 — 2026-07-14
+
+- [x] 新增 `npm run ops:backup-restore:docker`。
+- [x] 隔离 PostgreSQL 演练执行全部 migration。
+- [x] 演练 fixture 覆盖题库、学生、题目、选项、attempt、wrongbook、learning goals 和 question bookmarks。
+- [x] 使用 `pg_dump` 生成 backup，并恢复到 `bkyexam_restore_test`。
+- [x] 比较源库/恢复库关键表计数。
+- [x] 新增 production operations runbook，覆盖 backup、restore drill、migration rollback/forward-fix、deployment checklist 和 remote CI/branch protection gate。
+- [x] `artifacts/` 加入 `.gitignore`，避免演练 dump 进入 Git。
+- [x] 不新增前端页面，不提前做最终视觉。
+
 ## Completed Backend B9.1 — 2026-07-14
 
 - [x] 新增 shared v1 Readiness schema。
@@ -391,7 +402,7 @@
 - [ ] Linux systemd/Nginx 自动化部署。
 - [ ] 正式域名、TLS、Cloudflare 和 proxy 验收。
 - [ ] secrets 管理与 Cookie security。
-- [ ] PostgreSQL 备份、恢复和迁移回滚方案。
+- [x] PostgreSQL 备份、恢复演练和迁移 rollback/forward-fix 运行手册。
 - [x] readiness health、request id、结构化未捕获错误和基础安全 headers。
 - [x] 可配置最小 rate limit 与 CSRF origin check。
 - [ ] structured logging、metrics、alerts。

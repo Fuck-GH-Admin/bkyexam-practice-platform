@@ -13,7 +13,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
-- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers，以及可配置 rate limit / CSRF origin check；完整监控、备份恢复和部署验收仍未完成。**
+- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check，以及隔离 PostgreSQL backup/restore 演练；完整监控告警、远端 CI 保护和正式部署验收仍未完成。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -21,7 +21,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 93%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；账户、归档和部分 UX 未完成 |
-| 公开生产就绪度 | **约 61%** | 已补第一个管理员 bootstrap、Admin User manage API、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check；仍缺正式身份策略、远端 CI 首次验收、监控、备份恢复和部署验收 |
+| 公开生产就绪度 | **约 63%** | 已补第一个管理员 bootstrap、Admin User manage API、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill；仍缺正式身份策略、远端 CI 首次验收、监控告警和正式部署验收 |
 | 完整产品愿景 | **约 72%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
@@ -60,6 +60,14 @@ Playwright 实际报告为 `3 passed`；project 通过 tag 过滤，因此每个
 | 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
 
 该测试从空数据库执行九份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成 readiness/DB health、学生登录、Admin Auth/RBAC/audit、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run 创建/list/detail/error-report/audit/status summary、true import mode 写入/幂等/失败回滚/reset gate、Admin Question Review flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、学习概览统计、学习趋势/streak、学习目标与错题复习反馈、题目收藏/长期复习标记、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+
+隔离 backup/restore drill：
+
+```text
+npm run ops:backup-restore:docker  PASS
+```
+
+该演练在临时 PostgreSQL 16 上执行九份 migration，写入覆盖核心业务表的最小 fixture，使用 `pg_dump` 生成 backup，恢复到 `bkyexam_restore_test`，并比较源库/恢复库关键表计数一致。
 
 全量题库慢速 smoke：
 
@@ -291,7 +299,7 @@ PracticeSessionService
 | Student product shell | 功能性 | 78% | 登录、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
 | Admin console | 后端基础进行中，前端未实现 | 48% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、`/api/admin/auth/*`、Admin User manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit | 管理应用、工作流 UI、reset import/异步队列/取消重试 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
-| Operations | 可重复验证 | 73% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check | 监控、备份恢复、远端 CI 首次验收、正式发布验收 |
+| Operations | 可重复验证 | 76% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、部署文档、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill 和 production operations runbook | 监控告警、远端 CI 首次验收、正式发布验收 |
 
 ## Known Product And Technical Risks
 
@@ -299,7 +307,7 @@ PracticeSessionService
 
 - 当前登录策略接近“用户名即身份”，不适合公开环境。
 - 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap，但仍缺正式运营 UI、导入 reset/队列化和完整审核流程。
-- 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check；仍没有备份/恢复演练、监控和告警。
+- 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check 和隔离 backup/restore drill；仍没有真实生产数据量级恢复演练、监控和告警。
 - 没有对正式域名部署进行本轮验收。
 
 ### P1 Before Large Feature Expansion

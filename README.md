@@ -75,6 +75,12 @@ npm run test:e2e
 npm run verify
 ```
 
+隔离 PostgreSQL 备份/恢复演练：
+
+```sh
+npm run ops:backup-restore:docker
+```
+
 真实 PostgreSQL integration profile 使用独立临时数据库，不会接触开发数据库。安装 Docker 后执行：
 
 ```sh
@@ -197,6 +203,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [导入器](docs/importer.md)
 - [题库映射](docs/mapping.md)
 - [部署](docs/deployment.md)
+- [生产运维演练](docs/production-operations.md)
 - [路线图](docs/todo.md)
 
 `docs/superpowers/` 与部分 `docs/design/` 文件是历史设计/实施记录，用来解释决策来源；如与上述当前文档或代码冲突，以当前文档和已验证代码为准。

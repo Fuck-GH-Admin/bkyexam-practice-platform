@@ -159,6 +159,24 @@ npm run test:integration:db
 - unit/typecheck/build/Playwright quality gate。
 - 带 PostgreSQL 16 service container 的 database integration。
 
+### Backup / Restore Drill
+
+隔离 backup/restore 演练：
+
+```sh
+npm run ops:backup-restore:docker
+```
+
+该命令会启动同一个 `postgres-test` service，执行全部 migration，写入覆盖核心业务表的最小 fixture，使用容器内 `pg_dump` 导出 backup，再恢复到 `bkyexam_restore_test` 并比较关键表计数。
+
+当前演练覆盖：
+
+- schema 可被 `pg_dump` 导出并恢复。
+- 题库、学生、题目、选项、attempt、wrongbook、learning goals、question bookmarks 的最小数据可恢复。
+- 恢复库关键表计数与源库一致。
+
+backup 文件写入 `artifacts/ops/backup-restore-drill/`，该目录不提交 Git。
+
 ### Full Corpus Slow Smoke
 
 完整真实题库可通过可选慢速 profile 重复验证：

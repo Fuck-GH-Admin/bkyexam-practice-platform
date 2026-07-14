@@ -162,3 +162,11 @@ The deployment shape is documented, but the current codebase is not yet publicly
 - rate-limit/CSRF production policy tuning beyond the current configurable minimum implementation;
 - first successful remote run and branch protection for the repository CI workflow;
 - one repeatable deployment/rollback procedure on the target host.
+
+The local backup/restore drill is now executable:
+
+```sh
+npm run ops:backup-restore:docker
+```
+
+Detailed backup, restore, migration, deployment, and CI checklists are maintained in [`production-operations.md`](production-operations.md).

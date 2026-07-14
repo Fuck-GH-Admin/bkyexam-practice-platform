@@ -61,3 +61,59 @@ export function runCommand(command, args, env = process.env) {
     });
   });
 }
+
+export function captureCommand(command, args, env = process.env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: repositoryRoot,
+      env,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let stdout = '';
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve(stdout);
+        return;
+      }
+
+      reject(new Error(
+        signal
+          ? `${command} ${args.join(' ')} terminated by ${signal}`
+          : `${command} ${args.join(' ')} exited with code ${code ?? 'unknown'}`,
+      ));
+    });
+  });
+}
+
+export function runCommandWithInput(command, args, input, env = process.env) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: repositoryRoot,
+      env,
+      shell: false,
+      stdio: ['pipe', 'inherit', 'inherit'],
+    });
+
+    child.stdin.end(input);
+    child.once('error', reject);
+    child.once('exit', (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+
+      reject(new Error(
+        signal
+          ? `${command} ${args.join(' ')} terminated by ${signal}`
+          : `${command} ${args.join(' ')} exited with code ${code ?? 'unknown'}`,
+      ));
+    });
+  });
+}
