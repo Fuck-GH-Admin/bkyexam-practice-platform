@@ -32,7 +32,14 @@ export function createMemoryStudentAuthRepository(): StudentAuthRepository {
       return students.get(loginName) ?? null;
     },
     async createStudent(student) {
-      const createdStudent = { ...student };
+      const createdStudent = {
+        ...student,
+        className: student.className ?? null,
+        groupName: student.groupName ?? null,
+        passwordResetRequired: student.passwordResetRequired ?? false,
+        status: 'active' as const,
+        failedLoginCount: 0,
+      };
       students.set(createdStudent.loginName, createdStudent);
       return createdStudent;
     },
@@ -55,22 +62,25 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
       return reply.status(400).send(errorResponse('Invalid login request'));
     }
 
-    let student: { loginName: string; displayName: string };
+    let loginResult: Awaited<ReturnType<typeof authService.login>>;
     try {
-      student = await authService.login({ loginName, password });
+      loginResult = await authService.login({ loginName, password });
     } catch (error) {
       if (error instanceof Error && error.message === 'loginName is required') {
         return reply.status(400).send(errorResponse(error.message));
+      }
+      if (error instanceof Error && error.message === 'Student account disabled') {
+        return reply.status(403).send(errorResponse('Student account disabled'));
       }
 
       return reply.status(401).send(errorResponse('Invalid login credentials'));
     }
 
-    const responsePayload = AuthLoginResponseV1Schema.parse({ student });
+    const responsePayload = AuthLoginResponseV1Schema.parse(loginResult);
 
     if (sessionService) {
-      const sessionStudent = await authRepository.findByLoginName(student.loginName);
-      const session = await sessionService.createSession(sessionStudent?.id ?? student.loginName);
+      const sessionStudent = await authRepository.findByLoginName(loginResult.student.loginName);
+      const session = await sessionService.createSession(sessionStudent?.id ?? loginResult.student.loginName);
       reply.setCookie(sessionCookieName, session.token, {
         path: '/',
         httpOnly: true,
@@ -89,7 +99,11 @@ export async function registerAuthRoutes(app: FastifyInstance, options: AuthRout
       return reply.status(401).send(errorResponse('Unauthenticated'));
     }
 
-    return AuthMeResponseV1Schema.parse({ student });
+    const { passwordResetRequired, ...studentPayload } = student;
+    return AuthMeResponseV1Schema.parse({
+      student: studentPayload,
+      passwordResetRequired: passwordResetRequired ?? false,
+    });
   });
 
   app.post('/api/auth/logout', async (request, reply) => {

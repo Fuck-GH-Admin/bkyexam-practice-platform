@@ -204,12 +204,20 @@ Response：
 ```json
 {
   "student": {
-    "id": "student-uuid",
-    "loginName": "alice",
-    "displayName": "alice"
-  }
+    "loginName": "202502040201",
+    "displayName": "202502040201",
+    "className": "2班",
+    "groupName": null
+  },
+  "passwordResetRequired": false
 }
 ```
+
+说明：
+
+- `className/groupName` 是 B9.5 新增的轻量组织字段；未知时为 `null` 或省略。
+- `202502040201`–`202502040230` 当前默认归入 `2班`。
+- `passwordResetRequired=true` 表示管理员重置或临时密码登录后应先修改密码；修改密码接口仍属于后续 B9.7。
 
 Cookie：
 
@@ -225,8 +233,6 @@ Errors：
 - `400`：缺少 `loginName` 或字段类型错误。
 - `401`：凭据验证失败。
 
-目标正式 response 还会包含 `className` / `groupName` 与 `passwordResetRequired`，并新增学生修改密码接口；这些属于后续 B9.5–B9.7 实现范围。
-
 ### `GET /api/auth/me`
 
 返回 Cookie 对应学生。
@@ -238,8 +244,11 @@ Response：
   "student": {
     "id": "student-uuid",
     "loginName": "alice",
-    "displayName": "Alice"
-  }
+    "displayName": "Alice",
+    "className": null,
+    "groupName": null
+  },
+  "passwordResetRequired": false
 }
 ```
 
@@ -953,8 +962,8 @@ Response：
   },
   "database": {
     "ok": true,
-    "migrationCount": 9,
-    "currentMigration": "0009_question_bookmarks.sql"
+    "migrationCount": 10,
+    "currentMigration": "0010_student_identity_security.sql"
   },
   "corpus": {
     "classifications": 2941,

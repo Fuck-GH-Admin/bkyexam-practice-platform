@@ -233,13 +233,36 @@ export const bankMappings = pgTable(
   ],
 );
 
-export const students = pgTable('students', {
-  id: uuid('id').primaryKey(),
-  loginName: text('login_name').notNull().unique(),
-  displayName: text('display_name').notNull(),
-  passwordHash: text('password_hash'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const students = pgTable(
+  'students',
+  {
+    id: uuid('id').primaryKey(),
+    loginName: text('login_name').notNull().unique(),
+    displayName: text('display_name').notNull(),
+    passwordHash: text('password_hash'),
+    className: text('class_name'),
+    groupName: text('group_name'),
+    status: text('status').notNull().default('active'),
+    passwordResetRequired: boolean('password_reset_required').notNull().default(false),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    failedLoginWindowStartedAt: timestamp('failed_login_window_started_at', { withTimezone: true }),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdByAdminId: uuid('created_by_admin_id').references(() => adminUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('students_status_idx').on(table.status),
+    index('students_class_name_idx').on(table.className),
+    index('students_group_name_idx').on(table.groupName),
+    index('students_locked_until_idx').on(table.lockedUntil)
+      .where(sql`${table.lockedUntil} IS NOT NULL`),
+    check('students_status_check', sql`${table.status} IN ('active', 'disabled')`),
+    check('students_failed_login_count_check', sql`${table.failedLoginCount} >= 0`),
+  ],
+);
 
 export const studentLearningGoals = pgTable(
   'student_learning_goals',

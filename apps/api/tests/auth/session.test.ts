@@ -80,7 +80,14 @@ describe('PostgreSQL student session repository', () => {
   it('finds students only from active unexpired sessions', async () => {
     const now = new Date('2026-07-04T00:00:00.000Z');
     const { client, queries } = createFakeQueryClient([
-      { id: 'student-1', login_name: 'alice', display_name: 'Alice' },
+      {
+        id: 'student-1',
+        login_name: 'alice',
+        display_name: 'Alice',
+        class_name: '2班',
+        group_name: null,
+        password_reset_required: true,
+      },
     ]);
     const repository = createPgStudentSessionRepository(client);
 
@@ -88,10 +95,15 @@ describe('PostgreSQL student session repository', () => {
       id: 'student-1',
       loginName: 'alice',
       displayName: 'Alice',
+      className: '2班',
+      groupName: null,
+      passwordResetRequired: true,
     });
 
     expect(queries).toHaveLength(1);
     expect(queries[0].sql).toContain('JOIN students');
+    expect(queries[0].sql).toContain('students.class_name');
+    expect(queries[0].sql).toContain("students.status = 'active'");
     expect(queries[0].sql).toContain('token_hash = $1');
     expect(queries[0].sql).toContain('revoked_at IS NULL');
     expect(queries[0].sql).toContain('expires_at > $2');

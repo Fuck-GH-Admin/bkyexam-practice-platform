@@ -20,8 +20,8 @@
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
 | 后端工程可验证性 | **约 82%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 70–77%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览、趋势、目标、反馈与长期复习标记 API 已落地，但正式身份、全题型、管理前端和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 66%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint；仍缺外部监控告警、远端 CI/branch protection 实际确认、部署验收和正式安全策略闭环。 |
+| 完整平台后端 | **约 72–78%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览、趋势、目标、反馈、长期复习标记 API 和正式学生身份数据模型已落地，但密码登录 enforcement、全题型、管理前端和生产能力仍未完成。 |
+| 公开生产后端就绪 | **约 68%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型；仍缺学生账号管理 API、密码登录 enforcement、外部监控告警、远端 CI/branch protection 实际确认和正式部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -31,7 +31,7 @@
 
 已完成：
 
-- PostgreSQL schema 与九份 ordered SQL migration。
+- PostgreSQL schema 与十份 ordered SQL migration。
 - 原始题库解析：
   - classifications
   - questions
@@ -200,8 +200,8 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 433 Vitest
-- 377 API tests
+- 438 Vitest
+- 382 API tests
 - 31 Web tests
 - 25 Shared tests
 - 3 Playwright browser smoke
@@ -222,7 +222,7 @@
 
 - 当前登录接近“用户名即身份”。
 - 正式身份策略已在 B9.4 冻结：管理员批量创建学生、用户名/学号 + 密码、管理员重置密码、`className/groupName` 轻量字段、旧账号保留。
-- 但密码登录、学生账号管理 API、旧账号迁移和失败锁定尚未落地代码。
+- 学生身份安全数据模型已在 B9.5 落地；但密码登录 enforcement、学生账号管理 API、旧账号临时密码迁移和失败计数递增/解锁流程尚未落地。
 - 不做学校账号/邀请码/SSO 作为当前阶段；邀请码/SSO 留作远期。
 - 没有学生自助找回账号。
 - 没有账号合并。
@@ -1198,24 +1198,61 @@ review_items
 - 不做公网注册、邮箱找回、短信找回、SSO、MFA。
 - 不做复杂组织树。
 
+### Phase B9.5 — Student Identity Data Model
+
+状态：**已完成，2026-07-15。**
+
+实际落地：
+
+- 新增 migration `0010_student_identity_security.sql`。
+- `students` 扩展：
+  - `class_name`
+  - `group_name`
+  - `status = active|disabled`
+  - `password_reset_required`
+  - `password_changed_at`
+  - `failed_login_count`
+  - `failed_login_window_started_at`
+  - `locked_until`
+  - `last_login_at`
+  - `updated_at`
+  - `created_by_admin_id`
+- migration 回填 `202502040201`–`202502040230` 为 `2班`。
+- shared Auth contract 支持 `className`、`groupName` 和 `passwordResetRequired`。
+- PostgreSQL Auth repository 映射新字段。
+- Student session repository 返回 class/group/reset state，并排除 disabled student session。
+- 学生 auth service 保留 legacy passwordless 账号，识别 disabled/locked 状态，并在新建内部 MVP 学生时套用已知 `2班` 规则。
+- route/unit/shared/PostgreSQL integration 已覆盖。
+
+仍保留不做：
+
+- 不开放管理员学生账号管理 API；该项进入 B9.6。
+- 不强制学生密码登录；该项进入 B9.7。
+- 不新增学生修改密码前端。
+- 不删除旧学生账号或历史练习数据。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.5 Student Identity Data Model**，先把正式学生身份的数据层和 contract 落地。
+> **B9.6 Admin Student Manage API**，让管理员可以批量创建学生、重置密码、禁用账号和撤销学生 session。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add student identity security model
+feat: add admin student account management
 ```
 
 范围建议只包含：
 
-- migration 扩展 `students`：`class_name`、`group_name`、`status`、`password_reset_required`、失败计数、锁定时间、`last_login_at`。
-- shared Auth student DTO 增加 `className/groupName/passwordResetRequired`。
-- repository/service 识别 legacy account，但不删除旧数据。
-- route/unit/PostgreSQL integration 覆盖旧账号保留、新字段和基础密码 hash/lock 状态。
+- `GET /api/admin/students` list/search/filter。
+- `POST /api/admin/students` 单个创建。
+- `POST /api/admin/students/bulk-create` 批量创建，单次先限制 200。
+- `PATCH /api/admin/students/:studentId` 更新 displayName/status/className/groupName。
+- `POST /api/admin/students/:studentId/reset-password` 管理员重置密码并设置 `passwordResetRequired=true`。
+- `POST /api/admin/students/:studentId/revoke-sessions` 撤销学生现有 session。
+- RBAC permission：`student_account:read/write/reset_password/revoke_session`。
+- audit log：create/bulk-create/update/reset-password/revoke-session。
 - 本阶段仍不做正式前端。
 
 不做：
@@ -1248,6 +1285,6 @@ feat: add student identity security model
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；正式身份策略已冻结但代码未落地；完整平台后端还缺学生密码登录/账号管理、模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警和远端 CI/branch protection 实际确认。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；正式身份策略和学生身份安全数据模型已落地；完整平台后端还缺 Admin Student Manage、学生密码登录 enforcement、模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警和远端 CI/branch protection 实际确认。**
 
-最合理的下一步是继续后端闭环：优先做 B9.5 Student Identity Data Model，再做 Admin Student Manage API 和 password login enforcement；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：优先做 B9.6 Admin Student Manage API，再做 password login enforcement；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

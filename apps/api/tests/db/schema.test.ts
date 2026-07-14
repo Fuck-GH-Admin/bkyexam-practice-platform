@@ -48,6 +48,42 @@ describe('database schema', () => {
     expect(practiceSessionQuestions).toBeDefined();
   });
 
+  it('defines formal student identity security columns and indexes', () => {
+    const tableConfig = getTableConfig(students);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+    const checkNames = tableConfig.checks.map((tableCheck) => tableCheck.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'login_name',
+      'display_name',
+      'password_hash',
+      'class_name',
+      'group_name',
+      'status',
+      'password_reset_required',
+      'password_changed_at',
+      'failed_login_count',
+      'failed_login_window_started_at',
+      'locked_until',
+      'last_login_at',
+      'updated_at',
+      'created_by_admin_id',
+      'created_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'students_status_idx',
+      'students_class_name_idx',
+      'students_group_name_idx',
+      'students_locked_until_idx',
+    ]));
+    expect(checkNames).toEqual(expect.arrayContaining([
+      'students_status_check',
+      'students_failed_login_count_check',
+    ]));
+  });
+
   it('defines admin identity, session, RBAC, and audit foundation tables', () => {
     expect(adminUsers).toBeDefined();
     expect(adminSessions).toBeDefined();

@@ -27,10 +27,24 @@ function fakeSessionService(student = { id: 'student-1', loginName: 'alice', dis
 function fakeStudentAuthRepository(): StudentAuthRepository {
   return {
     async findByLoginName(loginName) {
-      return { id: 'student-1', loginName, displayName: 'Alice' };
+      return {
+        id: 'student-1',
+        loginName,
+        displayName: 'Alice',
+        className: null,
+        groupName: null,
+        status: 'active',
+        passwordResetRequired: false,
+      };
     },
     async createStudent(student) {
-      return { id: 'student-1', ...student };
+      return {
+        id: 'student-1',
+        ...student,
+        status: 'active',
+        passwordResetRequired: student.passwordResetRequired ?? false,
+        failedLoginCount: 0,
+      };
     },
   };
 }
@@ -50,7 +64,31 @@ describe('auth route', () => {
       student: {
         loginName: 'alice',
         displayName: 'alice',
+        className: null,
+        groupName: null,
       },
+      passwordResetRequired: false,
+    });
+  });
+
+  it('returns the known className for the 202502040201-202502040230 student range', async () => {
+    const app = buildApp();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { loginName: '202502040230' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      student: {
+        loginName: '202502040230',
+        displayName: '202502040230',
+        className: '2班',
+        groupName: null,
+      },
+      passwordResetRequired: false,
     });
   });
 
@@ -88,6 +126,7 @@ describe('auth route', () => {
     expect(me.statusCode).toBe(200);
     expect(me.json()).toEqual({
       student: { id: 'alice', loginName: 'alice', displayName: 'alice' },
+      passwordResetRequired: false,
     });
   });
 
@@ -135,7 +174,10 @@ describe('auth route', () => {
     const cookie = String(login.headers['set-cookie']);
 
     expect(login.statusCode).toBe(200);
-    expect(login.json()).toEqual({ student: { loginName: 'alice', displayName: 'Alice' } });
+    expect(login.json()).toEqual({
+      student: { loginName: 'alice', displayName: 'Alice', className: null, groupName: null },
+      passwordResetRequired: false,
+    });
     expect(createdSessionStudentIds).toEqual(['student-1']);
     expect(cookie).toContain('bky_session=');
     expect(cookie).toContain('HttpOnly');
@@ -149,6 +191,7 @@ describe('auth route', () => {
     expect(me.statusCode).toBe(200);
     expect(me.json()).toEqual({
       student: { id: 'student-1', loginName: 'alice', displayName: 'Alice' },
+      passwordResetRequired: false,
     });
   });
 

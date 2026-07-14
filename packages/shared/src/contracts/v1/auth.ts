@@ -4,6 +4,8 @@ export const AuthStudentV1Schema = z.object({
   id: z.string().min(1).optional(),
   loginName: z.string().min(1),
   displayName: z.string().min(1),
+  className: z.string().min(1).nullable().optional(),
+  groupName: z.string().min(1).nullable().optional(),
 }).strict();
 export type AuthStudentV1 = z.infer<typeof AuthStudentV1Schema>;
 
@@ -15,6 +17,7 @@ export type AuthLoginRequestV1 = z.infer<typeof AuthLoginRequestV1Schema>;
 
 export const AuthLoginResponseV1Schema = z.object({
   student: AuthStudentV1Schema,
+  passwordResetRequired: z.boolean().optional(),
 }).strict();
 export type AuthLoginResponseV1 = z.infer<typeof AuthLoginResponseV1Schema>;
 

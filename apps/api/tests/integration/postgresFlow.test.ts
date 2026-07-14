@@ -165,7 +165,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 9, currentMigration: '0009_question_bookmarks.sql' },
+      database: { ok: true, migrationCount: 10, currentMigration: '0010_student_identity_security.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -572,6 +572,14 @@ describe('PostgreSQL-backed API integration', () => {
       headers: { cookie: aliceCookie },
     });
     expect(me.statusCode).toBe(200);
+    expect(me.json()).toMatchObject({
+      student: {
+        loginName: 'integration-alice',
+        className: null,
+        groupName: null,
+      },
+      passwordResetRequired: false,
+    });
     const aliceId = me.json().student.id as string;
 
     const banks = await app.inject({ method: 'GET', url: '/api/banks' });

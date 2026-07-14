@@ -5,6 +5,22 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.5 — 2026-07-15
+
+- [x] 新增 migration `0010_student_identity_security.sql`。
+- [x] 扩展 `students`：`class_name`、`group_name`、`status`、`password_reset_required`、`password_changed_at`、登录失败计数、临时锁定、`last_login_at`、`updated_at`、`created_by_admin_id`。
+- [x] migration 回填 `202502040201`–`202502040230` 为 `2班`。
+- [x] shared Auth contract 支持 `className`、`groupName`、`passwordResetRequired`。
+- [x] PostgreSQL student auth/session repository 映射新字段。
+- [x] student session 查询排除 disabled student。
+- [x] route/unit/shared/PostgreSQL integration 覆盖学生身份安全字段。
+- [x] 不新增前端页面，不提前做最终视觉。
+
+后续代码阶段：
+
+- [ ] B9.6 Admin Student Manage API。
+- [ ] B9.7 Password Login Enforcement。
+
 ## Completed Backend B9.4 Strategy — 2026-07-15
 
 - [x] 冻结正式身份安全策略文档：`docs/identity-security-strategy.md`。
@@ -16,12 +32,6 @@
 - [x] 决定登录失败策略放宽但保留失败计数和临时锁定。
 - [x] 决定旧账号保留，不清空历史学生和学习数据。
 - [x] 不新增前端页面，不提前做最终视觉。
-
-后续代码阶段：
-
-- [ ] B9.5 Student Identity Data Model。
-- [ ] B9.6 Admin Student Manage API。
-- [ ] B9.7 Password Login Enforcement。
 
 ## Completed Backend B9.3 — 2026-07-15
 

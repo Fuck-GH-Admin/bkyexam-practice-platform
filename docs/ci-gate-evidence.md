@@ -15,12 +15,18 @@
 
 | Gate | Command | Expected result | Last local result |
 | --- | --- | --- | --- |
-| Shared build | `npm run build:shared` | PASS | B9.3 local PASS |
-| Shared contracts | `npm run test -w @bkyexam-practice/shared` | 2 files / 25 tests PASS | B9.3 local PASS |
-| API route/unit | `npm run test -w @bkyexam-practice/api` | 53 files / 377 tests PASS | B9.3 local PASS |
-| Typecheck | `npm run typecheck` | shared/api/web/e2e TS PASS | B9.3 local PASS |
-| Full repository gate | `npm run verify:docker` | Unit/typecheck/build/Playwright/PostgreSQL integration PASS | B9.3 local PASS: 57 Vitest files / 433 tests, 3 Playwright, 1 PostgreSQL integration |
-| Backup restore drill | `npm run ops:backup-restore:docker` | Migration + pg_dump + restore + count compare PASS | B9.3 local PASS |
+| Shared build | `npm run build:shared` | PASS | B9.5 local PASS |
+| Shared contracts | `npm run test -w @bkyexam-practice/shared` | 2 files / 25 tests PASS | B9.5 local PASS |
+| API route/unit | `npm run test -w @bkyexam-practice/api` | 53 files / 382 tests PASS | B9.5 local PASS |
+| Typecheck | `npm run typecheck` | shared/api/web/e2e TS PASS | B9.5 local PASS |
+| Full repository gate | `npm run verify:docker` | 57 Vitest files / 438 tests + typecheck + build + 3 Playwright + 1 PostgreSQL integration PASS | B9.5 local PASS |
+| Backup restore drill | `npm run ops:backup-restore:docker` | 10 migrations + pg_dump + restore + count compare PASS | B9.5 local PASS |
+
+B9.5 最新本地证据：
+
+- `npm run verify:docker`：通过，包含 shared 25、API 382、Web 31，共 438 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
+- `npm run ops:backup-restore:docker`：通过，`0010_student_identity_security.sql` 已纳入 migration drill，source/restored count 一致。
+- Web build artifact：`dist/assets/index-BC8sLw8F.js` 约 `317.64 kB`（gzip `92.36 kB`），CSS 约 `20.26 kB`（gzip `4.98 kB`）。
 
 ## 2. Remote CI Evidence Template
 

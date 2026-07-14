@@ -72,6 +72,26 @@ describe('v1 auth/catalog/error/health contracts', () => {
     });
 
     expect(AuthLoginResponseV1Schema.parse({
+      student: {
+        id: 'student-1',
+        loginName: '202502040201',
+        displayName: 'Alice',
+        className: '2班',
+        groupName: null,
+      },
+      passwordResetRequired: true,
+    })).toEqual({
+      student: {
+        id: 'student-1',
+        loginName: '202502040201',
+        displayName: 'Alice',
+        className: '2班',
+        groupName: null,
+      },
+      passwordResetRequired: true,
+    });
+
+    expect(AuthLoginResponseV1Schema.parse({
       student: { id: 'student-1', loginName: 'alice', displayName: 'Alice' },
     }).student.id).toBe('student-1');
 

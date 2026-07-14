@@ -23,6 +23,9 @@
 
 - `students.login_name` 唯一。
 - `students.password_hash` 已存在，但 PostgreSQL 学生登录仍允许首次使用 `loginName` 自动创建学生。
+- B9.5 已扩展 `students`：`class_name`、`group_name`、`status`、`password_reset_required`、失败计数、临时锁定、`last_login_at` 和 `created_by_admin_id`。
+- B9.5 已把 `202502040201`–`202502040230` 的默认 `className` 规则落入 migration 与登录创建 helper。
+- Auth shared contract 已支持 `className/groupName/passwordResetRequired`。
 - `student_sessions` 已有服务端 session 和 httpOnly `bky_session`。
 - Admin Auth/RBAC/Audit/User manage/bootstrap 已实现。
 - `x-request-id`、secure headers、可配置 rate limit/CSRF origin check、readiness、metrics smoke 已实现。
@@ -32,8 +35,8 @@
 - 学生仍近似“用户名即身份”。
 - 没有正式学生创建/导入 API。
 - 没有学生密码 reset / force-change 流程。
-- 登录失败锁定尚未落入学生身份模型。
-- 旧账号没有 password migration 策略落地代码。
+- 登录失败锁定字段已落入学生身份模型，但失败计数递增/解锁流程尚未启用。
+- 旧账号保留策略已落入数据模型，但批量设置临时密码和正式 password enforcement 尚未实现。
 
 ## 3. 学生账号生命周期
 
@@ -351,14 +354,14 @@ student_account:revoke_session
 
 ### B9.5 — Student Identity Data Model
 
-目标：
+状态：**已完成，2026-07-15。**
 
 - migration 扩展 `students`。
 - shared student auth contract 增加 `className/groupName/passwordResetRequired`。
 - repository/service 支持密码 hash、失败计数、锁定状态和旧账号识别。
 - 不改正式前端。
 
-验收：
+已验证：
 
 - migration test。
 - shared contract test。
@@ -415,4 +418,3 @@ student_account:revoke_session
 正式身份路线确定为：
 
 > **管理员批量创建学生；学生用用户名/学号 + 密码登录；管理员负责重置密码；学生只增加 className/groupName 轻量组织字段；202502040201–202502040230 暂归 2班；登录失败策略放宽但保留临时锁定；旧账号保留并通过迁移/临时密码进入正式模式。**
-

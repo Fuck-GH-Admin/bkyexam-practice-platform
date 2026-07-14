@@ -157,9 +157,17 @@ Stores student identities.
 - `login_name`: unique login identifier.
 - `display_name`: visible name.
 - `password_hash`: nullable password hash placeholder for later auth work.
+- `class_name`, `group_name`: lightweight text organization fields.
+- `status`: `active` or `disabled`.
+- `password_reset_required`: whether the student must change password after login.
+- `password_changed_at`: last password change timestamp.
+- `failed_login_count`, `failed_login_window_started_at`, `locked_until`: relaxed login failure/temporary lock state.
+- `last_login_at`: last successful login timestamp, reserved for the formal password-login phase.
+- `updated_at`: account update timestamp.
+- `created_by_admin_id`: nullable FK to `admin_users`, reserved for Admin Student Manage.
 - `created_at`: creation timestamp.
 
-正式身份策略已冻结在 [`identity-security-strategy.md`](identity-security-strategy.md)。后续 B9.5 migration 会在保留旧账号的前提下扩展 `students`，目标字段包括 `class_name`、`group_name`、`status`、`password_reset_required`、登录失败计数、临时锁定时间和 `last_login_at`。当前已知运营规则：`202502040201` 到 `202502040230` 属于 `2班`，其余学生班级/分组暂未定。
+正式身份策略已冻结在 [`identity-security-strategy.md`](identity-security-strategy.md)。B9.5 在保留旧账号的前提下扩展 `students`，并回填已知运营规则：`202502040201` 到 `202502040230` 属于 `2班`，其余学生班级/分组暂未定。
 
 ### `practice_attempts`
 
@@ -346,6 +354,8 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 
 `apps/api/src/db/migrations/0009_question_bookmarks.sql` adds per-question learning review marks. It creates `question_bookmarks` with favorite/long-term-review flags, source/note metadata, per-student uniqueness, and indexes for recent and bank-scoped review mark lists.
 
+`apps/api/src/db/migrations/0010_student_identity_security.sql` extends `students` for formal identity security. It adds lightweight `class_name` / `group_name`, account `status`, `password_reset_required`, password-change timestamp, relaxed failed-login/lockout fields, `last_login_at`, `updated_at`, and nullable `created_by_admin_id`. It backfills `202502040201` through `202502040230` to `class_name = '2班'` and adds status/class/group/locked indexes.
+
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
 Run API migrations with:
@@ -363,7 +373,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all nine migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, and Question Bookmarks, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all ten migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, Question Bookmarks, and Student Identity Security, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

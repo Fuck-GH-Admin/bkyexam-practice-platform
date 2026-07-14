@@ -110,4 +110,24 @@ describe('initial database migration', () => {
     expect(sql).toContain('question_bookmarks_student_bank_idx');
     expect(sql).toContain('question_bookmarks_question_id_idx');
   });
+
+  it('extends students for formal identity security state', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0010_student_identity_security.sql'), 'utf8');
+
+    expect(sql).toContain('ALTER TABLE students');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS class_name text');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS group_name text');
+    expect(sql).toContain("ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'active'");
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS password_reset_required boolean NOT NULL DEFAULT false');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS failed_login_count integer NOT NULL DEFAULT 0');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS locked_until timestamptz');
+    expect(sql).toContain("SET class_name = '2班'");
+    expect(sql).toContain("login_name ~ '^\\d{12}$'");
+    expect(sql).toContain("login_name >= '202502040201'");
+    expect(sql).toContain("login_name <= '202502040230'");
+    expect(sql).toContain("CHECK (status IN ('active', 'disabled'))");
+    expect(sql).toContain('CHECK (failed_login_count >= 0)');
+    expect(sql).toContain('students_class_name_idx');
+    expect(sql).toContain('students_locked_until_idx');
+  });
 });
