@@ -16,7 +16,8 @@
     "admin:bootstrap": "tsx src/admin/bootstrapAdmin.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:smoke": "tsx src/db/smoke.ts",
-    "ops:production-gate": "tsx src/ops/productionGate.ts"
+    "ops:production-gate": "tsx src/ops/productionGate.ts",
+    "ops:legacy-student-password-migration": "tsx src/ops/legacyStudentPasswordMigration.ts"
   },
   "dependencies": {
     "@bkyexam-practice/shared": "0.1.0",

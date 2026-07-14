@@ -1,6 +1,6 @@
 # Admin Backend Contract Design
 
-状态日期：**2026-07-14**
+状态日期：**2026-07-15**
 阶段：**Phase B4 — Admin Backend Contract Design**
 状态：**设计完成；B5.1–B5.9 后端 API/migration 已落地，UI 未开始**
 
@@ -9,6 +9,8 @@
 B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route，不写 migration；B5 按本文逐步落地后，在下方用更新块标明已实现范围。
 
 > B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run/Error Report/True Import Gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/import-jobs/:id/errors`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`GET/POST/PATCH /api/admin/users`、`npm run admin:bootstrap`、shared v1 Admin Auth/User/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、`ADMIN_IMPORT_ENABLE_WRITE` 写入门、import rollback/idempotency fixture、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。正式 Admin UI 仍按后续阶段实现。
+
+> B9 更新：2026-07-15 已实现 Admin Student Manage API、旧学生账号密码迁移 CLI、管理员登录失败锁定和 `0011_admin_identity_security.sql`。正式 Admin UI 仍未开始。
 
 ## 1. 目标与非目标
 

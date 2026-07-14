@@ -189,7 +189,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 10, currentMigration: '0010_student_identity_security.sql' },
+      database: { ok: true, migrationCount: 11, currentMigration: '0011_admin_identity_security.sql' },
       corpus: {
         classifications: 3,
         questions: 5,

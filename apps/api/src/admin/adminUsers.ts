@@ -424,6 +424,11 @@ export function createPgAdminUserRepository(client: QueryClient): AdminUserRepos
         if (input.changes.passwordHash !== undefined) {
           params.push(input.changes.passwordHash);
           assignments.push(`password_hash = $${params.length}`);
+          params.push(input.now);
+          assignments.push(`password_changed_at = $${params.length}`);
+          assignments.push('failed_login_count = 0');
+          assignments.push('failed_login_window_started_at = NULL');
+          assignments.push('locked_until = NULL');
         }
         params.push(input.now);
         assignments.push(`updated_at = $${params.length}`);

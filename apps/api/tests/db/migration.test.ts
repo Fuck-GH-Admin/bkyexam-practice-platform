@@ -130,4 +130,17 @@ describe('initial database migration', () => {
     expect(sql).toContain('students_class_name_idx');
     expect(sql).toContain('students_locked_until_idx');
   });
+
+  it('extends admin users for login lock and password security state', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0011_admin_identity_security.sql'), 'utf8');
+
+    expect(sql).toContain('ALTER TABLE admin_users');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS password_changed_at timestamptz');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS failed_login_count integer NOT NULL DEFAULT 0');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS failed_login_window_started_at timestamptz');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS locked_until timestamptz');
+    expect(sql).toContain('admin_users_failed_login_count_check');
+    expect(sql).toContain('CHECK (failed_login_count >= 0)');
+    expect(sql).toContain('admin_users_locked_until_idx');
+  });
 });

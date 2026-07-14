@@ -56,6 +56,16 @@ npm run ops:production-gate
 npm run ops:production-gate -- --skip-db
 ```
 
+## 1.2 Legacy Student Password Migration
+
+B9.9 新增受控旧账号迁移命令：
+
+```powershell
+npm run ops:legacy-student-password-migration -- --limit=50
+```
+
+默认 dry-run。正式迁移必须显式 `--apply`，并提供统一临时密码环境变量或 `--credentials-out=artifacts/.../credentials.csv` 生成每人独立临时密码。迁移会只更新 `password_hash IS NULL` 的学生，强制 `password_reset_required=true`，清空失败/锁定状态，并默认撤销未过期 student session。完整说明见 [`legacy-student-password-migration.md`](legacy-student-password-migration.md)。
+
 ## 2. Production Backup Procedure
 
 生产备份建议使用 custom format，并将输出写到受限目录：

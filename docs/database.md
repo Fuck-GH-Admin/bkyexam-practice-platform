@@ -81,7 +81,7 @@ Indexes:
 
 Store administrator identity, server-side sessions, and role membership.
 
-- `admin_users`: login name, display name, password hash, active/disabled status, timestamps, and last login timestamp.
+- `admin_users`: login name, display name, password hash, active/disabled status, timestamps, last login timestamp, password change timestamp, failed-login count/window, and temporary lock timestamp.
 - `admin_sessions`: token hash, expiry, revocation timestamp, and `admin_user_id` FK.
 - `admin_user_roles`: `(admin_user_id, role)` membership for `content_editor`, `operator`, and `super_admin`.
 
@@ -89,6 +89,7 @@ Indexes:
 
 - `admin_sessions_admin_user_id_idx` on `admin_user_id`.
 - `admin_sessions_expires_at_idx` on `expires_at`.
+- `admin_users_locked_until_idx` on non-null admin lock timestamps.
 - `admin_user_roles_role_idx` on `role`.
 
 ### `audit_logs`
@@ -356,9 +357,13 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 
 `apps/api/src/db/migrations/0010_student_identity_security.sql` extends `students` for formal identity security. It adds lightweight `class_name` / `group_name`, account `status`, `password_reset_required`, password-change timestamp, relaxed failed-login/lockout fields, `last_login_at`, `updated_at`, and nullable `created_by_admin_id`. It backfills `202502040201` through `202502040230` to `class_name = '2班'` and adds status/class/group/locked indexes.
 
+`apps/api/src/db/migrations/0011_admin_identity_security.sql` extends `admin_users` for administrator login security. It adds `password_changed_at`, `failed_login_count`, `failed_login_window_started_at`, and `locked_until`, backfills `password_changed_at` from `created_at`, adds a nonnegative failed-count check, and indexes non-null admin locks.
+
 B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
 B9.7 Password Login Enforcement now updates `failed_login_count`, `failed_login_window_started_at`, `locked_until`, and `last_login_at` during student login, and clears `password_reset_required` plus failure/lockout state on successful `POST /api/auth/password/change`.
+
+B9.10 Admin Login Security now updates the admin failed-login fields on bad credentials, returns `423` while `locked_until` is active, and clears admin failure/lockout state on successful login or admin password reset.
 
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
@@ -377,7 +382,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all ten migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, Question Bookmarks, and Student Identity Security, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, Question Bookmarks, Student Identity Security, and Admin Identity Security, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

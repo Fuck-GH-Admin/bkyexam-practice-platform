@@ -59,6 +59,7 @@ npm run ops:production-gate -- --sample-limit=50 *> artifacts\production-gate\pr
 | `CSRF_ORIGIN_CHECK_ENABLED` + `CSRF_ALLOWED_ORIGINS` | yes | 必须开启，并且 allowlist 使用 HTTPS 生产域名，不能是 localhost。 |
 | `ADMIN_BOOTSTRAP_*` | no | runtime env 中仍存在会 warning；bootstrap 后应删除。 |
 | `ADMIN_IMPORT_ENABLE_WRITE` | no | 如果为 `true` 会 warning；只应在受控导入窗口开启。 |
+| `STUDENT_MIGRATION_TEMP_PASSWORD` | no | 如果仍在 runtime env 中会 warning；只应在受控迁移 CLI 调用时临时存在。 |
 
 ## 3. Student Identity Migration Gate
 
@@ -116,15 +117,31 @@ Warning rule：
 4. 如果 `legacyPasswordlessStudents > 0`：
 
    - 从 report 的 `samples.legacyPasswordless` 和数据库只读查询确认账号清单。
-   - 通过 Admin Student reset-password 能力逐个或由受控运维脚本批量设置临时密码。
-   - 每个账号设置：
-     - `password_hash` 写入服务端 hash。
-     - `password_reset_required=true`。
-     - `failed_login_count=0`。
-     - `failed_login_window_started_at=NULL`。
-     - `locked_until=NULL`。
-     - 需要时撤销该学生现有 session。
+   - 先 dry-run：
+
+     ```sh
+     npm run ops:legacy-student-password-migration -- --limit=50
+     ```
+
+   - 再选择一种受控写入方式：
+
+     ```sh
+     STUDENT_MIGRATION_TEMP_PASSWORD='change-me-offline' \
+     npm run ops:legacy-student-password-migration -- --apply --limit=50
+     ```
+
+     或生成每人独立临时密码到 gitignored 凭据文件：
+
+     ```sh
+     npm run ops:legacy-student-password-migration -- \
+       --apply \
+       --limit=50 \
+       --credentials-out=artifacts/ops/legacy-student-password-migration/credentials.csv
+     ```
+
+   - 工具会写入 password hash、设置 `password_reset_required=true`、清空失败/锁定状态，并默认撤销未过期 student session。
    - 临时密码只通过线下可信渠道发给对应学生，不写入 audit log、文档或 Git。
+   - 细节见 [`legacy-student-password-migration.md`](./legacy-student-password-migration.md)。
 
 5. 再次运行：
 
@@ -153,10 +170,8 @@ Warning rule：
 artifacts/production-gate/<date>/
 ```
 
-## 6. B9.8 后仍未完成
+## 6. B9.9/B9.10 后仍未完成
 
-- 尚未实现批量旧账号临时密码写入 CLI；当前 gate 只审计和阻断。
-- 尚未实现管理员登录失败锁定。
 - 尚未实现更细粒度 login route rate limit。
 - 尚未完成远端 CI/branch protection 实际确认。
 - 尚未开始正式管理端前端。

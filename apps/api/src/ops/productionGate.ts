@@ -191,6 +191,16 @@ export function evaluateProductionEnvironment(env: NodeJS.ProcessEnv): Productio
     'Keep ADMIN_IMPORT_ENABLE_WRITE=false except during controlled import windows.',
   ));
 
+  checks.push(check(
+    'student_migration_temp_password_cleared',
+    'Legacy migration temporary password cleared from runtime env',
+    hasText(env.STUDENT_MIGRATION_TEMP_PASSWORD) ? 'warn' : 'pass',
+    hasText(env.STUDENT_MIGRATION_TEMP_PASSWORD)
+      ? 'STUDENT_MIGRATION_TEMP_PASSWORD is still present in the runtime environment.'
+      : 'STUDENT_MIGRATION_TEMP_PASSWORD is absent from runtime env.',
+    'Use STUDENT_MIGRATION_TEMP_PASSWORD only for the controlled migration CLI invocation, then remove it from service runtime env.',
+  ));
+
   return checks;
 }
 

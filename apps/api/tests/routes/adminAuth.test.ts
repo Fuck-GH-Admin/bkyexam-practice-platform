@@ -160,6 +160,39 @@ describe('admin auth routes', () => {
     expect(response.json()).toEqual({ error: 'Admin user disabled' });
   });
 
+  it('returns 423 and writes failure audit when an admin account is temporarily locked', async () => {
+    const auditRepository = createMemoryAuditLogRepository();
+    const lockedRepository = createMemoryAdminAuthRepository([{
+      id: 'admin-1',
+      loginName: 'operator@example.com',
+      displayName: 'Operator',
+      passwordHash: await hashPassword('secret'),
+      status: 'active',
+      roles: ['operator'],
+      failedLoginCount: 10,
+      failedLoginWindowStartedAt: new Date('2026-07-13T09:45:00.000Z'),
+      lockedUntil: new Date('2999-01-01T00:00:00.000Z'),
+    }]);
+    const app = buildApp({
+      adminAuthRepository: lockedRepository,
+      auditService: createAuditService(auditRepository),
+    });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/admin/auth/login',
+      payload: { loginName: 'operator@example.com', password: 'secret' },
+    });
+
+    expect(response.statusCode).toBe(423);
+    expect(response.json()).toEqual({ error: 'Admin user temporarily locked' });
+    expect(auditRepository.entries).toMatchObject([{
+      action: 'admin.auth.login',
+      result: 'failure',
+      metadata: { loginName: 'operator@example.com', reason: 'locked' },
+    }]);
+  });
+
   it('returns 403 when a valid admin session lacks the required permission', async () => {
     const forbiddenSessionService: AdminSessionService = {
       async createSession(admin) {

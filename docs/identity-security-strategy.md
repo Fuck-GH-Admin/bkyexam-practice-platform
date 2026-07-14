@@ -32,13 +32,15 @@
 - B9.6 已把 `student_account:read/write/reset_password/revoke_session` 纳入 RBAC，`operator` 可执行日常学生账号运营。
 - 管理员重置密码会写入 hash、设置 `passwordResetRequired=true`、清空失败/锁定状态，并可撤销学生现有 session。
 - B9.7 已实现 `POST /api/auth/login` 默认密码登录、显式 legacy passwordless 开关、失败计数/临时锁定、成功清空失败状态和 `POST /api/auth/password/change`。
+- B9.9 已实现 `npm run ops:legacy-student-password-migration`，可受控批量迁移旧无密码学生账号。
+- B9.10 已扩展管理员登录失败计数/临时锁定状态，并在管理员登录成功时清空失败状态。
 - `x-request-id`、secure headers、可配置 rate limit/CSRF origin check、readiness、metrics smoke 已实现。
 
 当前不能公开生产的原因：
 
-- 旧账号保留策略已落入数据模型，但批量临时密码迁移 runbook/CLI 尚未完成。
+- 旧账号保留策略和迁移 CLI 已落地，但目标环境仍需实际迁移执行、临时密码交付证据和二次 production gate。
 - 正式学生改密前端尚未设计；当前只有后端 API。
-- 管理员登录失败锁定、生产部署参数和外部监控告警仍未完成。
+- 生产部署参数和外部监控告警仍未完成。
 - 远端 CI / branch protection 与正式部署验收尚未确认。
 
 ## 3. 学生账号生命周期
@@ -167,8 +169,8 @@ STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=false
 
 管理员比学生略严格，但仍不做过强 MFA：
 
-- 同一 admin loginName 在 15 分钟窗口内失败 8 次，锁定 15 分钟。
-- 管理员失败登录写 audit log。
+- 同一 admin loginName 在默认 30 分钟窗口内失败 10 次，锁定 15 分钟。
+- 管理员失败登录写 audit log；临时锁定返回 `423 Admin user temporarily locked`。
 - 管理员禁用账号继续返回 `403`。
 - 成功登录写 `admin.auth.login` audit log，并清空失败计数。
 
@@ -433,9 +435,39 @@ student_account:revoke_session
 - `passwordResetRequiredStudents` 和 `lockedStudents` 作为 warning。
 - `docs/production-gate-runbook.md` 说明迁移步骤、证据包和 exit code。
 
-仍保留不做：
+后续已由 B9.9 补齐：
 
-- 不批量写入临时密码；后续 B9.9 单独做受控迁移工具。
+- 批量写入临时密码的受控迁移 CLI。
+
+## 9.2 B9.9 Legacy Student Password Migration Tool
+
+状态：**已完成，2026-07-15。**
+
+已落地：
+
+- `npm run ops:legacy-student-password-migration`。
+- 默认 dry-run，必须显式 `--apply` 才写库。
+- 只处理 `password_hash IS NULL` 的旧学生账号。
+- 写入 password hash、`password_reset_required=true`，清空失败/锁定状态。
+- 默认撤销未过期 student session，可用 `--no-revoke-sessions` 关闭。
+- 支持统一临时密码环境变量，或 `--credentials-out=artifacts/.../credentials.csv` 生成每人独立临时密码。
+- JSON 输出和 audit log 都不包含明文临时密码。
+
+## 9.3 B9.10 Admin Login Security Hardening
+
+状态：**已完成，2026-07-15。**
+
+已落地：
+
+- `0011_admin_identity_security.sql` 扩展 `admin_users`：
+  - `password_changed_at`
+  - `failed_login_count`
+  - `failed_login_window_started_at`
+  - `locked_until`
+- 管理员密码错误会累计失败计数，并在默认 10 次 / 30 分钟窗口后锁定 15 分钟。
+- 管理员锁定状态返回 `423`，并写入 `admin.auth.login` failure audit。
+- 管理员成功登录会清空失败计数、窗口和锁定状态。
+- 管理员被重置密码时会更新 `password_changed_at` 并清空失败/锁定状态。
 
 ## 10. 明确不做
 

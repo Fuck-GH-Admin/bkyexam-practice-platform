@@ -96,7 +96,7 @@ describe('evaluateProductionEnvironment', () => {
   it('passes production-critical environment checks', () => {
     const checks = evaluateProductionEnvironment(productionEnv);
 
-    expect(checks).toHaveLength(10);
+    expect(checks).toHaveLength(11);
     expect(checks.every((check) => check.status === 'pass')).toBe(true);
   });
 
@@ -113,6 +113,7 @@ describe('evaluateProductionEnvironment', () => {
       CSRF_ALLOWED_ORIGINS: 'http://localhost:5173',
       ADMIN_BOOTSTRAP_PASSWORD: 'secret123',
       ADMIN_IMPORT_ENABLE_WRITE: 'true',
+      STUDENT_MIGRATION_TEMP_PASSWORD: 'temporary123',
     });
 
     expect(checks.filter((check) => check.status === 'fail').map((check) => check.id)).toEqual([
@@ -128,6 +129,7 @@ describe('evaluateProductionEnvironment', () => {
       'node_env_production',
       'admin_bootstrap_env_cleared',
       'admin_import_write_explicit',
+      'student_migration_temp_password_cleared',
     ]);
   });
 });

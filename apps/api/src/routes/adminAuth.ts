@@ -136,6 +136,10 @@ export async function registerAdminAuthRoutes(app: FastifyInstance, options: Adm
           await recordAdminLoginFailure(auditService, loginName.trim(), error.code);
           return reply.status(403).send(errorResponse('Admin user disabled'));
         }
+        if (error.code === 'locked') {
+          await recordAdminLoginFailure(auditService, loginName.trim(), error.code);
+          return reply.status(423).send(errorResponse('Admin user temporarily locked'));
+        }
         return reply.status(400).send(errorResponse('Invalid admin login request'));
       }
 

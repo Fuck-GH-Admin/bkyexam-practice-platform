@@ -91,6 +91,10 @@ describe('database schema', () => {
     expect(auditLogs).toBeDefined();
 
     const adminUserColumnNames = getTableConfig(adminUsers).columns.map((column) => column.name);
+    const adminUserIndexNames = getTableConfig(adminUsers).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+    const adminUserCheckNames = getTableConfig(adminUsers).checks.map((tableCheck) => tableCheck.name);
     const adminSessionIndexNames = getTableConfig(adminSessions).indexes.map(
       (tableIndex) => tableIndex.config.name,
     );
@@ -107,7 +111,17 @@ describe('database schema', () => {
       'created_at',
       'updated_at',
       'last_login_at',
+      'password_changed_at',
+      'failed_login_count',
+      'failed_login_window_started_at',
+      'locked_until',
     ]);
+    expect(adminUserIndexNames).toEqual(expect.arrayContaining([
+      'admin_users_locked_until_idx',
+    ]));
+    expect(adminUserCheckNames).toEqual(expect.arrayContaining([
+      'admin_users_failed_login_count_check',
+    ]));
     expect(adminSessionIndexNames).toEqual(expect.arrayContaining([
       'admin_sessions_admin_user_id_idx',
       'admin_sessions_expires_at_idx',

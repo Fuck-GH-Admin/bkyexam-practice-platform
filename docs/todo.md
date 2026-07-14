@@ -5,6 +5,23 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.9/B9.10 Identity Migration And Admin Security — 2026-07-15
+
+- [x] 新增 `npm run ops:legacy-student-password-migration`。
+- [x] 旧学生账号迁移工具默认 dry-run，必须显式 `--apply` 才写库。
+- [x] 只迁移 `password_hash IS NULL` 的学生，写入 hash、设置 `password_reset_required=true`、清空失败/锁定状态。
+- [x] 默认撤销未过期 student session，支持 `--no-revoke-sessions`。
+- [x] 支持统一临时密码环境变量或 `--credentials-out=artifacts/.../credentials.csv` 生成每人独立临时密码。
+- [x] JSON 输出和 audit log 不包含明文临时密码。
+- [x] 新增 `0011_admin_identity_security.sql`，扩展管理员密码变更时间、失败计数、失败窗口和锁定时间。
+- [x] 管理员登录失败按默认 10 次 / 30 分钟窗口 / 15 分钟锁定；锁定返回 `423` 并写 audit。
+- [x] 管理员成功登录或被重置密码时清空失败/锁定状态。
+- [x] 不新增正式前端、不开放公网注册、不实现邮箱/短信找回。
+
+后续代码阶段：
+
+- [ ] B9.11 Production Deployment Evidence / Remote CI Closure。
+
 ## Completed Backend B9.8 Production Gate / Migration Runbook — 2026-07-15
 
 - [x] 新增 `npm run ops:production-gate`。
@@ -14,10 +31,6 @@
 - [x] 新增 `docs/production-gate-runbook.md`，固定旧账号迁移步骤、exit code 和证据包。
 - [x] 测试覆盖 env gate、student migration summary、CLI exit code 和 pool cleanup。
 - [x] 不新增正式前端，不批量写入明文/临时密码。
-
-后续代码阶段：
-
-- [ ] B9.9 Legacy Student Password Migration Tool。
 
 ## Completed Backend B9.7 Password Login Enforcement — 2026-07-15
 

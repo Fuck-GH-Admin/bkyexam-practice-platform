@@ -2,7 +2,7 @@
 
 BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已经形成可真实运行的“学生客观题练习闭环”，不再只是 Phase 1 脚手架。
 
-截至 **2026-07-14**，已实现并验证：
+截至 **2026-07-15**，已实现并验证：
 
 - 将 BKYExam 原始题库导入 PostgreSQL，并自动生成学生可见题库映射。
 - 基于固定用户名的学生身份、服务端 Cookie 会话、退出与会话恢复。
@@ -14,7 +14,8 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 学习概览、趋势、目标与长期复习标记 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
+- 生产 gate 与旧账号迁移工具：`npm run ops:production-gate`、`npm run ops:legacy-student-password-migration`。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
@@ -22,7 +23,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 完整管理平台、管理端 UI，以及 import reset/异步队列/取消重试等完整导入运营能力。
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
-- 生产级身份策略、外部监控告警、远端 CI 首次验收和正式部署验收。
+- 外部监控告警、远端 CI 首次验收、目标环境迁移执行证据和正式部署验收。
 
 当前完整度、验证证据和风险见 [系统状态](docs/status.md)，产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
@@ -81,6 +82,13 @@ npm run verify
 npm run ops:backup-restore:docker
 ```
 
+生产 gate 与旧无密码学生迁移 dry-run：
+
+```sh
+npm run ops:production-gate -- --skip-db
+npm run ops:legacy-student-password-migration -- --limit=50
+```
+
 真实 PostgreSQL integration profile 使用独立临时数据库，不会接触开发数据库。安装 Docker 后执行：
 
 ```sh
@@ -119,6 +127,7 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=600
 CSRF_ORIGIN_CHECK_ENABLED=false
 CSRF_ALLOWED_ORIGINS=http://127.0.0.1:5173;http://localhost:5173
+STUDENT_MIGRATION_TEMP_PASSWORD=
 ```
 
 PowerShell 示例：

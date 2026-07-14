@@ -159,7 +159,7 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
 - operational policy and UI for administrator/student account lifecycle; backend Admin User manage API, Admin Student Manage API, student password login enforcement, student password change API, and one-time `super_admin` bootstrap already exist;
-- old-account temporary-password migration execution; the B9.8 runbook and read-only production gate now identify blocking legacy passwordless accounts, but bulk password write automation is still not implemented;
+- old-account temporary-password migration execution on the target database; B9.9 now provides the controlled bulk migration CLI, but each environment still needs an approved credential distribution procedure and an actual migration evidence package;
 - secrets management;
 - PostgreSQL backup and restore drill;
 - external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;
@@ -177,6 +177,12 @@ The local production gate / identity migration audit is also executable:
 
 ```sh
 npm run ops:production-gate
+```
+
+The legacy passwordless student migration tool is executable:
+
+```sh
+npm run ops:legacy-student-password-migration -- --limit=50
 ```
 
 Detailed backup, restore, migration, deployment, observability smoke, and CI checklists are maintained in [`production-operations.md`](production-operations.md), [`production-gate-runbook.md`](production-gate-runbook.md), and [`ci-gate-evidence.md`](ci-gate-evidence.md).

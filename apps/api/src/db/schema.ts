@@ -78,9 +78,16 @@ export const adminUsers = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+    passwordChangedAt: timestamp('password_changed_at', { withTimezone: true }),
+    failedLoginCount: integer('failed_login_count').notNull().default(0),
+    failedLoginWindowStartedAt: timestamp('failed_login_window_started_at', { withTimezone: true }),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
   },
   (table) => [
+    index('admin_users_locked_until_idx').on(table.lockedUntil)
+      .where(sql`${table.lockedUntil} IS NOT NULL`),
     check('admin_users_status_check', sql`${table.status} IN ('active', 'disabled')`),
+    check('admin_users_failed_login_count_check', sql`${table.failedLoginCount} >= 0`),
   ],
 );
 
