@@ -155,7 +155,7 @@ describe('admin user routes', () => {
     });
     expect(detail.statusCode).toBe(200);
     expect(detail.json().adminUser.id).toBe(operatorId);
-    expect(JSON.stringify(detail.json())).not.toContain('password');
+    expect(JSON.stringify(detail.json())).not.toContain('passwordHash');
   });
 
   it('creates users, rejects duplicate loginName, and writes audit', async () => {

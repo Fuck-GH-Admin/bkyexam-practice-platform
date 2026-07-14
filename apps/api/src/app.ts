@@ -13,6 +13,7 @@ import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
 import type { AdminImportJobRepository, AdminImportJobRunner } from './admin/importJobs.js';
 import type { AdminQuestionReviewRepository } from './admin/questionReview.js';
+import type { AdminStudentRepository } from './admin/adminStudents.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
 import type { AdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createMemoryStudentSessionRepository, createSessionService } from './auth/session.js';
@@ -37,6 +38,7 @@ import { createAdminAuditLogRoutes } from './routes/adminAuditLogs.js';
 import { createAdminBankMappingRoutes } from './routes/adminBankMappings.js';
 import { createAdminImportJobRoutes } from './routes/adminImportJobs.js';
 import { createAdminQuestionReviewRoutes } from './routes/adminQuestionReview.js';
+import { createAdminStudentRoutes } from './routes/adminStudents.js';
 import { createAdminSystemStatusRoutes } from './routes/adminSystemStatus.js';
 import { createAdminUserRoutes } from './routes/adminUsers.js';
 import { registerAuthRoutes, sessionCookieName } from './routes/auth.js';
@@ -58,6 +60,7 @@ interface BuildAppOptions {
   adminImportModeEnabled?: boolean;
   adminImportRunner?: AdminImportJobRunner;
   adminQuestionReviewRepository?: AdminQuestionReviewRepository;
+  adminStudentRepository?: AdminStudentRepository;
   adminSystemStatusRepository?: AdminSystemStatusRepository;
   adminUserRepository?: AdminUserRepository;
   bankRepository?: BankRepository;
@@ -130,6 +133,11 @@ export function buildApp(options: BuildAppOptions = {}) {
   }));
   void app.register(createAdminUserRoutes({
     repository: options.adminUserRepository,
+    sessionService: adminSessionService,
+    auditService,
+  }));
+  void app.register(createAdminStudentRoutes({
+    repository: options.adminStudentRepository,
     sessionService: adminSessionService,
     auditService,
   }));

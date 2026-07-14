@@ -52,14 +52,14 @@ PostgreSQL / memory repository
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
 | Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, `LearningGoalsResponseV1Schema`, `LearningReviewMarkListResponseV1Schema`, `LearningReviewMarkResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend/goal/feedback/review-mark schemas |
 | Auth | `AuthStudentV1Schema` with `className/groupName`, login/me/logout response schemas, optional `passwordResetRequired` |
-| Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
+| Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
 | Error/Health/Observability | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema`, `MetricsResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未实现 shared schema：
 
-- Admin Student Manage、student password change/reset。
+- student self password change / force-change flow。
 - Production alert payload。
 
 ## Frozen V1 Semantics
@@ -206,4 +206,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；Admin Student Manage、student password change/reset、reset import、异步队列、正式告警 payload 和正式 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、Admin Auth、Admin User manage、Admin Student Manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；student self password change / force-change flow、reset import、异步队列、正式告警 payload 和正式 Admin UI 尚未实现。

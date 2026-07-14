@@ -5,6 +5,7 @@ import { createPgAdminBankMappingRepository } from './admin/bankMappings.js';
 import { createPgAdminImportJobRepository, createPgQuestionBankImportRunner } from './admin/importJobs.js';
 import { createPgAdminQuestionReviewRepository } from './admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from './admin/session.js';
+import { createPgAdminStudentRepository } from './admin/adminStudents.js';
 import { createPgAdminSystemStatusRepository } from './admin/systemStatus.js';
 import { createPgStudentSessionRepository, createSessionService } from './auth/session.js';
 import { createPgStudentAuthRepository } from './auth/studentAuth.js';
@@ -30,6 +31,7 @@ const app = buildApp({
   adminImportModeEnabled: config.ADMIN_IMPORT_ENABLE_WRITE,
   adminImportRunner: pool ? createPgQuestionBankImportRunner(pool) : undefined,
   adminQuestionReviewRepository: pool ? createPgAdminQuestionReviewRepository(pool) : undefined,
+  adminStudentRepository: pool ? createPgAdminStudentRepository(pool) : undefined,
   adminSystemStatusRepository: pool ? createPgAdminSystemStatusRepository(pool) : undefined,
   adminUserRepository: pool ? createPgAdminUserRepository(pool) : undefined,
   bankRepository: pool ? createPgBankRepository(pool) : undefined,

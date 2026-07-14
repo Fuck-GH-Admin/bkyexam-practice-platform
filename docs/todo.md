@@ -18,8 +18,21 @@
 
 后续代码阶段：
 
-- [ ] B9.6 Admin Student Manage API。
 - [ ] B9.7 Password Login Enforcement。
+
+## Completed Backend B9.6 Admin Student Manage API — 2026-07-15
+
+- [x] shared v1 contract 覆盖 Admin Student list/detail/create/bulk-create/update/reset-password/revoke-sessions。
+- [x] RBAC 新增 `student_account:read/write/reset_password/revoke_session`。
+- [x] `operator` 可进行学生账号日常运营，`content_editor` 默认无学生账号权限，`super_admin` 全权限。
+- [x] `GET /api/admin/students` 支持 search/filter/page。
+- [x] `POST /api/admin/students` 支持单个创建、hash 初始密码、不返回明文密码。
+- [x] `POST /api/admin/students/bulk-create` 支持最多 200 个 JSON 批量创建和 created/skipped/failed 部分结果。
+- [x] `PATCH /api/admin/students/:studentId` 支持 displayName/status/className/groupName。
+- [x] `POST /api/admin/students/:studentId/reset-password` 设置 `passwordResetRequired=true`、清空失败/锁定状态并可撤销现有 session。
+- [x] `POST /api/admin/students/:studentId/revoke-sessions` 撤销学生未过期 session。
+- [x] audit log 覆盖 create/bulk-create/update/reset-password/revoke-session。
+- [x] route/unit/shared/PostgreSQL integration 覆盖。
 
 ## Completed Backend B9.4 Strategy — 2026-07-15
 

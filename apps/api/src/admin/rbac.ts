@@ -27,6 +27,10 @@ export const adminPermissions = [
   'system_status:read',
   'audit_log:read',
   'admin_user:manage',
+  'student_account:read',
+  'student_account:write',
+  'student_account:reset_password',
+  'student_account:revoke_session',
 ] as const satisfies readonly AdminPermission[];
 
 export const rolePermissions = {
@@ -44,6 +48,10 @@ export const rolePermissions = {
     'import_job:read',
     'import_job:create',
     'system_status:read',
+    'student_account:read',
+    'student_account:write',
+    'student_account:reset_password',
+    'student_account:revoke_session',
   ],
   super_admin: adminPermissions,
 } as const satisfies Record<AdminRole, readonly AdminPermission[]>;

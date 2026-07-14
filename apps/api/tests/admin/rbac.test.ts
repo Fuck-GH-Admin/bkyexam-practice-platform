@@ -23,6 +23,10 @@ describe('admin RBAC', () => {
       'import_job:read',
       'import_job:create',
       'system_status:read',
+      'student_account:read',
+      'student_account:write',
+      'student_account:reset_password',
+      'student_account:revoke_session',
     ]);
   });
 
@@ -32,6 +36,7 @@ describe('admin RBAC', () => {
     expect(permissions).toContain('admin_user:manage');
     expect(permissions).toContain('audit_log:read');
     expect(permissions).toContain('bank_mapping:publish');
+    expect(permissions).toContain('student_account:reset_password');
   });
 
   it('deduplicates roles and rejects unknown role names', () => {

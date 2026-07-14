@@ -10,6 +10,8 @@ import {
   AdminAuditLogListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  AdminStudentDetailResponseV1Schema,
+  AdminStudentListResponseV1Schema,
   AdminUserDetailResponseV1Schema,
   AdminUserListResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
@@ -17,16 +19,24 @@ import {
   AdminSystemStatusResponseV1Schema,
   BulkUpdateAdminBankMappingStatusRequestV1Schema,
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
+  BulkCreateAdminStudentsRequestV1Schema,
+  BulkCreateAdminStudentsResponseV1Schema,
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
+  CreateAdminStudentRequestV1Schema,
   CreateAdminUserRequestV1Schema,
   ListAdminAuditLogsRequestV1Schema,
+  ListAdminStudentsRequestV1Schema,
   ListAdminUsersRequestV1Schema,
   ListAdminQuestionReviewsRequestV1Schema,
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
+  ResetAdminStudentPasswordRequestV1Schema,
+  ResetAdminStudentPasswordResponseV1Schema,
+  RevokeAdminStudentSessionsResponseV1Schema,
+  UpdateAdminStudentRequestV1Schema,
   UpdateAdminUserRequestV1Schema,
   AuthLoginResponseV1Schema,
   AuthLogoutResponseV1Schema,
@@ -362,7 +372,17 @@ describe('v1 auth/catalog/error/health contracts', () => {
       displayName: 'Operator',
       status: 'active',
       roles: ['operator'],
-      permissions: ['admin:self:read', 'bank_mapping:read', 'import_job:read', 'import_job:create', 'system_status:read'],
+      permissions: [
+        'admin:self:read',
+        'bank_mapping:read',
+        'import_job:read',
+        'import_job:create',
+        'system_status:read',
+        'student_account:read',
+        'student_account:write',
+        'student_account:reset_password',
+        'student_account:revoke_session',
+      ],
       createdAt: '2026-07-14T10:00:00.000Z',
       updatedAt: '2026-07-14T10:00:00.000Z',
       lastLoginAt: null,
@@ -373,6 +393,105 @@ describe('v1 auth/catalog/error/health contracts', () => {
       page: { limit: 20, offset: 0, hasMore: false },
     }).adminUsers[0]?.loginName).toBe('operator@example.com');
     expect(AdminUserDetailResponseV1Schema.parse({ adminUser }).adminUser.status).toBe('active');
+  });
+
+  it('parses admin student account management contracts and bulk partial results', () => {
+    const adminId = '50000000-0000-4000-8000-000000000001';
+    const studentId = '60000000-0000-4000-8000-000000000001';
+
+    expect(ListAdminStudentsRequestV1Schema.parse({
+      status: 'active',
+      className: '2班',
+      passwordResetRequired: 'true',
+      lockedOnly: 'false',
+      keyword: '202502040201',
+      limit: '10',
+      offset: '5',
+    })).toEqual({
+      status: 'active',
+      className: '2班',
+      passwordResetRequired: true,
+      lockedOnly: false,
+      keyword: '202502040201',
+      limit: 10,
+      offset: 5,
+    });
+
+    expect(CreateAdminStudentRequestV1Schema.parse({
+      loginName: '202502040201',
+      displayName: 'Student 201',
+      initialPassword: 'temporary123',
+      className: '2班',
+    })).toMatchObject({
+      loginName: '202502040201',
+      passwordResetRequired: true,
+    });
+    expect(() => CreateAdminStudentRequestV1Schema.parse({
+      loginName: '202502040201',
+      initialPassword: 'short',
+    })).toThrow();
+    expect(() => UpdateAdminStudentRequestV1Schema.parse({})).toThrow();
+
+    expect(BulkCreateAdminStudentsRequestV1Schema.parse({
+      students: [
+        { loginName: '202502040201', displayName: 'Student 201' },
+        { loginName: '202502040202', initialPassword: 'temporary456' },
+      ],
+      options: {
+        defaultInitialPassword: 'temporary123',
+        skipExisting: true,
+      },
+    }).options).toMatchObject({
+      defaultInitialPassword: 'temporary123',
+      passwordResetRequired: true,
+      revokeExistingSessions: true,
+      skipExisting: true,
+    });
+    expect(() => BulkCreateAdminStudentsRequestV1Schema.parse({
+      students: [{ loginName: '202502040201' }],
+    })).toThrow('initialPassword or options.defaultInitialPassword is required');
+
+    const student = {
+      id: studentId,
+      loginName: '202502040201',
+      displayName: 'Student 201',
+      className: '2班',
+      groupName: null,
+      status: 'active',
+      passwordResetRequired: true,
+      passwordChangedAt: null,
+      failedLoginCount: 0,
+      lockedUntil: null,
+      lastLoginAt: null,
+      createdBy: { id: adminId, displayName: 'Root Admin' },
+      createdAt: '2026-07-15T10:00:00.000Z',
+      updatedAt: '2026-07-15T10:00:00.000Z',
+    };
+
+    expect(AdminStudentListResponseV1Schema.parse({
+      students: [student],
+      page: { limit: 20, offset: 0, hasMore: false },
+    }).students[0]?.className).toBe('2班');
+    expect(AdminStudentDetailResponseV1Schema.parse({ student }).student.passwordResetRequired).toBe(true);
+    expect(BulkCreateAdminStudentsResponseV1Schema.parse({
+      created: [student],
+      skipped: [{ loginName: 'existing-student', reason: 'loginName already exists' }],
+      failed: [{ loginName: 'duplicate-student', error: 'Duplicate loginName in request' }],
+    }).failed).toHaveLength(1);
+    expect(ResetAdminStudentPasswordRequestV1Schema.parse({
+      newPassword: 'temporary123',
+    })).toEqual({ newPassword: 'temporary123', revokeExistingSessions: true });
+    expect(ResetAdminStudentPasswordResponseV1Schema.parse({
+      student,
+      revokedSessions: 2,
+    }).revokedSessions).toBe(2);
+    expect(RevokeAdminStudentSessionsResponseV1Schema.parse({
+      studentId,
+      revokedSessions: 1,
+    })).toEqual({ studentId, revokedSessions: 1 });
+    expect(() => AdminStudentDetailResponseV1Schema.parse({
+      student: { ...student, passwordHash: 'secret' },
+    })).toThrow();
   });
 
   it('parses admin audit log list contracts and filters', () => {

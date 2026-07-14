@@ -16,6 +16,10 @@ export const AdminPermissionV1Schema = z.enum([
   'system_status:read',
   'audit_log:read',
   'admin_user:manage',
+  'student_account:read',
+  'student_account:write',
+  'student_account:reset_password',
+  'student_account:revoke_session',
 ]);
 export type AdminPermissionV1 = z.infer<typeof AdminPermissionV1Schema>;
 
@@ -115,6 +119,153 @@ export const AdminUserDetailResponseV1Schema = z.object({
 }).strict();
 export type AdminUserDetailResponseV1 = z.infer<typeof AdminUserDetailResponseV1Schema>;
 
+const AdminQueryBooleanV1Schema = z.union([
+  z.boolean(),
+  z.enum(['true', 'false']).transform((value) => value === 'true'),
+]);
+
+export const AdminStudentStatusV1Schema = z.enum(['active', 'disabled']);
+export type AdminStudentStatusV1 = z.infer<typeof AdminStudentStatusV1Schema>;
+
+export const AdminStudentCreatedByV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  displayName: z.string().min(1),
+}).strict();
+export type AdminStudentCreatedByV1 = z.infer<typeof AdminStudentCreatedByV1Schema>;
+
+export const AdminStudentV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  loginName: z.string().min(1),
+  displayName: z.string().min(1),
+  className: z.string().min(1).nullable(),
+  groupName: z.string().min(1).nullable(),
+  status: AdminStudentStatusV1Schema,
+  passwordResetRequired: z.boolean(),
+  passwordChangedAt: z.string().datetime().nullable(),
+  failedLoginCount: z.number().int().nonnegative(),
+  lockedUntil: z.string().datetime().nullable(),
+  lastLoginAt: z.string().datetime().nullable(),
+  createdBy: AdminStudentCreatedByV1Schema.nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+}).strict();
+export type AdminStudentV1 = z.infer<typeof AdminStudentV1Schema>;
+
+export const ListAdminStudentsRequestV1Schema = z.object({
+  status: AdminStudentStatusV1Schema.optional(),
+  className: z.string().min(1).optional(),
+  groupName: z.string().min(1).optional(),
+  passwordResetRequired: AdminQueryBooleanV1Schema.optional(),
+  lockedOnly: AdminQueryBooleanV1Schema.optional(),
+  keyword: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListAdminStudentsRequestV1 = z.infer<typeof ListAdminStudentsRequestV1Schema>;
+
+export const CreateAdminStudentRequestV1Schema = z.object({
+  loginName: z.string().min(1),
+  displayName: z.string().min(1).optional(),
+  initialPassword: z.string().min(8),
+  className: z.string().min(1).nullable().optional(),
+  groupName: z.string().min(1).nullable().optional(),
+  passwordResetRequired: z.boolean().default(true),
+}).strict();
+export type CreateAdminStudentRequestV1 = z.infer<typeof CreateAdminStudentRequestV1Schema>;
+
+export const BulkCreateAdminStudentItemV1Schema = z.object({
+  loginName: z.string().min(1),
+  displayName: z.string().min(1).optional(),
+  initialPassword: z.string().min(8).optional(),
+  className: z.string().min(1).nullable().optional(),
+  groupName: z.string().min(1).nullable().optional(),
+}).strict();
+export type BulkCreateAdminStudentItemV1 = z.infer<typeof BulkCreateAdminStudentItemV1Schema>;
+
+export const BulkCreateAdminStudentsOptionsV1Schema = z.object({
+  defaultInitialPassword: z.string().min(8).optional(),
+  passwordResetRequired: z.boolean().default(true),
+  revokeExistingSessions: z.boolean().default(true),
+  skipExisting: z.boolean().default(true),
+}).strict().default({
+  passwordResetRequired: true,
+  revokeExistingSessions: true,
+  skipExisting: true,
+});
+export type BulkCreateAdminStudentsOptionsV1 = z.infer<typeof BulkCreateAdminStudentsOptionsV1Schema>;
+
+export const BulkCreateAdminStudentsRequestV1Schema = z.object({
+  students: z.array(BulkCreateAdminStudentItemV1Schema).min(1).max(200),
+  options: BulkCreateAdminStudentsOptionsV1Schema,
+}).strict().superRefine((request, context) => {
+  request.students.forEach((student, index) => {
+    if (!student.initialPassword && !request.options.defaultInitialPassword) {
+      context.addIssue({
+        code: 'custom',
+        message: 'initialPassword or options.defaultInitialPassword is required',
+        path: ['students', index, 'initialPassword'],
+      });
+    }
+  });
+});
+export type BulkCreateAdminStudentsRequestV1 = z.infer<typeof BulkCreateAdminStudentsRequestV1Schema>;
+
+export const UpdateAdminStudentRequestV1Schema = z.object({
+  displayName: z.string().min(1).optional(),
+  status: AdminStudentStatusV1Schema.optional(),
+  className: z.string().min(1).nullable().optional(),
+  groupName: z.string().min(1).nullable().optional(),
+}).strict().refine((changes) => Object.keys(changes).length > 0, {
+  message: 'At least one student account change is required',
+});
+export type UpdateAdminStudentRequestV1 = z.infer<typeof UpdateAdminStudentRequestV1Schema>;
+
+export const ResetAdminStudentPasswordRequestV1Schema = z.object({
+  newPassword: z.string().min(8),
+  revokeExistingSessions: z.boolean().default(true),
+}).strict();
+export type ResetAdminStudentPasswordRequestV1 = z.infer<typeof ResetAdminStudentPasswordRequestV1Schema>;
+
+export const AdminStudentListResponseV1Schema = z.object({
+  students: z.array(AdminStudentV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type AdminStudentListResponseV1 = z.infer<typeof AdminStudentListResponseV1Schema>;
+
+export const AdminStudentDetailResponseV1Schema = z.object({
+  student: AdminStudentV1Schema,
+}).strict();
+export type AdminStudentDetailResponseV1 = z.infer<typeof AdminStudentDetailResponseV1Schema>;
+
+export const BulkCreateAdminStudentsResponseV1Schema = z.object({
+  created: z.array(AdminStudentV1Schema),
+  skipped: z.array(z.object({
+    loginName: z.string().min(1),
+    reason: z.string().min(1),
+  }).strict()),
+  failed: z.array(z.object({
+    loginName: z.string().min(1),
+    error: z.string().min(1),
+  }).strict()),
+}).strict();
+export type BulkCreateAdminStudentsResponseV1 = z.infer<typeof BulkCreateAdminStudentsResponseV1Schema>;
+
+export const ResetAdminStudentPasswordResponseV1Schema = z.object({
+  student: AdminStudentV1Schema,
+  revokedSessions: z.number().int().nonnegative(),
+}).strict();
+export type ResetAdminStudentPasswordResponseV1 = z.infer<typeof ResetAdminStudentPasswordResponseV1Schema>;
+
+export const RevokeAdminStudentSessionsResponseV1Schema = z.object({
+  studentId: CanonicalUuidV1Schema,
+  revokedSessions: z.number().int().nonnegative(),
+}).strict();
+export type RevokeAdminStudentSessionsResponseV1 = z.infer<typeof RevokeAdminStudentSessionsResponseV1Schema>;
+
 export const AdminAuditLogResultV1Schema = z.enum(['success', 'failure']);
 export type AdminAuditLogResultV1 = z.infer<typeof AdminAuditLogResultV1Schema>;
 
@@ -164,11 +315,6 @@ export type AdminAuditLogListResponseV1 = z.infer<typeof AdminAuditLogListRespon
 
 export const AdminBankMappingStatusV1Schema = z.enum(['review', 'active', 'hidden', 'deprecated']);
 export type AdminBankMappingStatusV1 = z.infer<typeof AdminBankMappingStatusV1Schema>;
-
-const AdminQueryBooleanV1Schema = z.union([
-  z.boolean(),
-  z.enum(['true', 'false']).transform((value) => value === 'true'),
-]);
 
 export const ListAdminBankMappingsRequestV1Schema = z.object({
   status: AdminBankMappingStatusV1Schema.optional(),

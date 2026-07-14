@@ -60,6 +60,10 @@ describe('admin auth service', () => {
         'import_job:read',
         'import_job:create',
         'system_status:read',
+        'student_account:read',
+        'student_account:write',
+        'student_account:reset_password',
+        'student_account:revoke_session',
       ],
     });
 

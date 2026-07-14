@@ -294,7 +294,7 @@ Response：
     "loginName": "operator@example.com",
     "displayName": "Operator",
     "roles": ["operator"],
-    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"]
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"]
   },
   "expiresAt": "2026-07-13T18:00:00.000Z"
 }
@@ -358,7 +358,7 @@ Response：
       "displayName": "Operator",
       "status": "active",
       "roles": ["operator"],
-      "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"],
+      "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
       "createdAt": "2026-07-14T10:00:00.000Z",
       "updatedAt": "2026-07-14T10:00:00.000Z",
       "lastLoginAt": null
@@ -382,7 +382,7 @@ Response：
     "displayName": "Operator",
     "status": "active",
     "roles": ["operator"],
-    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read"],
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
     "createdAt": "2026-07-14T10:00:00.000Z",
     "updatedAt": "2026-07-14T10:00:00.000Z",
     "lastLoginAt": null
@@ -441,6 +441,198 @@ Errors：
 - `403`：缺少 `admin_user:manage`。
 - `404`：admin user 不存在。
 - `409`：loginName 冲突，或试图禁用/移除最后一个 active `super_admin`。
+
+## Admin Students
+
+Admin Student Manage API 是 B9.6 已实现的学生账号生命周期后端。它不开放公网自助注册；学生账号由管理员单个创建或批量创建，使用 `loginName` + 密码登录。所有响应都不返回 `password` 或 `passwordHash`。
+
+角色/权限：
+
+- `operator`：具备 `student_account:read/write/reset_password/revoke_session`，用于日常运营批量建号、重置密码和撤销 session。
+- `content_editor`：默认没有学生账号权限。
+- `super_admin`：拥有全部学生账号权限。
+
+### `GET /api/admin/students`
+
+Permission：`student_account:read`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `status` | `active|disabled` | optional |
+| `className` | string | optional |
+| `groupName` | string | optional |
+| `passwordResetRequired` | boolean | optional |
+| `lockedOnly` | boolean | optional |
+| `keyword` | string | optional，匹配 `loginName/displayName` |
+| `limit` | integer 1..100 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "students": [
+    {
+      "id": "student-uuid",
+      "loginName": "202502040201",
+      "displayName": "Student 201",
+      "className": "2班",
+      "groupName": null,
+      "status": "active",
+      "passwordResetRequired": true,
+      "passwordChangedAt": null,
+      "failedLoginCount": 0,
+      "lockedUntil": null,
+      "lastLoginAt": null,
+      "createdBy": { "id": "admin-user-uuid", "displayName": "Operator" },
+      "createdAt": "2026-07-15T10:00:00.000Z",
+      "updatedAt": "2026-07-15T10:00:00.000Z"
+    }
+  ],
+  "page": { "limit": 20, "offset": 0, "hasMore": false }
+}
+```
+
+### `GET /api/admin/students/:studentId`
+
+Permission：`student_account:read`
+
+返回单个学生账号详情。不存在返回 `404`。
+
+### `POST /api/admin/students`
+
+Permission：`student_account:write`
+
+Request：
+
+```json
+{
+  "loginName": "202502040201",
+  "displayName": "Student 201",
+  "initialPassword": "temporary-password",
+  "className": "2班",
+  "groupName": null,
+  "passwordResetRequired": true
+}
+```
+
+规则：
+
+- `initialPassword` 至少 8 字符，只进入服务端 hash，不在 response 或 audit 明文返回。
+- `displayName` 可省略，默认使用 `loginName`。
+- `className` 省略时，`202502040201`–`202502040230` 自动推断为 `2班`；显式传 `null` 可保持为空。
+- `loginName` 冲突返回 `409`。
+- 成功写 `student_account.create` audit log。
+
+### `POST /api/admin/students/bulk-create`
+
+Permission：`student_account:write`
+
+单次最多 200 个学生。
+
+Request：
+
+```json
+{
+  "students": [
+    {
+      "loginName": "202502040201",
+      "displayName": "Student 201",
+      "className": "2班",
+      "groupName": null
+    }
+  ],
+  "options": {
+    "defaultInitialPassword": "temporary-password",
+    "passwordResetRequired": true,
+    "revokeExistingSessions": true,
+    "skipExisting": true
+  }
+}
+```
+
+Response：
+
+```json
+{
+  "created": [],
+  "skipped": [
+    { "loginName": "existing-student", "reason": "loginName already exists" }
+  ],
+  "failed": [
+    { "loginName": "duplicate-student", "error": "Duplicate loginName in request" }
+  ]
+}
+```
+
+规则：
+
+- 每个 student 可单独传 `initialPassword`；否则使用 `options.defaultInitialPassword`。
+- `skipExisting=true` 时，已存在账号进入 `skipped`；否则进入 `failed`。
+- 同一 request 内重复 `loginName` 进入 `failed`，不影响其他项创建。
+- 成功写聚合 `student_account.bulk_create` audit log。
+
+### `PATCH /api/admin/students/:studentId`
+
+Permission：`student_account:write`
+
+Request 至少包含一个字段：
+
+```json
+{
+  "displayName": "Student 201 Updated",
+  "status": "disabled",
+  "className": "2班",
+  "groupName": "A组"
+}
+```
+
+成功写 `student_account.update` audit log。
+
+### `POST /api/admin/students/:studentId/reset-password`
+
+Permission：`student_account:reset_password`
+
+Request：
+
+```json
+{
+  "newPassword": "new-temporary-password",
+  "revokeExistingSessions": true
+}
+```
+
+规则：
+
+- `newPassword` 至少 8 字符，只写入 hash。
+- 设置 `passwordResetRequired=true`，清空失败计数与临时锁定。
+- `revokeExistingSessions=true` 时撤销该学生当前未过期 session。
+- 成功写 `student_account.reset_password` audit log，metadata 记录 `revokedSessions`。
+
+### `POST /api/admin/students/:studentId/revoke-sessions`
+
+Permission：`student_account:revoke_session`
+
+撤销该学生当前未过期 session，并返回：
+
+```json
+{
+  "studentId": "student-uuid",
+  "revokedSessions": 1
+}
+```
+
+成功写 `student_account.revoke_sessions` audit log。
+
+Errors：
+
+- `400`：query、body 或 student id 无效。
+- `401`：缺少有效 `bky_admin_session`。
+- `403`：缺少对应 `student_account:*` 权限。
+- `404`：student 不存在。
+- `409`：单个创建时 `loginName` 冲突。
 
 ## Admin Bank Mappings
 

@@ -162,9 +162,9 @@ Stores student identities.
 - `password_reset_required`: whether the student must change password after login.
 - `password_changed_at`: last password change timestamp.
 - `failed_login_count`, `failed_login_window_started_at`, `locked_until`: relaxed login failure/temporary lock state.
-- `last_login_at`: last successful login timestamp, reserved for the formal password-login phase.
+- `last_login_at`: last successful login timestamp, to be actively updated in the formal password-login phase.
 - `updated_at`: account update timestamp.
-- `created_by_admin_id`: nullable FK to `admin_users`, reserved for Admin Student Manage.
+- `created_by_admin_id`: nullable FK to `admin_users`; populated by Admin Student Manage create/bulk-create APIs.
 - `created_at`: creation timestamp.
 
 正式身份策略已冻结在 [`identity-security-strategy.md`](identity-security-strategy.md)。B9.5 在保留旧账号的前提下扩展 `students`，并回填已知运营规则：`202502040201` 到 `202502040230` 属于 `2班`，其余学生班级/分组暂未定。
@@ -355,6 +355,8 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 `apps/api/src/db/migrations/0009_question_bookmarks.sql` adds per-question learning review marks. It creates `question_bookmarks` with favorite/long-term-review flags, source/note metadata, per-student uniqueness, and indexes for recent and bank-scoped review mark lists.
 
 `apps/api/src/db/migrations/0010_student_identity_security.sql` extends `students` for formal identity security. It adds lightweight `class_name` / `group_name`, account `status`, `password_reset_required`, password-change timestamp, relaxed failed-login/lockout fields, `last_login_at`, `updated_at`, and nullable `created_by_admin_id`. It backfills `202502040201` through `202502040230` to `class_name = '2班'` and adds status/class/group/locked indexes.
+
+B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 

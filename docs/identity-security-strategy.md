@@ -28,15 +28,17 @@
 - Auth shared contract 已支持 `className/groupName/passwordResetRequired`。
 - `student_sessions` 已有服务端 session 和 httpOnly `bky_session`。
 - Admin Auth/RBAC/Audit/User manage/bootstrap 已实现。
+- B9.6 已实现 Admin Student Manage API：list/detail/create/bulk-create/update/reset-password/revoke-sessions。
+- B9.6 已把 `student_account:read/write/reset_password/revoke_session` 纳入 RBAC，`operator` 可执行日常学生账号运营。
+- 管理员重置密码会写入 hash、设置 `passwordResetRequired=true`、清空失败/锁定状态，并可撤销学生现有 session。
 - `x-request-id`、secure headers、可配置 rate limit/CSRF origin check、readiness、metrics smoke 已实现。
 
 当前不能公开生产的原因：
 
-- 学生仍近似“用户名即身份”。
-- 没有正式学生创建/导入 API。
-- 没有学生密码 reset / force-change 流程。
+- 学生登录仍处在兼容旧账号阶段；未默认强制 `password`。
+- 学生临时密码登录后的 force-change 流程尚未完成。
 - 登录失败锁定字段已落入学生身份模型，但失败计数递增/解锁流程尚未启用。
-- 旧账号保留策略已落入数据模型，但批量设置临时密码和正式 password enforcement 尚未实现。
+- 旧账号保留策略已落入数据模型，但正式 password enforcement 尚未实现。
 
 ## 3. 学生账号生命周期
 
@@ -245,7 +247,7 @@ POST /api/auth/login
 
 若 `passwordResetRequired=true`，后续前端应进入修改密码流程。
 
-新增目标接口：
+已实现接口：
 
 ```http
 POST /api/auth/password/change
@@ -270,7 +272,7 @@ POST   /api/admin/students/:studentId/reset-password
 POST   /api/admin/students/:studentId/revoke-sessions
 ```
 
-权限建议：
+已实现权限：
 
 ```text
 student_account:read
@@ -279,13 +281,11 @@ student_account:reset_password
 student_account:revoke_session
 ```
 
-角色建议：
+已实现角色边界：
 
-- `operator`：可读学生、批量创建、重置密码。
+- `operator`：可读学生、单个/批量创建、更新轻量字段、重置密码、撤销学生 session。
 - `content_editor`：默认不管理学生账号。
 - `super_admin`：全部学生账号权限。
-
-是否让 `operator` 重置密码可在实现前再确认；如果用户较少，第一版也可以只给 `super_admin`。
 
 ### 7.3 批量创建格式
 
@@ -303,6 +303,7 @@ student_account:revoke_session
     }
   ],
   "options": {
+    "defaultInitialPassword": "temporary-password",
     "passwordResetRequired": true,
     "revokeExistingSessions": true,
     "skipExisting": true
@@ -313,7 +314,7 @@ student_account:revoke_session
 服务端规则：
 
 - 单次批量数量先限制在 200。
-- `loginName` 必须唯一。
+- `loginName` 应唯一；同一 request 内重复会进入 `failed`，已存在账号按 `skipExisting` 进入 `skipped` 或 `failed`。
 - `initialPassword` 可统一传默认临时密码，也可每个学生单独传。
 - response 返回 created / skipped / failed 三类结果。
 - 不返回明文密码。
@@ -370,6 +371,8 @@ student_account:revoke_session
 
 ### B9.6 — Admin Student Manage API
 
+状态：**已完成，2026-07-15。**
+
 目标：
 
 - 管理员批量创建学生。
@@ -380,10 +383,10 @@ student_account:revoke_session
 
 验收：
 
-- RBAC boundary。
-- 不返回 password/passwordHash。
-- 批量创建幂等/冲突/部分失败。
-- PostgreSQL integration。
+- RBAC boundary 已覆盖。
+- 不返回 password/passwordHash 已覆盖。
+- 批量创建 created/skipped/failed 部分结果已覆盖。
+- PostgreSQL integration 已覆盖真实创建、重置密码、撤销 session 和 audit。
 
 ### B9.7 — Password Login Enforcement
 

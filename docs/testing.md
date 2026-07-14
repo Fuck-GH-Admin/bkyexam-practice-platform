@@ -1,6 +1,6 @@
 # Testing Strategy
 
-状态日期：**2026-07-14**
+状态日期：**2026-07-15**
 
 测试按失败定位和外部依赖分层。任何一层通过都不能替代其他层。
 
@@ -71,7 +71,7 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 438 个 Vitest 测试覆盖：
+当前 452 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
@@ -80,10 +80,10 @@ npm run test:e2e
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint。
 - Web 练习 model 与关键状态转换。
 - 学生端 URL parser/builder。
-- Practice/Wrongbook/Learning/Admin Auth/Admin User/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
+- Practice/Wrongbook/Learning/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 25 项、API 382 项、Web 31 项。Practice/Wrongbook/Learning/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 395 项、Web 31 项。Practice/Wrongbook/Learning/Admin route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
@@ -129,7 +129,7 @@ npm run test:integration:db:docker
 - PostgreSQL migration 可落到空数据库。
 - 学生登录、Cookie session、学生身份安全字段、题库可见性和递归客观题计数。
 - DB-aware readiness health 与 metrics smoke。
-- Admin Auth/RBAC/session/audit foundation、Admin bootstrap、Admin Audit Log read、Admin User manage、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run create/list/detail/error-report/audit/status summary、true import write/idempotency/failed rollback/reset gate、Admin Question Review flag/exclusion/status summary、version conflict、audit log，且 `bky_admin_session` 与 `bky_session` 隔离。
+- Admin Auth/RBAC/session/audit foundation、Admin bootstrap、Admin Audit Log read、Admin User manage、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run create/list/detail/error-report/audit/status summary、true import write/idempotency/failed rollback/reset gate、Admin Question Review flag/exclusion/status summary、version conflict、audit log，且 `bky_admin_session` 与 `bky_session` 隔离。
 - `excludedFromPractice=true` 的 open quality flag 会从新的 Practice bank session 自动选题中排除对应题目。
 - 创建练习、题目锁定、草稿、`false`、存疑和当前位置持久化。
 - 多 active session、最近活动排序、answered/review summary 与分页 contract。

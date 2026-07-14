@@ -8,6 +8,7 @@ import { createAdminBootstrapService, createPgAdminBootstrapRepository } from '.
 import { createPgAdminImportJobRepository, createPgQuestionBankImportRunner } from '../../src/admin/importJobs.js';
 import { createPgAdminQuestionReviewRepository } from '../../src/admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from '../../src/admin/session.js';
+import { createPgAdminStudentRepository } from '../../src/admin/adminStudents.js';
 import { createPgAdminSystemStatusRepository } from '../../src/admin/systemStatus.js';
 import { createPgAdminUserRepository } from '../../src/admin/adminUsers.js';
 import { hashPassword } from '../../src/auth/password.js';
@@ -45,6 +46,7 @@ describe('PostgreSQL-backed API integration', () => {
     adminImportModeEnabled: true,
     adminImportRunner: createPgQuestionBankImportRunner(pool),
     adminQuestionReviewRepository: createPgAdminQuestionReviewRepository(pool),
+    adminStudentRepository: createPgAdminStudentRepository(pool),
     adminSystemStatusRepository: createPgAdminSystemStatusRepository(pool),
     adminUserRepository: createPgAdminUserRepository(pool),
     bankRepository: createPgBankRepository(pool),
@@ -307,6 +309,191 @@ describe('PostgreSQL-backed API integration', () => {
         AND result = 'success'
     `, [superAdminLogin.json().admin.id]);
     expect(adminUserAuditState.rows[0]).toEqual({ create_count: '1', update_count: '1' });
+
+    const existingStudentList = await app.inject({
+      method: 'GET',
+      url: '/api/admin/students?keyword=integration-alice&limit=10&offset=0',
+      headers: { cookie: adminCookie },
+    });
+    expect(existingStudentList.statusCode).toBe(200);
+    expect(existingStudentList.json()).toMatchObject({
+      students: [expect.objectContaining({
+        loginName: 'integration-alice',
+        status: 'active',
+        className: null,
+        groupName: null,
+      })],
+      page: { limit: 10, offset: 0, hasMore: false },
+    });
+    expect(JSON.stringify(existingStudentList.json())).not.toContain('passwordHash');
+
+    const createdStudent = await app.inject({
+      method: 'POST',
+      url: '/api/admin/students',
+      headers: { cookie: adminCookie },
+      payload: {
+        loginName: '202502040201',
+        displayName: 'Student 201',
+        initialPassword: 'temporary123',
+      },
+    });
+    expect(createdStudent.statusCode).toBe(200);
+    expect(createdStudent.json()).toMatchObject({
+      student: {
+        loginName: '202502040201',
+        displayName: 'Student 201',
+        className: '2班',
+        groupName: null,
+        status: 'active',
+        passwordResetRequired: true,
+        createdBy: {
+          id: '50000000-0000-4000-8000-000000000001',
+          displayName: 'Integration Operator',
+        },
+      },
+    });
+    expect(JSON.stringify(createdStudent.json())).not.toContain('temporary123');
+    const managedStudentId = createdStudent.json().student.id as string;
+
+    const managedStudentLogin = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { loginName: '202502040201', password: 'temporary123' },
+    });
+    expect(managedStudentLogin.statusCode).toBe(200);
+    expect(managedStudentLogin.json()).toMatchObject({
+      student: {
+        loginName: '202502040201',
+        className: '2班',
+      },
+      passwordResetRequired: true,
+    });
+    const managedStudentCookie = extractCookie(managedStudentLogin.headers['set-cookie']);
+
+    const bulkCreatedStudents = await app.inject({
+      method: 'POST',
+      url: '/api/admin/students/bulk-create',
+      headers: { cookie: adminCookie },
+      payload: {
+        students: [
+          { loginName: 'integration-bulk-1', displayName: 'Bulk One', className: '实验班' },
+          { loginName: '202502040202', displayName: 'Student 202' },
+          { loginName: '202502040201' },
+          { loginName: 'integration-bulk-1' },
+        ],
+        options: {
+          defaultInitialPassword: 'temporary123',
+          passwordResetRequired: true,
+          skipExisting: true,
+        },
+      },
+    });
+    expect(bulkCreatedStudents.statusCode).toBe(200);
+    expect(bulkCreatedStudents.json()).toMatchObject({
+      created: expect.arrayContaining([
+        expect.objectContaining({ loginName: 'integration-bulk-1', className: '实验班' }),
+        expect.objectContaining({ loginName: '202502040202', className: '2班' }),
+      ]),
+      skipped: [{ loginName: '202502040201', reason: 'loginName already exists' }],
+      failed: [{ loginName: 'integration-bulk-1', error: 'Duplicate loginName in request' }],
+    });
+    expect(bulkCreatedStudents.json().created).toHaveLength(2);
+
+    const updatedStudent = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/students/${managedStudentId}`,
+      headers: { cookie: adminCookie },
+      payload: {
+        displayName: 'Student 201 Updated',
+        groupName: 'A组',
+      },
+    });
+    expect(updatedStudent.statusCode).toBe(200);
+    expect(updatedStudent.json()).toMatchObject({
+      student: {
+        id: managedStudentId,
+        displayName: 'Student 201 Updated',
+        className: '2班',
+        groupName: 'A组',
+        status: 'active',
+      },
+    });
+
+    const resetStudentPassword = await app.inject({
+      method: 'POST',
+      url: `/api/admin/students/${managedStudentId}/reset-password`,
+      headers: { cookie: adminCookie },
+      payload: {
+        newPassword: 'temporary456',
+        revokeExistingSessions: true,
+      },
+    });
+    expect(resetStudentPassword.statusCode).toBe(200);
+    expect(resetStudentPassword.json()).toMatchObject({
+      student: {
+        id: managedStudentId,
+        passwordResetRequired: true,
+        failedLoginCount: 0,
+        lockedUntil: null,
+      },
+      revokedSessions: 1,
+    });
+    expect(JSON.stringify(resetStudentPassword.json())).not.toContain('temporary456');
+
+    const afterResetOldSession = await app.inject({
+      method: 'GET',
+      url: '/api/auth/me',
+      headers: { cookie: managedStudentCookie },
+    });
+    expect(afterResetOldSession.statusCode).toBe(401);
+
+    const disabledStudent = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/students/${managedStudentId}`,
+      headers: { cookie: adminCookie },
+      payload: { status: 'disabled' },
+    });
+    expect(disabledStudent.statusCode).toBe(200);
+    expect(disabledStudent.json()).toMatchObject({
+      student: {
+        id: managedStudentId,
+        status: 'disabled',
+      },
+    });
+
+    const revokedAgain = await app.inject({
+      method: 'POST',
+      url: `/api/admin/students/${managedStudentId}/revoke-sessions`,
+      headers: { cookie: adminCookie },
+    });
+    expect(revokedAgain.statusCode).toBe(200);
+    expect(revokedAgain.json()).toEqual({ studentId: managedStudentId, revokedSessions: 0 });
+
+    const studentAccountAuditState = await pool.query<{
+      create_count: string;
+      bulk_count: string;
+      update_count: string;
+      reset_count: string;
+      revoke_count: string;
+    }>(`
+      SELECT
+        COUNT(*) FILTER (WHERE action = 'student_account.create') AS create_count,
+        COUNT(*) FILTER (WHERE action = 'student_account.bulk_create') AS bulk_count,
+        COUNT(*) FILTER (WHERE action = 'student_account.update') AS update_count,
+        COUNT(*) FILTER (WHERE action = 'student_account.reset_password') AS reset_count,
+        COUNT(*) FILTER (WHERE action = 'student_account.revoke_sessions') AS revoke_count
+      FROM audit_logs
+      WHERE actor_admin_id = $1
+        AND resource_type = 'student'
+        AND result = 'success'
+    `, ['50000000-0000-4000-8000-000000000001']);
+    expect(studentAccountAuditState.rows[0]).toEqual({
+      create_count: '1',
+      bulk_count: '1',
+      update_count: '2',
+      reset_count: '1',
+      revoke_count: '1',
+    });
 
     const adminAuditLogList = await app.inject({
       method: 'GET',
