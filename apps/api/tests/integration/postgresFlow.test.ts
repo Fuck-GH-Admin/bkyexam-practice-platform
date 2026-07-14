@@ -103,6 +103,24 @@ describe('PostgreSQL-backed API integration', () => {
       },
     });
 
+    const metrics = await app.inject({ method: 'GET', url: '/api/health/metrics' });
+    expect(metrics.statusCode).toBe(200);
+    expect(metrics.json()).toMatchObject({
+      service: 'bkyexam-practice-api',
+      http: {
+        totalRequests: expect.any(Number),
+        responses: expect.objectContaining({ success: expect.any(Number) }),
+        routes: expect.arrayContaining([
+          expect.objectContaining({
+            method: 'GET',
+            route: '/api/health/readiness',
+            responses: expect.objectContaining({ success: 1 }),
+          }),
+        ]),
+      },
+    });
+    expect(metrics.json().http.totalRequests).toBeGreaterThanOrEqual(1);
+
     const login = await app.inject({
       method: 'POST',
       url: '/api/auth/login',

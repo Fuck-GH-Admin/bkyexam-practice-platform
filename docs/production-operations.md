@@ -169,6 +169,7 @@ Deploy:
 Postflight:
   /api/health: PASS/FAIL
   /api/health/readiness: PASS/FAIL
+  /api/health/metrics: PASS/FAIL
   db:smoke: PASS/FAIL
   admin_login: PASS/FAIL
   student_login: PASS/FAIL
@@ -178,7 +179,31 @@ Postflight:
 
 失败时不要继续做 UI 或新功能变更；先记录失败阶段、日志位置、使用的 backup、下一步处理方式。
 
-## 6. Remote CI And Branch Protection Gate
+## 6. Observability Smoke
+
+B9.3 起，API 进程内提供最小可观测性 smoke：
+
+- request 完成时写结构化 `http_request` log，可检索字段包括 `requestId`、`method`、`route`、`statusCode`、`statusBucket`、`durationMs`、`remoteAddress` 和 `userAgent`。
+- `GET /api/health/metrics` 返回 shared v1 metrics payload，包含 total requests、status buckets、per-route counters、平均耗时和进程内存摘要。
+- `/api/health/metrics` 只用于部署后 smoke/debug；生产监控仍需后续接入日志聚合、外部 metrics store 和 alerting。
+
+发布后最小检查：
+
+```bash
+curl -fsS http://127.0.0.1:3000/api/health
+curl -fsS http://127.0.0.1:3000/api/health/readiness
+curl -fsS http://127.0.0.1:3000/api/health/metrics
+```
+
+验收标准：
+
+- `x-request-id` 在 response header 中存在。
+- readiness `ok=true`。
+- metrics `http.totalRequests` 会随请求增长。
+- metrics status bucket 能看到 success；故意请求不存在路径后能看到 clientError 增长。
+- 应用日志中存在 `event=http_request` 字段。
+
+## 7. Remote CI And Branch Protection Gate
 
 远端仓库启用后，需要记录首次 CI 验收：
 
@@ -188,4 +213,4 @@ Postflight:
 - 默认分支禁止直接 push。
 - PR 需要至少一次 review 或由项目 owner 明确豁免。
 
-该项当前仍需实际远端仓库状态确认；本地只提供流程定义。
+该项当前仍需实际远端仓库状态确认；本地只提供流程定义。B9.3 的可填写模板见 [`ci-gate-evidence.md`](ci-gate-evidence.md)。

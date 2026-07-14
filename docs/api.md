@@ -134,6 +134,54 @@ Response when ready：
 }
 ```
 
+### `GET /api/health/metrics`
+
+返回当前 API 进程内的最小 HTTP metrics smoke payload。该接口用于部署后快速确认路由计数、状态桶和延迟字段正在增长；它不是最终 Prometheus/alerting 集成。
+
+Response：
+
+```json
+{
+  "service": "bkyexam-practice-api",
+  "generatedAt": "2026-07-15T00:00:00.000Z",
+  "uptimeSeconds": 12.345,
+  "process": {
+    "pid": 12345,
+    "nodeVersion": "v24.0.0",
+    "memoryRssBytes": 104857600,
+    "memoryHeapUsedBytes": 52428800
+  },
+  "http": {
+    "totalRequests": 3,
+    "responses": {
+      "informational": 0,
+      "success": 2,
+      "redirection": 0,
+      "clientError": 1,
+      "serverError": 0
+    },
+    "averageDurationMs": 2.5,
+    "routes": [
+      {
+        "method": "GET",
+        "route": "/api/health",
+        "requests": 1,
+        "responses": {
+          "informational": 0,
+          "success": 1,
+          "redirection": 0,
+          "clientError": 0,
+          "serverError": 0
+        },
+        "averageDurationMs": 1.2
+      }
+    ]
+  }
+}
+```
+
+该 response 使用 shared v1 `MetricsResponseV1Schema` parse；`/api/health/metrics` 本次请求本身会在 response 发送完成后计入下一次 snapshot。
+
 ## Auth
 
 ### `POST /api/auth/login`
@@ -1841,7 +1889,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness/metrics DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

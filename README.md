@@ -22,7 +22,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 完整管理平台、管理端 UI，以及 import reset/异步队列/取消重试等完整导入运营能力。
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
-- 生产级身份策略、监控、备份、远端 CI 首次验收和正式部署验收。
+- 生产级身份策略、外部监控告警、远端 CI 首次验收和正式部署验收。
 
 当前完整度、验证证据和风险见 [系统状态](docs/status.md)，产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
@@ -170,6 +170,7 @@ npm run dev:web
 - Web：`http://127.0.0.1:5173`
 - Health：`http://127.0.0.1:3000/api/health`
 - Readiness：`http://127.0.0.1:3000/api/health/readiness`
+- Metrics smoke：`http://127.0.0.1:3000/api/health/metrics`
 
 `USE_DATABASE=false` 只适合轻量本地启动和 route 单元测试。真实题库、持久化学生会话、草稿和错题本需要 `USE_DATABASE=true`。
 
@@ -204,6 +205,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [题库映射](docs/mapping.md)
 - [部署](docs/deployment.md)
 - [生产运维演练](docs/production-operations.md)
+- [CI Gate / 部署证据模板](docs/ci-gate-evidence.md)
 - [路线图](docs/todo.md)
 
 `docs/superpowers/` 与部分 `docs/design/` 文件是历史设计/实施记录，用来解释决策来源；如与上述当前文档或代码冲突，以当前文档和已验证代码为准。

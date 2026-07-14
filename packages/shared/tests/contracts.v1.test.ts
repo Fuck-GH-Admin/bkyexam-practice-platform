@@ -32,6 +32,7 @@ import {
   AuthLogoutResponseV1Schema,
   CatalogBankListResponseV1Schema,
   HealthResponseV1Schema,
+  MetricsResponseV1Schema,
   ReadinessResponseV1Schema,
   GetLearningDashboardRequestV1Schema,
   GetLearningTrendsRequestV1Schema,
@@ -529,6 +530,52 @@ describe('v1 auth/catalog/error/health contracts', () => {
         database: { ok: false, status: 'down', message: 'query failed' },
       },
     })).toThrow('readiness ok must match dependency health');
+    expect(MetricsResponseV1Schema.parse({
+      service: 'bkyexam-practice-api',
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      uptimeSeconds: 12.3,
+      process: {
+        pid: 12345,
+        nodeVersion: 'v24.0.0',
+        memoryRssBytes: 1000,
+        memoryHeapUsedBytes: 500,
+      },
+      http: {
+        totalRequests: 2,
+        responses: { informational: 0, success: 1, redirection: 0, clientError: 1, serverError: 0 },
+        averageDurationMs: 3.5,
+        routes: [{
+          method: 'GET',
+          route: '/api/health',
+          requests: 1,
+          responses: { informational: 0, success: 1, redirection: 0, clientError: 0, serverError: 0 },
+          averageDurationMs: 1.5,
+        }, {
+          method: 'GET',
+          route: '/api/missing',
+          requests: 1,
+          responses: { informational: 0, success: 0, redirection: 0, clientError: 1, serverError: 0 },
+          averageDurationMs: 5.5,
+        }],
+      },
+    }).http.totalRequests).toBe(2);
+    expect(() => MetricsResponseV1Schema.parse({
+      service: 'bkyexam-practice-api',
+      generatedAt: '2026-07-14T10:00:00.000Z',
+      uptimeSeconds: 12.3,
+      process: {
+        pid: 12345,
+        nodeVersion: 'v24.0.0',
+        memoryRssBytes: 1000,
+        memoryHeapUsedBytes: 500,
+      },
+      http: {
+        totalRequests: 2,
+        responses: { informational: 0, success: 1, redirection: 0, clientError: 0, serverError: 0 },
+        averageDurationMs: 3.5,
+        routes: [],
+      },
+    })).toThrow('HTTP response buckets must sum to totalRequests');
   });
 
   it('parses learning dashboard contracts and counter boundaries', () => {

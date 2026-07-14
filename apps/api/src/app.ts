@@ -25,6 +25,11 @@ import {
   type CsrfOriginCheckOptions,
   type RateLimitOptions,
 } from './platform/guardrails.js';
+import {
+  createMetricsRegistry,
+  registerObservability,
+  type MetricsRegistry,
+} from './platform/observability.js';
 import type { PracticeRepository } from './practice/repository.js';
 import { createMemoryPracticeRepository } from './practice/repository.js';
 import { registerAdminAuthRoutes } from './routes/adminAuth.js';
@@ -71,12 +76,15 @@ interface BuildAppOptions {
   sessionTtlDays?: number;
   adminSessionTtlHours?: number;
   readinessProbe?: ReadinessProbe;
+  metricsRegistry?: MetricsRegistry;
   rateLimit?: RateLimitOptions;
   csrfOriginCheck?: CsrfOriginCheckOptions;
 }
 
 export function buildApp(options: BuildAppOptions = {}) {
   const app = Fastify({ logger: options.logger ?? process.env.NODE_ENV !== 'test' });
+  const metricsRegistry = options.metricsRegistry ?? createMetricsRegistry();
+  registerObservability(app, metricsRegistry);
   registerBackendGuardrails(app, {
     rateLimit: options.rateLimit,
     csrfOriginCheck: options.csrfOriginCheck,
@@ -163,6 +171,7 @@ export function buildApp(options: BuildAppOptions = {}) {
   }));
   void app.register(registerHealthRoutes, {
     readinessProbe: options.readinessProbe,
+    metricsRegistry,
   });
 
   return app;

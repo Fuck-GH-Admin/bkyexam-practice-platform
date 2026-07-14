@@ -1,7 +1,7 @@
 # Backend Completeness And Next Plan
 
-状态日期：**2026-07-14**
-最近完整验证：**2026-07-14 `npm run verify:docker` PASS**
+状态日期：**2026-07-15**
+最近完整验证：**2026-07-15 `npm run verify:docker` PASS**
 本轮初始基线提交：`cae6657 feat: add student session home and history`
 
 本文专门从后端视角回答两个问题：
@@ -21,7 +21,7 @@
 | 后端工程可验证性 | **约 82%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
 | 完整平台后端 | **约 70–77%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read 与 Admin User manage；学生学习概览、趋势、目标、反馈与长期复习标记 API 已落地，但正式身份、全题型、管理前端和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 61%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check；仍缺监控、备份恢复、部署验收和正式安全策略闭环。 |
+| 公开生产后端就绪 | **约 66%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint；仍缺外部监控告警、远端 CI/branch protection 实际确认、部署验收和正式安全策略闭环。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -200,8 +200,8 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 432 Vitest
-- 376 API tests
+- 433 Vitest
+- 377 API tests
 - 31 Web tests
 - 25 Shared tests
 - 3 Playwright browser smoke
@@ -642,6 +642,7 @@ contracts/v1/health.ts
 - Web API helper 对非 2xx response 使用 `ApiErrorResponseV1Schema`。
 - `/api/health` response 使用 `HealthResponseV1Schema`。
 - `/api/health/readiness` response 使用 `ReadinessResponseV1Schema`。
+- `/api/health/metrics` response 使用 `MetricsResponseV1Schema`。
 - route 回归覆盖 Auth/Catalog 不合法 repository payload fail-closed。
 - B9.1 已补 readiness/DB health、request id 和基础 guardrail。
 
@@ -1141,25 +1142,55 @@ review_items
 - 不做自动化蓝绿/回滚发布系统。
 - 不做监控/告警接入。
 
+### Phase B9.3 — Observability / CI Gate Evidence
+
+状态：**已完成，2026-07-15。**
+
+实际落地：
+
+- 新增 shared v1 `MetricsResponseV1Schema`：
+  - service / generatedAt / uptimeSeconds
+  - process pid / nodeVersion / RSS / heap used
+  - HTTP totalRequests
+  - status buckets：informational / success / redirection / clientError / serverError
+  - per-route counters 和 averageDurationMs
+  - status bucket sum 必须与 request count 一致
+- 新增 Fastify observability hook：
+  - `onRequest` 记录高精度开始时间
+  - `onResponse` 记录 route/method/status/duration
+  - structured request log 使用 `event=http_request`、`requestId`、`method`、`route`、`statusCode`、`statusBucket`、`durationMs`、`remoteAddress`、`userAgent`
+- 新增 `GET /api/health/metrics`，用于最小部署后 smoke/debug。
+- PostgreSQL integration 覆盖真实 app 中 readiness 后 metrics route 可读。
+- 新增 [`ci-gate-evidence.md`](ci-gate-evidence.md)，固定远端 CI、branch protection 与部署验收证据模板。
+- `production-operations.md` 的 deployment checklist 纳入 `/api/health/metrics` postflight。
+
+仍保留不做：
+
+- 不接入 Prometheus / OpenTelemetry / 外部 metrics store。
+- 不接入正式 alerting。
+- 不代替日志聚合；当前只是 structured log 字段策略和进程内 metrics smoke。
+- 不推送远端分支，也不替项目 owner 设置 branch protection；远端 CI 首次通过与 required checks 仍需后续实际记录。
+- 不创建正式 Admin UI 或学生前端新页面。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.3 Observability / CI Gate**，或补正式身份安全策略。
+> **正式身份安全策略**，或继续 B9.4 远端 CI / branch protection 实际确认。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add observability smoke and ci gate evidence
+docs: record production identity security strategy
 ```
 
 范围建议只包含：
 
-- structured logging 策略落地到可检索字段。
-- metrics/alerts 最小方案或 smoke endpoint。
-- 远端 CI 首次验收和 branch protection 实际记录。
-- 生产部署 checklist evidence 文件模板。
-- 全量 `npm run verify:docker`。
+- 学生身份从“用户名即身份”升级前的安全决策。
+- 管理员密码策略、会话策略和恢复流程。
+- Cookie/CSRF/rate-limit 生产参数。
+- secrets 管理与部署配置边界。
+- 远端 CI 与 branch protection 若可用，则补实际证据记录。
 
 不做：
 
@@ -1191,6 +1222,6 @@ feat: add observability smoke and ci gate evidence
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check 已落地；完整平台后端还缺正式身份、模块化、非客观题、推荐策略/完整长期档案、管理前端、监控告警和备份恢复演练。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；完整平台后端还缺正式身份、模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警和远端 CI/branch protection 实际确认。**
 
-最合理的下一步是继续后端闭环：优先做生产运维演练或正式身份安全策略；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：优先做正式身份安全策略，或在远端仓库条件允许时完成 CI/branch protection 实际验收；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

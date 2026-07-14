@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MetricsResponseV1Schema } from '@bkyexam-practice/shared';
 import { buildApp } from '../../src/app';
 import type { ReadinessProbe } from '../../src/health/readiness';
 
@@ -39,6 +40,55 @@ describe('health and backend guardrails', () => {
         },
       },
     });
+  });
+
+  it('returns in-process HTTP metrics with route and status buckets', async () => {
+    const app = buildApp();
+
+    const health = await app.inject({ method: 'GET', url: '/api/health' });
+    const banks = await app.inject({ method: 'GET', url: '/api/banks' });
+    const missing = await app.inject({ method: 'GET', url: '/api/missing' });
+    const metrics = await app.inject({ method: 'GET', url: '/api/health/metrics' });
+
+    expect(health.statusCode).toBe(200);
+    expect(banks.statusCode).toBe(200);
+    expect(missing.statusCode).toBe(404);
+    expect(metrics.statusCode).toBe(200);
+
+    const payload = MetricsResponseV1Schema.parse(metrics.json());
+    expect(payload.service).toBe('bkyexam-practice-api');
+    expect(payload.generatedAt).toEqual(expect.any(String));
+    expect(payload.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(payload.process).toMatchObject({
+      pid: expect.any(Number),
+      nodeVersion: expect.stringMatching(/^v/),
+      memoryRssBytes: expect.any(Number),
+      memoryHeapUsedBytes: expect.any(Number),
+    });
+    expect(payload.http.totalRequests).toBe(3);
+    expect(payload.http.responses.success).toBe(2);
+    expect(payload.http.responses.clientError).toBe(1);
+    expect(payload.http.averageDurationMs).toBeGreaterThanOrEqual(0);
+    expect(payload.http.routes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        method: 'GET',
+        route: '/api/health',
+        requests: 1,
+        responses: expect.objectContaining({ success: 1 }),
+      }),
+      expect.objectContaining({
+        method: 'GET',
+        route: '/api/banks',
+        requests: 1,
+        responses: expect.objectContaining({ success: 1 }),
+      }),
+      expect.objectContaining({
+        method: 'GET',
+        route: '/api/missing',
+        requests: 1,
+        responses: expect.objectContaining({ clientError: 1 }),
+      }),
+    ]));
   });
 
   it('returns 503 readiness when the database probe is down', async () => {

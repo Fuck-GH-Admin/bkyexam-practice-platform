@@ -158,7 +158,7 @@ The deployment shape is documented, but the current codebase is not yet publicly
 - strong student identity policy;
 - secrets management;
 - PostgreSQL backup and restore drill;
-- structured logs beyond Fastify defaults, metrics, and alerts;
+- external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;
 - rate-limit/CSRF production policy tuning beyond the current configurable minimum implementation;
 - first successful remote run and branch protection for the repository CI workflow;
 - one repeatable deployment/rollback procedure on the target host.
@@ -169,4 +169,4 @@ The local backup/restore drill is now executable:
 npm run ops:backup-restore:docker
 ```
 
-Detailed backup, restore, migration, deployment, and CI checklists are maintained in [`production-operations.md`](production-operations.md).
+Detailed backup, restore, migration, deployment, observability smoke, and CI checklists are maintained in [`production-operations.md`](production-operations.md) and [`ci-gate-evidence.md`](ci-gate-evidence.md).

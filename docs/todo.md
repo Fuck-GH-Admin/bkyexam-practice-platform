@@ -5,6 +5,22 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.3 — 2026-07-15
+
+- [x] 新增 shared v1 `MetricsResponseV1Schema`。
+- [x] 新增 Fastify observability hook，记录 `event=http_request`、`requestId`、`method`、`route`、`statusCode`、`statusBucket`、`durationMs`、`remoteAddress` 和 `userAgent`。
+- [x] 新增 `GET /api/health/metrics`，返回进程内 HTTP total requests、status buckets、per-route counters、平均耗时和 process memory summary。
+- [x] route/shared/PostgreSQL integration 覆盖 metrics contract 与 smoke endpoint。
+- [x] 新增 `docs/ci-gate-evidence.md`，固定远端 CI、branch protection 和 deployment evidence 模板。
+- [x] 更新 production operations runbook，把 metrics endpoint 纳入 postflight。
+- [x] 不新增前端页面，不提前做最终视觉。
+
+仍保留不做：
+
+- [ ] 不接入 Prometheus/外部 metrics store。
+- [ ] 不接入正式 alerting。
+- [ ] 不推送远端分支或替项目 owner 设置 branch protection；远端状态仍需后续实际确认。
+
 ## Completed Backend B9.2 — 2026-07-14
 
 - [x] 新增 `npm run ops:backup-restore:docker`。
@@ -405,7 +421,8 @@
 - [x] PostgreSQL 备份、恢复演练和迁移 rollback/forward-fix 运行手册。
 - [x] readiness health、request id、结构化未捕获错误和基础安全 headers。
 - [x] 可配置最小 rate limit 与 CSRF origin check。
-- [ ] structured logging、metrics、alerts。
+- [x] structured request logging 与 metrics smoke endpoint。
+- [ ] external metrics store、log aggregation 和 alerts。
 - [ ] rate limit、CSRF 生产策略细化与多实例方案。
 - [ ] 数据保留、账户删除和隐私规则。
 - [ ] 小范围真实用户试用与问题回收。

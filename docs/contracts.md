@@ -54,12 +54,12 @@ PostgreSQL / memory repository
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
-| Error/Health | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema` |
+| Error/Health/Observability | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema`, `MetricsResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未实现 shared schema：
 
-- Production metrics/alert payload。
+- Production alert payload。
 
 ## Frozen V1 Semantics
 
@@ -161,6 +161,7 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 - `/api/health` 当前 response 固定为 `{ "ok": true, "service": "bkyexam-practice-api" }`。
 - `/api/health` 只代表 Fastify 进程可响应，不代表 PostgreSQL readiness。
 - `/api/health/readiness` 使用 `ReadinessResponseV1Schema`，固定 `api` 与 `database` dependency；database status 可为 `ok|disabled|down`，整体 `ok` 必须与 dependency 状态一致。
+- `/api/health/metrics` 使用 `MetricsResponseV1Schema`，固定 service、generatedAt、uptimeSeconds、process memory summary、HTTP totalRequests、status buckets、averageDurationMs 和 per-route counters；status bucket 之和必须等于 request count。
 
 ## Versioning Rules
 
@@ -192,7 +193,7 @@ npm run build:shared
 
 当前回归包括：
 
-- shared schema 的边界、Auth/Catalog/Error/Health、`false`、计数不变量和 legacy UUID 测试。
+- shared schema 的边界、Auth/Catalog/Error/Health/Metrics、`false`、计数不变量和 legacy UUID 测试。
 - Fastify route 对不合法 Practice/Wrongbook/Learning/Auth/Catalog payload fail-closed 的测试。
 - Web model 对空白文本、`false`、option answer 和 catalog item 类型的测试。
 - Playwright mock API 通过同一 Web runtime parser。
@@ -204,4 +205,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列和正式 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列、正式告警 payload 和正式 Admin UI 尚未实现。
