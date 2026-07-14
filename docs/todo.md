@@ -5,6 +5,20 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.8 Production Gate / Migration Runbook — 2026-07-15
+
+- [x] 新增 `npm run ops:production-gate`。
+- [x] 检查 `DATABASE_URL`、`USE_DATABASE`、`COOKIE_SECRET`、`COOKIE_SECURE`、rate limit、CSRF origin、legacy passwordless 开关。
+- [x] PostgreSQL 汇总学生身份迁移状态：password protected、legacy passwordless、reset required、locked。
+- [x] `legacyPasswordlessStudents > 0` 作为 production blocking failure。
+- [x] 新增 `docs/production-gate-runbook.md`，固定旧账号迁移步骤、exit code 和证据包。
+- [x] 测试覆盖 env gate、student migration summary、CLI exit code 和 pool cleanup。
+- [x] 不新增正式前端，不批量写入明文/临时密码。
+
+后续代码阶段：
+
+- [ ] B9.9 Legacy Student Password Migration Tool。
+
 ## Completed Backend B9.7 Password Login Enforcement — 2026-07-15
 
 - [x] shared v1 `AuthLoginRequestV1Schema` 正式要求 `password`。
@@ -16,10 +30,6 @@
 - [x] `POST /api/auth/password/change` 校验当前密码、写入新 hash、清空 `passwordResetRequired` 与失败/锁定状态。
 - [x] route/unit/shared/PostgreSQL integration 覆盖无密码默认失败、legacy 兼容、临时密码登录、改密与旧密码失效。
 - [x] 不新增正式前端，不删除旧账号或历史学习数据。
-
-后续代码阶段：
-
-- [ ] B9.8 Production Gate Hardening / Migration Runbook。
 
 ## Completed Backend B9.5 — 2026-07-15
 

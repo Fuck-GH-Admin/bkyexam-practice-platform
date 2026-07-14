@@ -28,7 +28,8 @@
     "typecheck:e2e": "tsc -p tests/e2e/tsconfig.json --noEmit",
     "verify": "npm run test && npm run typecheck && npm run build && npm run test:e2e",
     "verify:db": "npm run verify && npm run test:integration:db",
-    "verify:docker": "npm run verify && npm run test:integration:db:docker"
+    "verify:docker": "npm run verify && npm run test:integration:db:docker",
+    "ops:production-gate": "npm run ops:production-gate -w @bkyexam-practice/api --"
   },
   "engines": {
     "node": ">=24.0.0"

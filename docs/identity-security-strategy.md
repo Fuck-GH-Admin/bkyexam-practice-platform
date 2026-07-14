@@ -416,6 +416,27 @@ student_account:revoke_session
 - 密码错误写入 `failed_login_count` / `failed_login_window_started_at` / `locked_until`；成功登录或成功改密清空失败状态。
 - PostgreSQL integration 已覆盖无密码默认失败、临时密码登录、改密、旧密码失效和旧 session 后续重置撤销。
 
+### B9.8 — Production Gate / Migration Runbook
+
+状态：**已完成，2026-07-15。**
+
+目标：
+
+- 将身份生产发布门槛变成可执行命令。
+- 能审计旧无密码账号是否仍存在。
+- 固定旧账号临时密码迁移 runbook。
+
+已落地：
+
+- `npm run ops:production-gate` 检查 production env 与学生身份迁移状态。
+- `legacyPasswordlessStudents > 0` 作为 blocking failure。
+- `passwordResetRequiredStudents` 和 `lockedStudents` 作为 warning。
+- `docs/production-gate-runbook.md` 说明迁移步骤、证据包和 exit code。
+
+仍保留不做：
+
+- 不批量写入临时密码；后续 B9.9 单独做受控迁移工具。
+
 ## 10. 明确不做
 
 - 不做公网注册。

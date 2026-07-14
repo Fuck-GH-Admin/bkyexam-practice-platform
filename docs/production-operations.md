@@ -1,6 +1,6 @@
 # Production Operations Runbook
 
-状态日期：**2026-07-14**
+状态日期：**2026-07-15**
 
 本文记录 B9.2 的生产运维演练边界。它不是最终 SRE 手册；目标是在进入正式前端前，先把备份、恢复、迁移、部署验收和 CI 保护的最小可执行流程固定下来。
 
@@ -39,6 +39,22 @@ artifacts/ops/backup-restore-drill/<timestamp>/bkyexam_test.sql
 ```
 
 `artifacts/` 不提交 Git。该演练只验证 schema + 最小数据的可备份/可恢复能力，不替代生产数据量级恢复演练。
+
+## 1.1 Production Gate Smoke
+
+B9.8 新增生产发布 gate：
+
+```powershell
+npm run ops:production-gate
+```
+
+该命令检查生产 env、连接 `DATABASE_URL`，并汇总学生正式身份迁移状态。完整说明见 [`production-gate-runbook.md`](production-gate-runbook.md)。
+
+发布前至少保存一次完整 JSON report；仅审查 env 时可先用：
+
+```powershell
+npm run ops:production-gate -- --skip-db
+```
 
 ## 2. Production Backup Procedure
 
@@ -157,6 +173,7 @@ Release:
 Preflight:
   npm run verify:docker: PASS/FAIL
   npm run ops:backup-restore:docker: PASS/FAIL
+  npm run ops:production-gate: PASS/FAIL
   remote_ci: PASS/FAIL
   branch_protection_checked: YES/NO
   identity_security_strategy_checked: YES/NO

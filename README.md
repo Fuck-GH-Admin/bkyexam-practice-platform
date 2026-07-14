@@ -206,6 +206,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [题库映射](docs/mapping.md)
 - [部署](docs/deployment.md)
 - [生产运维演练](docs/production-operations.md)
+- [Production Gate 与旧账号迁移 Runbook](docs/production-gate-runbook.md)
 - [CI Gate / 部署证据模板](docs/ci-gate-evidence.md)
 - [路线图](docs/todo.md)
 

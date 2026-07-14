@@ -15,7 +15,8 @@
     "smoke:import:full": "tsx src/import/fullImportSmoke.ts",
     "admin:bootstrap": "tsx src/admin/bootstrapAdmin.ts",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:smoke": "tsx src/db/smoke.ts"
+    "db:smoke": "tsx src/db/smoke.ts",
+    "ops:production-gate": "tsx src/ops/productionGate.ts"
   },
   "dependencies": {
     "@bkyexam-practice/shared": "0.1.0",

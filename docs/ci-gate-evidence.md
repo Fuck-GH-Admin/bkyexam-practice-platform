@@ -15,17 +15,19 @@
 
 | Gate | Command | Expected result | Last local result |
 | --- | --- | --- | --- |
-| Shared build | `npm run build:shared` | PASS | B9.7 local PASS |
-| Shared contracts | `npm run test -w @bkyexam-practice/shared` | 2 files / 26 tests PASS | B9.7 local PASS |
-| API route/unit | `npm run test -w @bkyexam-practice/api` | 55 files / 407 tests PASS | B9.7 local PASS |
-| Typecheck | `npm run typecheck` | shared/api/web/e2e TS PASS | B9.7 local PASS |
-| Full repository gate | `npm run verify:docker` | 59 Vitest files / 464 tests + typecheck + build + 3 Playwright + 1 PostgreSQL integration PASS | B9.7 local PASS |
-| Backup restore drill | `npm run ops:backup-restore:docker` | 10 migrations + pg_dump + restore + count compare PASS | B9.7 local PASS |
+| Shared build | `npm run build:shared` | PASS | B9.8 local PASS |
+| Shared contracts | `npm run test -w @bkyexam-practice/shared` | 2 files / 26 tests PASS | B9.8 local PASS |
+| API route/unit | `npm run test -w @bkyexam-practice/api` | 56 files / 415 tests PASS | B9.8 local PASS |
+| Typecheck | `npm run typecheck` | shared/api/web/e2e TS PASS | B9.8 local PASS |
+| Full repository gate | `npm run verify:docker` | 60 Vitest files / 472 tests + typecheck + build + 3 Playwright + 1 PostgreSQL integration PASS | B9.8 local PASS |
+| Backup restore drill | `npm run ops:backup-restore:docker` | 10 migrations + pg_dump + restore + count compare PASS | B9.8 local PASS |
+| Production gate dry-run | `npm run ops:production-gate -- --skip-db` | JSON report and exit 0 with production-safe fixture env | B9.8 local PASS |
 
-B9.7 最新本地证据：
+B9.8 最新本地证据：
 
-- `npm run verify:docker`：通过，包含 shared 26、API 407、Web 31，共 464 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
+- `npm run verify:docker`：通过，包含 shared 26、API 415、Web 31，共 472 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
 - `npm run ops:backup-restore:docker`：通过，`0010_student_identity_security.sql` 已纳入 migration drill，source/restored count 一致。
+- `npm run ops:production-gate -- --skip-db`：在 production-safe fixture env 下通过；真实发布仍必须连接目标 `DATABASE_URL` 跑完整 gate。
 - Web build artifact：`dist/assets/index-9CEFB64M.js` 约 `320.47 kB`（gzip `92.79 kB`），CSS `dist/assets/index-CC2OWsF5.css` 约 `20.26 kB`（gzip `4.98 kB`）。
 
 ## 2. Remote CI Evidence Template

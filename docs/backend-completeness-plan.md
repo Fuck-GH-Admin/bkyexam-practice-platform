@@ -18,10 +18,10 @@
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 82%** | 单元、路由、PostgreSQL integration、Playwright 与完整导入 smoke 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
+| 后端工程可验证性 | **约 84%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke 与 production gate dry-run 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 78–82%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型和密码登录 enforcement 已落地，但全题型、管理前端、推荐策略和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 74%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型；仍缺外部监控告警、远端 CI/branch protection 实际确认、旧账号批量临时密码迁移 runbook 和正式部署验收。 |
+| 完整平台后端 | **约 79–83%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement 和生产 gate runbook 已落地，但全题型、管理前端、推荐策略和生产能力仍未完成。 |
+| 公开生产后端就绪 | **约 76%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移 runbook、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型；仍缺外部监控告警、远端 CI/branch protection 实际确认、旧账号批量临时密码写入自动化和正式部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -200,8 +200,8 @@
 已完成质量门：
 
 - `npm run verify:docker`
-- 464 Vitest
-- 407 API tests
+- 472 Vitest
+- 415 API tests
 - 31 Web tests
 - 26 Shared tests
 - 3 Playwright browser smoke
@@ -1299,28 +1299,59 @@ review_items
 - 不新增正式学生改密前端；前端仍应等后端语义和管理端信息架构稳定后再设计。
 - 不做公开注册、邮箱/短信找回、SSO、MFA、账号合并。
 - 不自动删除旧账号或历史 practice/wrongbook/learning 数据。
-- 不做旧账号批量临时密码迁移 CLI/runbook；该项可作为后续生产迁移准备。
+- 不做旧账号批量临时密码写入 CLI；B9.8 已补只读 production gate 和迁移 runbook。
 - 不做管理员登录失败锁定；该项留给更完整 Admin security hardening。
+
+### Phase B9.8 — Production Gate Hardening / Migration Runbook
+
+状态：**已完成，2026-07-15。**
+
+实际落地：
+
+- 新增 `npm run ops:production-gate` 根脚本和 API workspace 脚本。
+- 新增 `apps/api/src/ops/productionGate.ts`：
+  - 检查 `DATABASE_URL`、`USE_DATABASE`、`COOKIE_SECRET`、`COOKIE_SECURE`。
+  - 检查 `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED` 必须关闭。
+  - 检查 `RATE_LIMIT_ENABLED`、`CSRF_ORIGIN_CHECK_ENABLED` 和生产 HTTPS origins。
+  - 对残留 `ADMIN_BOOTSTRAP_*` 和 `ADMIN_IMPORT_ENABLE_WRITE=true` 给出 warning。
+  - 连接 PostgreSQL 汇总学生身份迁移状态。
+  - 对 `legacyPasswordlessStudents > 0` 输出 blocking failure。
+- 新增 `docs/production-gate-runbook.md`：
+  - production gate 命令、exit code、参数。
+  - env gate 表。
+  - 旧账号迁移流程。
+  - 发布前最小证据包。
+- `docs/production-operations.md`、`docs/deployment.md`、`docs/ci-gate-evidence.md`、`README.md` 已链接该 gate/runbook。
+- 新增 route/unit 风格的 ops tests，覆盖 env gate、PostgreSQL summary mapping、CLI exit code 和 pool cleanup。
+
+仍保留不做：
+
+- 不批量写入旧账号临时密码；当前工具只读审计和阻断。
+- 不输出或保存明文临时密码。
+- 不做管理员登录失败锁定。
+- 不做远端 CI/branch protection 实际确认。
+- 不做正式前端。
 
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.8 Production Gate Hardening / Migration Runbook**，把已经完成的正式学生身份能力接到公开生产前的运维与发布门槛上。
+> **B9.9 Legacy Student Password Migration Tool**，把 B9.8 只读 gate 发现的旧无密码账号，安全地迁移为“临时密码 + 强制改密”状态。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-chore: harden production gate documentation
+feat: add legacy student password migration tooling
 ```
 
 范围建议只包含：
 
-- 明确旧账号批量临时密码迁移 runbook：筛选无 `password_hash` 或需要 reset 的账号、批量设置临时密码、标记 `passwordResetRequired=true`、保留历史学习数据。
-- 补充生产环境 env checklist：`STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED=false`、Cookie secure、rate limit、CSRF allowed origins、backup/restore、admin bootstrap。
-- 将 `docs/ci-gate-evidence.md` 从模板推进为可执行验收表，记录本地 gate、Docker gate、备份恢复 drill 和远端 CI/branch protection 待确认项。
-- 评估是否先做 Admin 登录失败锁定与登录 route 细分 rate limit；若范围过大，拆成 B9.9。
-- 本阶段仍不做正式前端；前端设计应等管理端 command/query、身份迁移和生产 gate 更稳定后再进入审核。
+- 增加只对 `password_hash IS NULL` 学生生效的受控迁移 CLI。
+- 默认 dry-run，必须显式 `--apply` 才写库。
+- 每个迁移学生写入 password hash、`passwordResetRequired=true`，清空失败/锁定状态，并可撤销 session。
+- 输出操作结果和账号清单，但不把明文临时密码写入 audit log、文档或 Git；明文交付策略需单独确认。
+- 覆盖 unit + PostgreSQL integration。
+- 本阶段仍不做正式前端。
 
 不做：
 
@@ -1328,12 +1359,13 @@ chore: harden production gate documentation
 - 不改正式 UI
 - 不开放 public 管理员注册
 - 不开放 public 学生注册
+- 不实现邮箱/短信找回
 - 不改 true import reset gate；reset/队列化另设阶段
 - 不改学生端业务语义
 - 不引入微服务
 - 不引入复杂消息队列
 
-这样可以先把“正式身份后端”变成可迁移、可验收、可部署的生产候选，再考虑管理端 UI 与学生端正式前端。
+这样可以把“生产 gate 发现问题”推进到“可安全执行迁移”，再考虑 Admin 登录安全 hardening、远端 CI/branch protection 和正式前端。
 
 ## 7. 阶段提交规则
 
@@ -1350,6 +1382,6 @@ chore: harden production gate documentation
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警、旧账号迁移 runbook 和远端 CI/branch protection 实际确认。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI 与旧账号迁移 runbook 已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警、旧账号批量临时密码写入自动化和远端 CI/branch protection 实际确认。**
 
-最合理的下一步是继续后端闭环：做 B9.8 production gate hardening / migration runbook；正式前端仍应等管理后端 command/query、身份迁移和生产 gate 稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：做 B9.9 legacy student password migration tool；正式前端仍应等管理端 command/query、身份迁移和生产 gate 稳定后再进入设计实现。
