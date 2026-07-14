@@ -50,7 +50,7 @@ PostgreSQL / memory repository
 | Practice session collection | `PracticeSessionCardV1Schema`, `PracticeSessionPageV1Schema`, `ListPracticeSessionsRequestV1Schema` |
 | Legacy Practice submit | `PracticeSubmitAnswerResponseV1Schema`, `SubmitPracticeAnswerRequestV1Schema` |
 | Wrongbook | `WrongQuestionItemV1Schema`, `WrongQuestionDetailV1Schema`, list/detail/review/mastered response schemas |
-| Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, `LearningGoalsResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend/goal/feedback stat schemas |
+| Learning | `LearningDashboardResponseV1Schema`, `LearningTrendsResponseV1Schema`, `LearningGoalsResponseV1Schema`, `LearningReviewMarkListResponseV1Schema`, `LearningReviewMarkResponseV1Schema`, summary/recent-bank/question-type/wrongbook/trend/goal/feedback/review-mark schemas |
 | Auth | `AuthStudentV1Schema`, login/me/logout response schemas |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
@@ -138,6 +138,9 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 - `LearningGoalsResponseV1Schema` 固定三类目标：daily attempts、weekly active days、wrongbook review；目标可为 `null`，此时对应 progress `remaining` 必须为 `null` 且 `completed=false`。
 - goal progress 中 `current/target/completed/remaining` 必须自洽；已判定/正确 attempt 仍遵循 dashboard/trends 的计数不变量。
 - `feedback` 只允许枚举化 signal type/severity/action，避免前端依赖任意字符串策略。
+- `LearningReviewMarkV1Schema` 固定收藏/长期复习标记：`favorite` 与 `longTermReview` 至少一个必须为 `true`。
+- review mark 列表按 `updatedAt DESC, id DESC` 返回摘要，分页固定 `limit/offset/hasMore`，`limit` 范围为 `1..50`。
+- review mark upsert request 允许大小写 UUID；`source` 只允许 `manual|practice_review|wrongbook`，`note` 最长 500 字符。
 
 ### Auth
 

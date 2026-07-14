@@ -101,7 +101,7 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 当前缺失：
 
 - 账户说明、身份安全和数据归属提示。
-- 学习统计后端概览、趋势、目标与错题复习反馈信号已具备；仍缺前端呈现、推荐策略和长期进步反馈。
+- 学习统计后端概览、趋势、目标、错题复习反馈信号、题目收藏和长期复习标记已具备；仍缺前端呈现、推荐策略和更完整长期进步反馈。
 - active session 的归档/放弃操作与超过首屏 20 条时的“更多”交互。
 
 ### Student State Machines
@@ -260,10 +260,11 @@ mastered -> active  # 再次答错时自动恢复
 - 学习概览统计 contract。
 - 学习趋势与 activity streak contract。
 - 学习目标与错题复习反馈 contract。
-- 最近题库、题型正确率、错题掌握摘要、UTC 日期桶趋势、目标进度。
+- 题目收藏/长期复习标记 contract。
+- 最近题库、题型正确率、错题掌握摘要、UTC 日期桶趋势、目标进度、长期复习标记列表。
 
 当前再练 session 已通过 `WrongQuestionService -> PracticeSessionService` 创建；Wrongbook repository 不直接写 Practice 表。
-当前学习概览、趋势、目标进度和反馈通过 `LearningDashboardRepository` 从 Practice/Wrongbook 事实表聚合；目标设置由 `student_learning_goals` 持久化，但 Learning 不直接拥有 session 生命周期。
+当前学习概览、趋势、目标进度和反馈通过 `LearningDashboardRepository` 从 Practice/Wrongbook 事实表聚合；目标设置由 `student_learning_goals` 持久化，题目收藏/长期复习标记由 `question_bookmarks` 持久化，但 Learning 不直接拥有 session 生命周期。
 
 ### Import
 
@@ -303,6 +304,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 /api/banks/*
 /api/practice/*
 /api/wrong-questions/*
+/api/learning/*
 /api/admin/*
 ```
 
@@ -314,7 +316,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook/Learning 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、Learning Dashboard/Trends/Goals、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate、Admin Question Review、Admin Audit Log、通用 error 已迁入 shared v1；reset import、异步队列和正式 Admin UI 尚未实现。
+- Auth、Catalog、Learning Dashboard/Trends/Goals/Review Marks、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate、Admin Question Review、Admin Audit Log、通用 error 已迁入 shared v1；reset import、异步队列和正式 Admin UI 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision

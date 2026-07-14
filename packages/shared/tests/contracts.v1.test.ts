@@ -36,8 +36,13 @@ import {
   GetLearningTrendsRequestV1Schema,
   LearningDashboardResponseV1Schema,
   LearningGoalsResponseV1Schema,
+  LearningReviewMarkListResponseV1Schema,
+  LearningReviewMarkResponseV1Schema,
   LearningTrendsResponseV1Schema,
+  ListLearningReviewMarksRequestV1Schema,
   UpdateLearningGoalsRequestV1Schema,
+  UpsertLearningReviewMarkRequestV1Schema,
+  DeleteLearningReviewMarkResponseV1Schema,
   CreatePracticeSessionRequestV1Schema,
   ListPracticeSessionsRequestV1Schema,
   PRACTICE_COMPLETED_COUNT_SEMANTICS_V1,
@@ -54,6 +59,7 @@ const bankId = '10000000-0000-4000-8000-000000000001';
 const sessionId = '20000000-0000-4000-8000-000000000001';
 const questionId = '30000000-0000-4000-8000-000000000001';
 const wrongQuestionId = '40000000-0000-4000-8000-000000000001';
+const reviewMarkId = '80000000-0000-4000-8000-000000000001';
 
 describe('v1 auth/catalog/error/health contracts', () => {
   it('parses auth responses with optional student ids and strict logout success', () => {
@@ -196,7 +202,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
   it('parses admin system status contracts', () => {
     const status = AdminSystemStatusResponseV1Schema.parse({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-        database: { ok: true, migrationCount: 8, currentMigration: '0008_student_learning_goals.sql' },
+      database: { ok: true, migrationCount: 9, currentMigration: '0009_question_bookmarks.sql' },
       corpus: {
         classifications: 2941,
         questions: 89922,
@@ -221,7 +227,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
       },
     });
 
-    expect(status.database.currentMigration).toBe('0008_student_learning_goals.sql');
+    expect(status.database.currentMigration).toBe('0009_question_bookmarks.sql');
     expect(() => AdminSystemStatusResponseV1Schema.parse({
       ...status,
       corpus: { ...status.corpus, questions: -1 },
@@ -743,6 +749,69 @@ describe('v1 auth/catalog/error/health contracts', () => {
     })).toThrow('remaining must be null when target is null');
     expect(() => UpdateLearningGoalsRequestV1Schema.parse({ dailyAttemptsTarget: 0 })).toThrow();
     expect(() => UpdateLearningGoalsRequestV1Schema.parse({})).toThrow('At least one learning goal change is required');
+  });
+
+  it('parses learning review mark contracts for favorites and long-term review', () => {
+    expect(ListLearningReviewMarksRequestV1Schema.parse({
+      bankId: bankId.toUpperCase(),
+      kind: 'favorite',
+      limit: '10',
+      offset: '5',
+    })).toEqual({
+      bankId: bankId.toUpperCase(),
+      kind: 'favorite',
+      limit: 10,
+      offset: 5,
+    });
+
+    const request = UpsertLearningReviewMarkRequestV1Schema.parse({
+      questionId: questionId.toUpperCase(),
+      bankId,
+      favorite: true,
+      note: '长期复习',
+    });
+    expect(request).toEqual({
+      questionId: questionId.toUpperCase(),
+      bankId,
+      favorite: true,
+      longTermReview: false,
+      note: '长期复习',
+      source: 'manual',
+    });
+
+    const reviewMark = {
+      id: reviewMarkId,
+      questionId,
+      bankId,
+      bankName: '数据库测试题库',
+      subjectCategory: '质量保障',
+      subjectName: 'PostgreSQL',
+      questionType: 'multiple_choice',
+      contentPreview: '以下哪些属于 ACID 属性？',
+      favorite: true,
+      longTermReview: true,
+      note: '长期复习',
+      source: 'manual',
+      createdAt: '2026-07-14T10:00:00.000Z',
+      updatedAt: '2026-07-14T10:05:00.000Z',
+    };
+
+    expect(LearningReviewMarkResponseV1Schema.parse({ reviewMark }).reviewMark.longTermReview).toBe(true);
+    expect(LearningReviewMarkListResponseV1Schema.parse({
+      reviewMarks: [reviewMark],
+      page: { limit: 10, offset: 0, hasMore: false },
+    }).reviewMarks[0]?.id).toBe(reviewMarkId);
+    expect(DeleteLearningReviewMarkResponseV1Schema.parse({ success: true })).toEqual({ success: true });
+    expect(() => UpsertLearningReviewMarkRequestV1Schema.parse({
+      questionId,
+      bankId,
+      favorite: false,
+      longTermReview: false,
+    })).toThrow('At least one review mark flag must be true');
+    expect(() => LearningReviewMarkResponseV1Schema.parse({
+      reviewMark: { ...reviewMark, favorite: false, longTermReview: false },
+    })).toThrow('review mark must be favorite or longTermReview');
+    expect(() => ListLearningReviewMarksRequestV1Schema.parse({ kind: 'favorite', limit: '51' })).toThrow();
   });
 });
 

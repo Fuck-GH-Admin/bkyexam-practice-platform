@@ -5,6 +5,18 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B7.4 — 2026-07-14
+
+- [x] 新增 migration `0009_question_bookmarks.sql`。
+- [x] 新增 shared v1 Learning Review Mark schema。
+- [x] 实现 `GET /api/learning/review-marks`，支持 `bankId`、`kind`、`limit/offset`。
+- [x] 实现 `PUT /api/learning/review-marks`，支持题目收藏、长期复习标记、note/source 和 upsert。
+- [x] 实现 `DELETE /api/learning/review-marks/:id`，保持学生 ownership boundary。
+- [x] 实现 memory/PostgreSQL Learning review marks repository。
+- [x] route fail-closed 覆盖不合法 review mark response。
+- [x] PostgreSQL integration 覆盖创建、列表过滤、学生隔离、持久化和删除。
+- [x] 不新增前端页面，不提前做最终视觉。
+
 ## Completed Backend B7.3 — 2026-07-14
 
 - [x] 新增 migration `0008_student_learning_goals.sql`。
@@ -328,7 +340,7 @@
 - [x] 练习历史和历史结果回看。
 - [x] 错题再练反馈后端信号。
 - [ ] 更细的错题掌握规则与错因模型。
-- [ ] 题目收藏/存疑长期化是否需要独立模型。
+- [x] 题目收藏/存疑长期化独立模型。
 - [x] 基础学习统计后端：练习次数、正确率、错题摘要。
 - [x] 最近使用题库后端，不先做复杂算法。
 - [x] 周期趋势和 activity streak 后端 API。

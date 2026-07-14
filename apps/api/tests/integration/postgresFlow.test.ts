@@ -129,7 +129,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 8, currentMigration: '0008_student_learning_goals.sql' },
+      database: { ok: true, migrationCount: 9, currentMigration: '0009_question_bookmarks.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -1352,6 +1352,96 @@ describe('PostgreSQL-backed API integration', () => {
         AND wrong_questions_review_target = 1
     `, [aliceId]);
     expect(learningGoalState.rows[0]).toEqual({ goal_count: '1' });
+
+    const createdReviewMark = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/review-marks',
+      headers: { cookie: aliceCookie },
+      payload: {
+        questionId: fixtureIds.questions.multipleWrong,
+        bankId: fixtureIds.bank,
+        favorite: true,
+        longTermReview: true,
+        note: 'Review ACID question again.',
+        source: 'manual',
+      },
+    });
+    expect(createdReviewMark.statusCode).toBe(200);
+    expect(createdReviewMark.json()).toMatchObject({
+      reviewMark: {
+        id: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        questionId: fixtureIds.questions.multipleWrong,
+        bankId: fixtureIds.bank,
+        bankName: '数据库集成测试题库',
+        subjectCategory: '质量保障',
+        subjectName: 'PostgreSQL',
+        questionType: 'multiple_choice',
+        contentPreview: expect.stringContaining('ACID'),
+        favorite: true,
+        longTermReview: true,
+        note: 'Review ACID question again.',
+        source: 'manual',
+        createdAt: expect.any(String),
+        updatedAt: expect.any(String),
+      },
+    });
+    const reviewMarkId = createdReviewMark.json().reviewMark.id as string;
+
+    const listedReviewMarks = await app.inject({
+      method: 'GET',
+      url: '/api/learning/review-marks?kind=long_term_review&limit=10&offset=0',
+      headers: { cookie: aliceCookie },
+    });
+    expect(listedReviewMarks.statusCode).toBe(200);
+    expect(listedReviewMarks.json()).toMatchObject({
+      reviewMarks: [expect.objectContaining({
+        id: reviewMarkId,
+        questionId: fixtureIds.questions.multipleWrong,
+        longTermReview: true,
+      })],
+      page: { limit: 10, offset: 0, hasMore: false },
+    });
+
+    const bobReviewMarks = await app.inject({
+      method: 'GET',
+      url: '/api/learning/review-marks',
+      headers: { cookie: bobCookie },
+    });
+    expect(bobReviewMarks.statusCode).toBe(200);
+    expect(bobReviewMarks.json()).toEqual({
+      reviewMarks: [],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    const bookmarkState = await pool.query<{ bookmark_count: string }>(`
+      SELECT COUNT(*) AS bookmark_count
+      FROM question_bookmarks
+      WHERE student_id = $1
+        AND question_id = $2
+        AND bank_id = $3
+        AND favorite = true
+        AND long_term_review = true
+    `, [aliceId, fixtureIds.questions.multipleWrong, fixtureIds.bank]);
+    expect(bookmarkState.rows[0]).toEqual({ bookmark_count: '1' });
+
+    const deletedReviewMark = await app.inject({
+      method: 'DELETE',
+      url: `/api/learning/review-marks/${reviewMarkId}`,
+      headers: { cookie: aliceCookie },
+    });
+    expect(deletedReviewMark.statusCode).toBe(200);
+    expect(deletedReviewMark.json()).toEqual({ success: true });
+
+    const afterDeleteReviewMarks = await app.inject({
+      method: 'GET',
+      url: '/api/learning/review-marks',
+      headers: { cookie: aliceCookie },
+    });
+    expect(afterDeleteReviewMarks.statusCode).toBe(200);
+    expect(afterDeleteReviewMarks.json()).toEqual({
+      reviewMarks: [],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
 
     const logout = await app.inject({
       method: 'POST',

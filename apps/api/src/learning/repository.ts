@@ -1,4 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import type {
+  LearningReviewMarkKindV1,
+  LearningReviewMarkListResponseV1,
+  LearningReviewMarkSourceV1,
+  LearningReviewMarkV1,
   LearningDashboardResponseV1,
   LearningFeedbackSignalV1,
   LearningGoalSettingsV1,
@@ -11,6 +16,7 @@ import type {
   LearningTrendsResponseV1,
   LearningWrongbookSummaryV1,
   UpdateLearningGoalsRequestV1,
+  UpsertLearningReviewMarkRequestV1,
 } from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
 
@@ -34,6 +40,22 @@ export interface LearningDashboardRepository {
     goals: UpdateLearningGoalsRequestV1;
     now?: Date;
   }): Promise<LearningGoalsResponseV1>;
+  listReviewMarks(input: {
+    studentId: string;
+    bankId?: string;
+    kind: LearningReviewMarkKindV1;
+    limit: number;
+    offset: number;
+  }): Promise<LearningReviewMarkListResponseV1>;
+  upsertReviewMark(input: {
+    studentId: string;
+    mark: UpsertLearningReviewMarkRequestV1;
+    now?: Date;
+  }): Promise<LearningReviewMarkV1 | null>;
+  deleteReviewMark(input: {
+    studentId: string;
+    id: string;
+  }): Promise<boolean>;
 }
 
 interface QueryRows<T> {
@@ -52,11 +74,13 @@ export function createMemoryLearningDashboardRepository(
   dashboards: Record<string, MemoryDashboard> = {},
   trends: Record<string, MemoryTrends> = {},
   goals: Record<string, LearningGoalSettingsV1> = {},
+  reviewMarks: Array<LearningReviewMarkV1 & { studentId: string }> = [],
 ): LearningDashboardRepository {
   const goalSettingsByStudent = new Map(Object.entries(goals).map(([studentId, settings]) => [
     studentId,
     cloneGoalSettings(settings),
   ]));
+  const marks = reviewMarks.map((mark) => ({ ...mark }));
 
   return {
     async getDashboard({ studentId, recentLimit, now = new Date() }) {
@@ -101,6 +125,65 @@ export function createMemoryLearningDashboardRepository(
       goalSettingsByStudent.set(studentId, cloneGoalSettings(updated));
 
       return buildLearningGoalsResponse(updated, emptyGoalActivityFacts(now), now);
+    },
+    async listReviewMarks({ studentId, bankId, kind, limit, offset }) {
+      const filtered = marks
+        .filter((mark) => mark.studentId === studentId)
+        .filter((mark) => !bankId || mark.bankId === toLowerUuid(bankId))
+        .filter((mark) => kind === 'all'
+          || (kind === 'favorite' && mark.favorite)
+          || (kind === 'long_term_review' && mark.longTermReview))
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id));
+      const page = filtered.slice(offset, offset + limit + 1);
+
+      return {
+        reviewMarks: page.slice(0, limit).map(({ studentId: _studentId, ...mark }) => ({ ...mark })),
+        page: { limit, offset, hasMore: page.length > limit },
+      };
+    },
+    async upsertReviewMark({ studentId, mark, now = new Date() }) {
+      const existing = marks.find((candidate) => (
+        candidate.studentId === studentId
+        && candidate.questionId === toLowerUuid(mark.questionId)
+        && candidate.bankId === toLowerUuid(mark.bankId)
+      ));
+      const timestamp = now.toISOString();
+      if (existing) {
+        existing.favorite = mark.favorite;
+        existing.longTermReview = mark.longTermReview;
+        existing.note = mark.note;
+        existing.source = mark.source;
+        existing.updatedAt = timestamp;
+        const { studentId: _studentId, ...updated } = existing;
+        return { ...updated };
+      }
+
+      const created: LearningReviewMarkV1 & { studentId: string } = {
+        studentId,
+        id: randomUUID(),
+        questionId: toLowerUuid(mark.questionId),
+        bankId: toLowerUuid(mark.bankId),
+        bankName: 'Unknown Bank',
+        subjectCategory: 'Unknown',
+        subjectName: 'Unknown',
+        questionType: 'unknown',
+        contentPreview: '',
+        favorite: mark.favorite,
+        longTermReview: mark.longTermReview,
+        note: mark.note,
+        source: mark.source,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      marks.push(created);
+      const { studentId: _studentId, ...reviewMark } = created;
+      return { ...reviewMark };
+    },
+    async deleteReviewMark({ studentId, id }) {
+      const index = marks.findIndex((mark) => mark.studentId === studentId && mark.id === toLowerUuid(id));
+      if (index < 0) return false;
+      marks.splice(index, 1);
+      return true;
     },
   };
 }
@@ -192,6 +275,23 @@ interface GoalActivityFacts {
   wrongQuestionsReviewedToday: number;
 }
 
+interface ReviewMarkRow {
+  id: string;
+  question_id: string;
+  bank_id: string;
+  bank_name: string | null;
+  subject_category: string | null;
+  subject_name: string | null;
+  normalized_type: LearningReviewMarkV1['questionType'] | null;
+  content_preview: string | null;
+  favorite: boolean;
+  long_term_review: boolean;
+  note: string | null;
+  source: LearningReviewMarkSourceV1;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
 export function createPgLearningDashboardRepository(client: QueryClient): LearningDashboardRepository {
   return {
     async getDashboard({ studentId, recentLimit, now = new Date() }) {
@@ -241,6 +341,15 @@ export function createPgLearningDashboardRepository(client: QueryClient): Learni
       const facts = await loadGoalActivityFacts(client, studentId, now);
 
       return buildLearningGoalsResponse(settings, facts, now);
+    },
+    async listReviewMarks({ studentId, bankId, kind, limit, offset }) {
+      return loadReviewMarks(client, { studentId, bankId, kind, limit, offset });
+    },
+    async upsertReviewMark({ studentId, mark, now = new Date() }) {
+      return upsertReviewMark(client, studentId, mark, now);
+    },
+    async deleteReviewMark({ studentId, id }) {
+      return deleteReviewMark(client, studentId, id);
     },
   };
 }
@@ -701,6 +810,181 @@ async function loadGoalActivityFacts(
   return mapGoalActivityRow(result.rows[0], now);
 }
 
+async function loadReviewMarks(
+  client: QueryClient,
+  input: {
+    studentId: string;
+    bankId?: string;
+    kind: LearningReviewMarkKindV1;
+    limit: number;
+    offset: number;
+  },
+): Promise<LearningReviewMarkListResponseV1> {
+  const params: unknown[] = [input.studentId, input.limit + 1, input.offset];
+  const filters = ['question_bookmarks.student_id = $1'];
+
+  if (input.bankId) {
+    params.push(input.bankId);
+    filters.push(`question_bookmarks.bank_id = $${params.length}`);
+  }
+  if (input.kind === 'favorite') {
+    filters.push('question_bookmarks.favorite = true');
+  }
+  if (input.kind === 'long_term_review') {
+    filters.push('question_bookmarks.long_term_review = true');
+  }
+
+  const result = (await client.query(
+    `
+      SELECT
+        question_bookmarks.id,
+        question_bookmarks.question_id,
+        question_bookmarks.bank_id,
+        COALESCE(bank_mappings.bank_name, question_bookmarks.bank_id::text) AS bank_name,
+        COALESCE(bank_mappings.subject_category, 'Unknown') AS subject_category,
+        COALESCE(bank_mappings.subject_name, 'Unknown') AS subject_name,
+        questions.normalized_type,
+        LEFT(regexp_replace(COALESCE(questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
+        question_bookmarks.favorite,
+        question_bookmarks.long_term_review,
+        question_bookmarks.note,
+        question_bookmarks.source,
+        question_bookmarks.created_at,
+        question_bookmarks.updated_at
+      FROM question_bookmarks
+      JOIN questions ON questions.id = question_bookmarks.question_id
+      LEFT JOIN bank_mappings ON bank_mappings.bank_id = question_bookmarks.bank_id
+      WHERE ${filters.join(' AND ')}
+      ORDER BY question_bookmarks.updated_at DESC, question_bookmarks.id DESC
+      LIMIT $2 OFFSET $3
+    `,
+    params,
+  )) as QueryRows<ReviewMarkRow>;
+  const rows = result.rows.slice(0, input.limit);
+
+  return {
+    reviewMarks: rows.map(mapReviewMarkRow),
+    page: {
+      limit: input.limit,
+      offset: input.offset,
+      hasMore: result.rows.length > input.limit,
+    },
+  };
+}
+
+async function upsertReviewMark(
+  client: QueryClient,
+  studentId: string,
+  mark: UpsertLearningReviewMarkRequestV1,
+  now: Date,
+): Promise<LearningReviewMarkV1 | null> {
+  const result = (await client.query(
+    `
+      WITH RECURSIVE bank_tree AS (
+        SELECT id
+        FROM classifications
+        WHERE id = $3
+
+        UNION ALL
+
+        SELECT classifications.id
+        FROM classifications
+        JOIN bank_tree ON classifications.parent_id = bank_tree.id
+      ),
+      valid_question AS (
+        SELECT questions.id
+        FROM questions
+        WHERE questions.id = $2
+          AND questions.classification_id IN (SELECT id FROM bank_tree)
+        LIMIT 1
+      ),
+      upserted AS (
+        INSERT INTO question_bookmarks (
+          student_id,
+          question_id,
+          bank_id,
+          favorite,
+          long_term_review,
+          note,
+          source,
+          created_at,
+          updated_at
+        )
+        SELECT
+          $1,
+          valid_question.id,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $8
+        FROM valid_question
+        ON CONFLICT (student_id, question_id, bank_id) DO UPDATE SET
+          favorite = EXCLUDED.favorite,
+          long_term_review = EXCLUDED.long_term_review,
+          note = EXCLUDED.note,
+          source = EXCLUDED.source,
+          updated_at = EXCLUDED.updated_at
+        RETURNING
+          id,
+          question_id,
+          bank_id,
+          favorite,
+          long_term_review,
+          note,
+          source,
+          created_at,
+          updated_at
+      )
+      SELECT
+        upserted.id,
+        upserted.question_id,
+        upserted.bank_id,
+        COALESCE(bank_mappings.bank_name, upserted.bank_id::text) AS bank_name,
+        COALESCE(bank_mappings.subject_category, 'Unknown') AS subject_category,
+        COALESCE(bank_mappings.subject_name, 'Unknown') AS subject_name,
+        questions.normalized_type,
+        LEFT(regexp_replace(COALESCE(questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
+        upserted.favorite,
+        upserted.long_term_review,
+        upserted.note,
+        upserted.source,
+        upserted.created_at,
+        upserted.updated_at
+      FROM upserted
+      JOIN questions ON questions.id = upserted.question_id
+      LEFT JOIN bank_mappings ON bank_mappings.bank_id = upserted.bank_id
+    `,
+    [
+      studentId,
+      mark.questionId,
+      mark.bankId,
+      mark.favorite,
+      mark.longTermReview,
+      mark.note,
+      mark.source,
+      now.toISOString(),
+    ],
+  )) as QueryRows<ReviewMarkRow>;
+
+  return result.rows[0] ? mapReviewMarkRow(result.rows[0]) : null;
+}
+
+async function deleteReviewMark(client: QueryClient, studentId: string, id: string): Promise<boolean> {
+  const result = (await client.query(
+    `
+      DELETE FROM question_bookmarks
+      WHERE student_id = $1
+        AND id = $2
+    `,
+    [studentId, id],
+  )) as { rowCount?: number | null };
+
+  return (result.rowCount ?? 0) > 0;
+}
+
 function emptyDashboard(): MemoryDashboard {
   return {
     summary: {
@@ -870,6 +1154,25 @@ function mapGoalActivityRow(row: GoalActivityRow | undefined, now: Date): GoalAc
     masteredWrongQuestions: toCount(row.mastered_wrong_questions),
     pendingWrongQuestions: toCount(row.pending_wrong_questions),
     wrongQuestionsReviewedToday: toCount(row.wrong_questions_reviewed_today),
+  };
+}
+
+function mapReviewMarkRow(row: ReviewMarkRow): LearningReviewMarkV1 {
+  return {
+    id: row.id,
+    questionId: row.question_id,
+    bankId: row.bank_id,
+    bankName: row.bank_name ?? row.bank_id,
+    subjectCategory: row.subject_category ?? 'Unknown',
+    subjectName: row.subject_name ?? 'Unknown',
+    questionType: row.normalized_type ?? 'unknown',
+    contentPreview: row.content_preview ?? '',
+    favorite: row.favorite,
+    longTermReview: row.long_term_review,
+    note: row.note ?? '',
+    source: row.source,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
   };
 }
 
@@ -1055,6 +1358,10 @@ function toIso(value: Date | string): string {
 
 function toIsoOrNull(value: Date | string | null): string | null {
   return value ? toIso(value) : null;
+}
+
+function toLowerUuid(value: string): string {
+  return value.toLowerCase();
 }
 
 function toUtcDateKey(value: Date): string {

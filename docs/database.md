@@ -284,6 +284,46 @@ Wrong-question review screens do not duplicate question content into `wrong_ques
 
 Wrong-question review sessions reuse the existing practice session tables. Creating a review session inserts an active `practice_sessions` row with `mode = 'sequential'` and `origin = 'wrongbook'`, locks the selected wrong-question IDs into `practice_session_questions`, and then serves the session through the normal practice retrieval route. A separate practice mode is not required; origin records the creation purpose without changing grading behavior.
 
+### `student_learning_goals`
+
+Stores per-student learning goal settings used by Learning goals API.
+
+- `student_id`: PK and FK to `students.id`, deleted when the student is deleted.
+- `daily_attempts_target`: nullable target for today's attempt count, constrained to `1..500`.
+- `weekly_active_days_target`: nullable target for active days in the current 7-day window, constrained to `1..7`.
+- `wrong_questions_review_target`: nullable target for wrong-question review count, constrained to `1..100`.
+- `created_at`, `updated_at`: goal setting timestamps.
+
+Indexes:
+
+- `student_learning_goals_updated_at_idx` on `updated_at DESC`.
+
+Learning goal progress is not precomputed into this table. The API combines saved targets with current facts from `practice_sessions`, `practice_attempts`, and `wrong_questions`.
+
+### `question_bookmarks`
+
+Stores student-owned question review marks for favorites and long-term review.
+
+- `id`: UUID primary key.
+- `student_id`: FK to `students.id`, deleted when the student is deleted.
+- `question_id`: FK to `questions.id`.
+- `bank_id`: FK to `classifications.id`.
+- `favorite`: whether the student explicitly saved the question as a favorite.
+- `long_term_review`: whether the student wants the question in a long-term review queue.
+- `note`: optional student note.
+- `source`: `manual`, `practice_review`, or `wrongbook`.
+- `created_at`, `updated_at`: mark timestamps.
+
+Indexes and constraints:
+
+- Unique `(student_id, question_id, bank_id)` so one student has one mark row per question/bank pair.
+- `CHECK (favorite = true OR long_term_review = true)` prevents empty mark rows.
+- `question_bookmarks_student_updated_at_idx` on `(student_id, updated_at DESC, id DESC)` for stable recent mark lists.
+- `question_bookmarks_student_bank_idx` on `(student_id, bank_id, updated_at DESC, id DESC)` for bank-scoped lists.
+- `question_bookmarks_question_id_idx` on `question_id`.
+
+Review mark list screens join `questions` and `bank_mappings` to return question type, content preview, and bank labels without duplicating full question content into `question_bookmarks`.
+
 ## Migrations
 
 `apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the initial Drizzle schema. It creates imported content, mapping, student, attempt, and wrong-question tables.
@@ -302,6 +342,8 @@ Wrong-question review sessions reuse the existing practice session tables. Creat
 
 `apps/api/src/db/migrations/0008_student_learning_goals.sql` adds per-student learning goal settings. It creates `student_learning_goals` with bounded nullable targets for daily attempts, weekly active days, and wrong-question review goals.
 
+`apps/api/src/db/migrations/0009_question_bookmarks.sql` adds per-question learning review marks. It creates `question_bookmarks` with favorite/long-term-review flags, source/note metadata, per-student uniqueness, and indexes for recent and bank-scoped review mark lists.
+
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
 Run API migrations with:
@@ -319,7 +361,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all eight migrations, including Admin foundation, Import Jobs, Question Review flags, and Student Learning Goals, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-14 all nine migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, and Question Bookmarks, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
 
 ## Isolated Integration Profile
 

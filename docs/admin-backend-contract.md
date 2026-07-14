@@ -1308,8 +1308,8 @@ B5.1 到 B5.9 已实现；进入正式 Admin UI 前仍需要确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report/true import gate、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成，下一步应转入学生学习记录/统计后端，或补生产安全/运维前置项：
+当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report/true import gate、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成；学生 Learning Dashboard/Trends/Goals/Review Marks 后端也已完成。下一步应补生产安全/运维前置项：
 
-> **Student Learning Record And Statistics**
+> **Production Backend Readiness**
 
-这会把最小可运营闭环从“后端 command/query 与导入写入可用”继续推进到“学生学习数据可长期沉淀”，同时保持正式前端最后设计。
+这会把最小可运营闭环从“后端 command/query、导入写入与学生学习数据可用”继续推进到“可部署、可监控、可恢复”，同时保持正式前端最后设计。

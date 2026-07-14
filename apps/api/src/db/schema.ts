@@ -241,6 +241,35 @@ export const students = pgTable('students', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const studentLearningGoals = pgTable(
+  'student_learning_goals',
+  {
+    studentId: uuid('student_id')
+      .primaryKey()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    dailyAttemptsTarget: integer('daily_attempts_target'),
+    weeklyActiveDaysTarget: integer('weekly_active_days_target'),
+    wrongQuestionsReviewTarget: integer('wrong_questions_review_target'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('student_learning_goals_updated_at_idx').on(table.updatedAt.desc()),
+    check(
+      'student_learning_goals_daily_attempts_target_check',
+      sql`${table.dailyAttemptsTarget} IS NULL OR ${table.dailyAttemptsTarget} BETWEEN 1 AND 500`,
+    ),
+    check(
+      'student_learning_goals_weekly_active_days_target_check',
+      sql`${table.weeklyActiveDaysTarget} IS NULL OR ${table.weeklyActiveDaysTarget} BETWEEN 1 AND 7`,
+    ),
+    check(
+      'student_learning_goals_wrong_questions_review_target_check',
+      sql`${table.wrongQuestionsReviewTarget} IS NULL OR ${table.wrongQuestionsReviewTarget} BETWEEN 1 AND 100`,
+    ),
+  ],
+);
+
 export const studentSessions = pgTable(
   'student_sessions',
   {
@@ -409,5 +438,48 @@ export const wrongQuestions = pgTable(
       table.questionId,
       table.bankId,
     ),
+  ],
+);
+
+export const questionBookmarks = pgTable(
+  'question_bookmarks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    studentId: uuid('student_id')
+      .notNull()
+      .references(() => students.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id),
+    bankId: uuid('bank_id')
+      .notNull()
+      .references(() => classifications.id),
+    favorite: boolean('favorite').notNull().default(false),
+    longTermReview: boolean('long_term_review').notNull().default(false),
+    note: text('note').notNull().default(''),
+    source: text('source').notNull().default('manual'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('question_bookmarks_student_updated_at_idx').on(
+      table.studentId,
+      table.updatedAt.desc(),
+      table.id.desc(),
+    ),
+    index('question_bookmarks_student_bank_idx').on(
+      table.studentId,
+      table.bankId,
+      table.updatedAt.desc(),
+      table.id.desc(),
+    ),
+    index('question_bookmarks_question_id_idx').on(table.questionId),
+    uniqueIndex('question_bookmarks_student_question_bank_unique_idx').on(
+      table.studentId,
+      table.questionId,
+      table.bankId,
+    ),
+    check('question_bookmarks_flag_check', sql`${table.favorite} = true OR ${table.longTermReview} = true`),
+    check('question_bookmarks_source_check', sql`${table.source} IN ('manual', 'practice_review', 'wrongbook')`),
   ],
 );

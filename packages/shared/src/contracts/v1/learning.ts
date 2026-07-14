@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { QuestionTypeSchema } from '../../question.js';
-import { CanonicalUuidV1Schema } from './common.js';
+import { CanonicalUuidV1Schema, CaseInsensitiveUuidV1Schema } from './common.js';
 
 const IsoTimestampV1Schema = z.string().datetime({ offset: true });
 
@@ -449,3 +449,81 @@ export const UpdateLearningGoalsRequestV1Schema = z.object({
   message: 'At least one learning goal change is required',
 });
 export type UpdateLearningGoalsRequestV1 = z.infer<typeof UpdateLearningGoalsRequestV1Schema>;
+
+export const LearningReviewMarkKindV1Schema = z.enum(['all', 'favorite', 'long_term_review']);
+export type LearningReviewMarkKindV1 = z.infer<typeof LearningReviewMarkKindV1Schema>;
+
+export const LearningReviewMarkSourceV1Schema = z.enum(['manual', 'practice_review', 'wrongbook']);
+export type LearningReviewMarkSourceV1 = z.infer<typeof LearningReviewMarkSourceV1Schema>;
+
+export const LearningReviewMarkV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  questionId: CanonicalUuidV1Schema,
+  bankId: CanonicalUuidV1Schema,
+  bankName: z.string().min(1),
+  subjectCategory: z.string().min(1),
+  subjectName: z.string().min(1),
+  questionType: QuestionTypeSchema,
+  contentPreview: z.string(),
+  favorite: z.boolean(),
+  longTermReview: z.boolean(),
+  note: z.string(),
+  source: LearningReviewMarkSourceV1Schema,
+  createdAt: IsoTimestampV1Schema,
+  updatedAt: IsoTimestampV1Schema,
+}).strict().superRefine((mark, context) => {
+  if (!mark.favorite && !mark.longTermReview) {
+    context.addIssue({
+      code: 'custom',
+      message: 'review mark must be favorite or longTermReview',
+      path: ['favorite'],
+    });
+  }
+});
+export type LearningReviewMarkV1 = z.infer<typeof LearningReviewMarkV1Schema>;
+
+export const ListLearningReviewMarksRequestV1Schema = z.object({
+  bankId: CaseInsensitiveUuidV1Schema.optional(),
+  kind: LearningReviewMarkKindV1Schema.default('all'),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+}).strict();
+export type ListLearningReviewMarksRequestV1 = z.infer<typeof ListLearningReviewMarksRequestV1Schema>;
+
+export const LearningReviewMarkListResponseV1Schema = z.object({
+  reviewMarks: z.array(LearningReviewMarkV1Schema),
+  page: z.object({
+    limit: z.number().int().min(1).max(50),
+    offset: z.number().int().nonnegative(),
+    hasMore: z.boolean(),
+  }).strict(),
+}).strict();
+export type LearningReviewMarkListResponseV1 = z.infer<typeof LearningReviewMarkListResponseV1Schema>;
+
+export const UpsertLearningReviewMarkRequestV1Schema = z.object({
+  questionId: CaseInsensitiveUuidV1Schema,
+  bankId: CaseInsensitiveUuidV1Schema,
+  favorite: z.boolean().default(false),
+  longTermReview: z.boolean().default(false),
+  note: z.string().max(500).default(''),
+  source: LearningReviewMarkSourceV1Schema.default('manual'),
+}).strict().superRefine((request, context) => {
+  if (!request.favorite && !request.longTermReview) {
+    context.addIssue({
+      code: 'custom',
+      message: 'At least one review mark flag must be true',
+      path: ['favorite'],
+    });
+  }
+});
+export type UpsertLearningReviewMarkRequestV1 = z.infer<typeof UpsertLearningReviewMarkRequestV1Schema>;
+
+export const LearningReviewMarkResponseV1Schema = z.object({
+  reviewMark: LearningReviewMarkV1Schema,
+}).strict();
+export type LearningReviewMarkResponseV1 = z.infer<typeof LearningReviewMarkResponseV1Schema>;
+
+export const DeleteLearningReviewMarkResponseV1Schema = z.object({
+  success: z.literal(true),
+}).strict();
+export type DeleteLearningReviewMarkResponseV1 = z.infer<typeof DeleteLearningReviewMarkResponseV1Schema>;

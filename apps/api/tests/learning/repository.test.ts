@@ -13,16 +13,24 @@ interface RecordedQuery {
 class FakeQueryClient implements QueryClient {
   queries: RecordedQuery[] = [];
 
-  constructor(private readonly rows: unknown[][] = []) {}
+  constructor(
+    private readonly rows: unknown[][] = [],
+    private readonly rowCounts: Array<number | null | undefined> = [],
+  ) {}
 
   async query(sql: string, params?: readonly unknown[]) {
     this.queries.push({ sql, params });
-    return { rows: this.rows.shift() ?? [] };
+    return {
+      rows: this.rows.shift() ?? [],
+      rowCount: this.rowCounts.shift(),
+    };
   }
 }
 
 const studentId = '50000000-0000-4000-8000-000000000001';
 const bankId = '10000000-0000-4000-8000-000000000001';
+const questionId = '20000000-0000-4000-8000-000000000002';
+const reviewMarkId = '80000000-0000-4000-8000-000000000001';
 
 describe('learning dashboard repositories', () => {
   it('returns empty memory dashboard defaults for students without activity', async () => {
@@ -148,6 +156,64 @@ describe('learning dashboard repositories', () => {
       completed: false,
       remaining: null,
     });
+  });
+
+  it('lists, updates, and deletes memory review marks per student', async () => {
+    const repository = createMemoryLearningDashboardRepository({}, {}, {}, [
+      { studentId, ...sampleReviewMark() },
+      {
+        studentId: '50000000-0000-4000-8000-000000000099',
+        ...sampleReviewMark({
+          id: '80000000-0000-4000-8000-000000000099',
+          updatedAt: '2026-07-14T10:10:00.000Z',
+        }),
+      },
+    ]);
+
+    const initial = await repository.listReviewMarks({
+      studentId,
+      bankId,
+      kind: 'long_term_review',
+      limit: 1,
+      offset: 0,
+    });
+
+    expect(initial).toMatchObject({
+      reviewMarks: [{ id: reviewMarkId, questionId, bankId, longTermReview: true }],
+      page: { limit: 1, offset: 0, hasMore: false },
+    });
+
+    const updated = await repository.upsertReviewMark({
+      studentId,
+      mark: {
+        questionId: questionId.toUpperCase(),
+        bankId: bankId.toUpperCase(),
+        favorite: true,
+        longTermReview: false,
+        note: 'favorite only',
+        source: 'wrongbook',
+      },
+      now: new Date('2026-07-14T10:30:00.000Z'),
+    });
+    expect(updated).toMatchObject({
+      id: reviewMarkId,
+      questionId,
+      bankId,
+      favorite: true,
+      longTermReview: false,
+      note: 'favorite only',
+      source: 'wrongbook',
+      updatedAt: '2026-07-14T10:30:00.000Z',
+    });
+
+    await expect(repository.deleteReviewMark({ studentId, id: reviewMarkId.toUpperCase() })).resolves.toBe(true);
+    await expect(repository.deleteReviewMark({ studentId, id: reviewMarkId })).resolves.toBe(false);
+    await expect(repository.listReviewMarks({
+      studentId,
+      kind: 'all',
+      limit: 20,
+      offset: 0,
+    })).resolves.toEqual({ reviewMarks: [], page: { limit: 20, offset: 0, hasMore: false } });
   });
 
   it('maps PostgreSQL aggregate rows into learning dashboard counters', async () => {
@@ -498,4 +564,167 @@ describe('learning dashboard repositories', () => {
       '2026-07-14T10:05:00.000Z',
     ]);
   });
+
+  it('lists PostgreSQL review marks with bank and kind filters', async () => {
+    const client = new FakeQueryClient([
+      [
+        sampleReviewMarkRow({ updated_at: new Date('2026-07-14T10:30:00.000Z') }),
+        sampleReviewMarkRow({
+          id: '80000000-0000-4000-8000-000000000002',
+          question_id: '20000000-0000-4000-8000-000000000003',
+          updated_at: new Date('2026-07-14T10:20:00.000Z'),
+        }),
+      ],
+    ]);
+    const repository = createPgLearningDashboardRepository(client);
+
+    const marks = await repository.listReviewMarks({
+      studentId,
+      bankId,
+      kind: 'favorite',
+      limit: 1,
+      offset: 0,
+    });
+
+    expect(marks).toMatchObject({
+      reviewMarks: [{
+        id: reviewMarkId,
+        questionId,
+        bankId,
+        bankName: '数据库测试题库',
+        subjectCategory: '质量保障',
+        subjectName: 'PostgreSQL',
+        questionType: 'multiple_choice',
+        contentPreview: '以下哪些属于 ACID 属性？',
+        favorite: true,
+        longTermReview: true,
+        note: 'review ACID',
+        source: 'manual',
+        createdAt: '2026-07-14T10:00:00.000Z',
+        updatedAt: '2026-07-14T10:30:00.000Z',
+      }],
+      page: { limit: 1, offset: 0, hasMore: true },
+    });
+    expect(client.queries).toHaveLength(1);
+    expect(client.queries[0]?.sql).toContain('FROM question_bookmarks');
+    expect(client.queries[0]?.sql).toContain('question_bookmarks.favorite = true');
+    expect(client.queries[0]?.params).toEqual([studentId, 2, 0, bankId]);
+  });
+
+  it('upserts and deletes PostgreSQL review marks', async () => {
+    const client = new FakeQueryClient([
+      [sampleReviewMarkRow({ note: 'review again', updated_at: new Date('2026-07-14T10:45:00.000Z') })],
+      [],
+    ], [undefined, 1]);
+    const repository = createPgLearningDashboardRepository(client);
+
+    const mark = await repository.upsertReviewMark({
+      studentId,
+      mark: {
+        questionId,
+        bankId,
+        favorite: true,
+        longTermReview: true,
+        note: 'review again',
+        source: 'manual',
+      },
+      now: new Date('2026-07-14T10:45:00.000Z'),
+    });
+
+    expect(mark).toMatchObject({
+      id: reviewMarkId,
+      questionId,
+      bankId,
+      favorite: true,
+      longTermReview: true,
+      note: 'review again',
+      updatedAt: '2026-07-14T10:45:00.000Z',
+    });
+    expect(client.queries[0]?.sql).toContain('WITH RECURSIVE bank_tree AS');
+    expect(client.queries[0]?.sql).toContain('ON CONFLICT (student_id, question_id, bank_id) DO UPDATE');
+    expect(client.queries[0]?.params).toEqual([
+      studentId,
+      questionId,
+      bankId,
+      true,
+      true,
+      'review again',
+      'manual',
+      '2026-07-14T10:45:00.000Z',
+    ]);
+
+    await expect(repository.deleteReviewMark({ studentId, id: reviewMarkId })).resolves.toBe(true);
+    expect(client.queries[1]?.sql).toContain('DELETE FROM question_bookmarks');
+    expect(client.queries[1]?.params).toEqual([studentId, reviewMarkId]);
+  });
 });
+
+function sampleReviewMark(overrides: Partial<{
+  id: string;
+  questionId: string;
+  bankId: string;
+  bankName: string;
+  subjectCategory: string;
+  subjectName: string;
+  questionType: 'multiple_choice';
+  contentPreview: string;
+  favorite: boolean;
+  longTermReview: boolean;
+  note: string;
+  source: 'manual' | 'practice_review' | 'wrongbook';
+  createdAt: string;
+  updatedAt: string;
+}> = {}) {
+  return {
+    id: reviewMarkId,
+    questionId,
+    bankId,
+    bankName: '数据库测试题库',
+    subjectCategory: '质量保障',
+    subjectName: 'PostgreSQL',
+    questionType: 'multiple_choice' as const,
+    contentPreview: '以下哪些属于 ACID 属性？',
+    favorite: true,
+    longTermReview: true,
+    note: 'review ACID',
+    source: 'manual' as const,
+    createdAt: '2026-07-14T10:00:00.000Z',
+    updatedAt: '2026-07-14T10:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function sampleReviewMarkRow(overrides: Partial<{
+  id: string;
+  question_id: string;
+  bank_id: string;
+  bank_name: string;
+  subject_category: string;
+  subject_name: string;
+  normalized_type: 'multiple_choice';
+  content_preview: string;
+  favorite: boolean;
+  long_term_review: boolean;
+  note: string;
+  source: 'manual' | 'practice_review' | 'wrongbook';
+  created_at: Date;
+  updated_at: Date;
+}> = {}) {
+  return {
+    id: reviewMarkId,
+    question_id: questionId,
+    bank_id: bankId,
+    bank_name: '数据库测试题库',
+    subject_category: '质量保障',
+    subject_name: 'PostgreSQL',
+    normalized_type: 'multiple_choice' as const,
+    content_preview: '以下哪些属于 ACID 属性？',
+    favorite: true,
+    long_term_review: true,
+    note: 'review ACID',
+    source: 'manual' as const,
+    created_at: new Date('2026-07-14T10:00:00.000Z'),
+    updated_at: new Date('2026-07-14T10:00:00.000Z'),
+    ...overrides,
+  };
+}

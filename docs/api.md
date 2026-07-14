@@ -841,8 +841,8 @@ Response：
   },
   "database": {
     "ok": true,
-    "migrationCount": 8,
-    "currentMigration": "0008_student_learning_goals.sql"
+    "migrationCount": 9,
+    "currentMigration": "0009_question_bookmarks.sql"
   },
   "corpus": {
     "classifications": 2941,
@@ -1260,7 +1260,7 @@ Response：
 
 ## Learning
 
-所有 Learning 路由需要认证。当前不新增统计表，直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合，作为学生首页/档案页后续可用的数据 contract。
+所有 Learning 路由需要认证。概览/趋势/目标进度直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合；长期复习标记使用 `question_bookmarks` 持久化。它们共同作为学生首页/档案页后续可用的数据 contract。
 
 ### `GET /api/learning/dashboard`
 
@@ -1561,6 +1561,95 @@ Errors：
 - `400`：body 无效。
 - `401`：缺少有效 `bky_session`。
 
+### `GET /api/learning/review-marks`
+
+列出当前学生收藏或长期复习标记过的题目。该接口只返回题目摘要，不返回完整题干、选项或解析；完整复盘仍应走 Practice/Wrongbook 详情链路。
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `bankId` | UUID | optional |
+| `kind` | `all|favorite|long_term_review` | `all` |
+| `limit` | integer 1..50 | 20 |
+| `offset` | integer >= 0 | 0 |
+
+Response：
+
+```json
+{
+  "reviewMarks": [
+    {
+      "id": "bookmark-uuid",
+      "questionId": "question-uuid",
+      "bankId": "bank-uuid",
+      "bankName": "数据库集成测试题库",
+      "subjectCategory": "质量保障",
+      "subjectName": "PostgreSQL",
+      "questionType": "multiple_choice",
+      "contentPreview": "以下哪些属于 ACID 属性？",
+      "favorite": true,
+      "longTermReview": true,
+      "note": "Review ACID question again.",
+      "source": "manual",
+      "createdAt": "2026-07-14T10:00:00.000Z",
+      "updatedAt": "2026-07-14T10:05:00.000Z"
+    }
+  ],
+  "page": {
+    "limit": 20,
+    "offset": 0,
+    "hasMore": false
+  }
+}
+```
+
+### `PUT /api/learning/review-marks`
+
+Upsert 当前学生对某题的收藏/长期复习标记。`questionId` 必须属于 `bankId` 指向的题库或其后代分类；同一学生、题目、题库只保留一条标记。
+
+Request：
+
+```json
+{
+  "questionId": "question-uuid",
+  "bankId": "bank-uuid",
+  "favorite": true,
+  "longTermReview": true,
+  "note": "Review ACID question again.",
+  "source": "manual"
+}
+```
+
+Rules：
+
+- `favorite` 和 `longTermReview` 至少一个必须为 `true`。
+- `source` 允许 `manual|practice_review|wrongbook`，默认 `manual`。
+- `note` 最长 500 字符，默认空字符串。
+- 返回体与列表 item 同形，包在 `{ "reviewMark": ... }` 中。
+
+Errors：
+
+- `400`：body 无效，或两个标记都为 `false`。
+- `401`：缺少有效 `bky_session`。
+- `404`：题目不属于该题库或不存在。
+
+### `DELETE /api/learning/review-marks/:id`
+
+删除当前学生的一条收藏/长期复习标记。
+
+Response：
+
+```json
+{ "success": true }
+```
+
+Errors：
+
+- `400`：`:id` 不是 UUID。
+- `401`：缺少有效 `bky_session`。
+- `404`：标记不存在，或不属于当前学生。
+
 ## Wrongbook
 
 所有 Wrongbook 路由需要认证。
@@ -1690,7 +1779,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，但 reset import、异步队列、取消/重试仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

@@ -38,6 +38,7 @@ export async function resetAndSeedPostgresFixture(client: QueryClient) {
       practice_sessions,
       student_sessions,
       student_learning_goals,
+      question_bookmarks,
       wrong_questions,
       practice_attempts,
       question_options,

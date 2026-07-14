@@ -7,6 +7,8 @@ type SessionService = ReturnType<typeof createSessionService>;
 
 const studentId = 'student-1';
 const bankId = '10000000-0000-4000-8000-000000000001';
+const questionId = '20000000-0000-4000-8000-000000000002';
+const reviewMarkId = '80000000-0000-4000-8000-000000000001';
 
 function fakeLoggedInSessionService(): SessionService {
   return {
@@ -19,6 +21,21 @@ function fakeLoggedInSessionService(): SessionService {
     async revokeSession() {},
   };
 }
+
+const unusedReviewMarkMethods: Pick<
+LearningDashboardRepository,
+'listReviewMarks' | 'upsertReviewMark' | 'deleteReviewMark'
+> = {
+  async listReviewMarks() {
+    throw new Error('not used by this learning route test');
+  },
+  async upsertReviewMark() {
+    throw new Error('not used by this learning route test');
+  },
+  async deleteReviewMark() {
+    throw new Error('not used by this learning route test');
+  },
+};
 
 describe('learning dashboard routes', () => {
   it('requires a student session', async () => {
@@ -89,6 +106,7 @@ describe('learning dashboard routes', () => {
       async updateGoals() {
         throw new Error('not used by dashboard route test');
       },
+      ...unusedReviewMarkMethods,
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -217,6 +235,7 @@ describe('learning dashboard routes', () => {
       async updateGoals() {
         throw new Error('not used by trends route test');
       },
+      ...unusedReviewMarkMethods,
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -276,6 +295,7 @@ describe('learning dashboard routes', () => {
         });
         return sampleGoalsResponse('student', input.goals.dailyAttemptsTarget ?? 3);
       },
+      ...unusedReviewMarkMethods,
     };
     const app = buildApp({
       sessionService: fakeLoggedInSessionService(),
@@ -325,6 +345,208 @@ describe('learning dashboard routes', () => {
       { kind: 'get', studentId },
       { kind: 'update', studentId, dailyAttemptsTarget: 2 },
     ]);
+  });
+
+  it('returns typed review marks and forwards list filters', async () => {
+    const requests: Array<{
+      studentId: string;
+      bankId?: string;
+      kind: string;
+      limit: number;
+      offset: number;
+    }> = [];
+    const repository: LearningDashboardRepository = {
+      async getDashboard() {
+        throw new Error('not used by review mark list route test');
+      },
+      async getTrends() {
+        throw new Error('not used by review mark list route test');
+      },
+      async getGoals() {
+        throw new Error('not used by review mark list route test');
+      },
+      async updateGoals() {
+        throw new Error('not used by review mark list route test');
+      },
+      async listReviewMarks(input) {
+        requests.push(input);
+        return {
+          reviewMarks: [sampleReviewMark()],
+          page: { limit: input.limit, offset: input.offset, hasMore: false },
+        };
+      },
+      async upsertReviewMark() {
+        throw new Error('not used by review mark list route test');
+      },
+      async deleteReviewMark() {
+        throw new Error('not used by review mark list route test');
+      },
+    };
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: repository,
+    });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/learning/review-marks?bankId=${bankId.toUpperCase()}&kind=favorite&limit=10&offset=0`,
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      reviewMarks: [{
+        id: reviewMarkId,
+        questionId,
+        bankId,
+        bankName: '数据库测试题库',
+        questionType: 'multiple_choice',
+        favorite: true,
+        longTermReview: true,
+        note: 'review ACID',
+        source: 'manual',
+      }],
+      page: { limit: 10, offset: 0, hasMore: false },
+    });
+    expect(requests).toEqual([{
+      studentId,
+      bankId: bankId.toUpperCase(),
+      kind: 'favorite',
+      limit: 10,
+      offset: 0,
+    }]);
+  });
+
+  it('upserts and deletes review marks for the logged-in student', async () => {
+    const requests: Array<{ kind: 'upsert' | 'delete'; studentId: string; note?: string; id?: string }> = [];
+    const repository: LearningDashboardRepository = {
+      async getDashboard() {
+        throw new Error('not used by review mark write route test');
+      },
+      async getTrends() {
+        throw new Error('not used by review mark write route test');
+      },
+      async getGoals() {
+        throw new Error('not used by review mark write route test');
+      },
+      async updateGoals() {
+        throw new Error('not used by review mark write route test');
+      },
+      async listReviewMarks() {
+        throw new Error('not used by review mark write route test');
+      },
+      async upsertReviewMark(input) {
+        requests.push({ kind: 'upsert', studentId: input.studentId, note: input.mark.note });
+        return {
+          ...sampleReviewMark(),
+          note: input.mark.note,
+          favorite: input.mark.favorite,
+          longTermReview: input.mark.longTermReview,
+          source: input.mark.source,
+        };
+      },
+      async deleteReviewMark(input) {
+        requests.push({ kind: 'delete', studentId: input.studentId, id: input.id });
+        return true;
+      },
+    };
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: repository,
+    });
+
+    const upsert = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/review-marks',
+      headers: { cookie: 'bky_session=token' },
+      payload: {
+        questionId,
+        bankId,
+        favorite: true,
+        longTermReview: true,
+        note: 'review ACID again',
+      },
+    });
+    expect(upsert.statusCode).toBe(200);
+    expect(upsert.json()).toMatchObject({
+      reviewMark: {
+        id: reviewMarkId,
+        questionId,
+        bankId,
+        favorite: true,
+        longTermReview: true,
+        note: 'review ACID again',
+        source: 'manual',
+      },
+    });
+
+    const deleted = await app.inject({
+      method: 'DELETE',
+      url: `/api/learning/review-marks/${reviewMarkId}`,
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ success: true });
+    expect(requests).toEqual([
+      { kind: 'upsert', studentId, note: 'review ACID again' },
+      { kind: 'delete', studentId, id: reviewMarkId },
+    ]);
+  });
+
+  it('rejects invalid review mark payloads and fails closed on invalid review mark responses', async () => {
+    const app = buildApp({
+      sessionService: fakeLoggedInSessionService(),
+      learningRepository: {
+        async getDashboard() {
+          throw new Error('not used by review mark validation test');
+        },
+        async getTrends() {
+          throw new Error('not used by review mark validation test');
+        },
+        async getGoals() {
+          throw new Error('not used by review mark validation test');
+        },
+        async updateGoals() {
+          throw new Error('not used by review mark validation test');
+        },
+        async listReviewMarks() {
+          return {
+            reviewMarks: [{
+              ...sampleReviewMark(),
+              favorite: false,
+              longTermReview: false,
+            }],
+            page: { limit: 20, offset: 0, hasMore: false },
+          };
+        },
+        async upsertReviewMark() {
+          return sampleReviewMark();
+        },
+        async deleteReviewMark() {
+          return true;
+        },
+      },
+    });
+
+    const invalidRequest = await app.inject({
+      method: 'PUT',
+      url: '/api/learning/review-marks',
+      headers: { cookie: 'bky_session=token' },
+      payload: {
+        questionId,
+        bankId,
+        favorite: false,
+        longTermReview: false,
+      },
+    });
+    expect(invalidRequest.statusCode).toBe(400);
+
+    const invalidResponse = await app.inject({
+      method: 'GET',
+      url: '/api/learning/review-marks',
+      headers: { cookie: 'bky_session=token' },
+    });
+    expect(invalidResponse.statusCode).toBe(500);
   });
 
   it('rejects invalid query and fails closed on invalid repository payloads', async () => {
@@ -516,4 +738,23 @@ function sampleGoalsResponse(source: 'default' | 'student', dailyAttemptsTarget 
       },
     ],
   };
+}
+
+function sampleReviewMark() {
+  return {
+    id: reviewMarkId,
+    questionId,
+    bankId,
+    bankName: '数据库测试题库',
+    subjectCategory: '质量保障',
+    subjectName: 'PostgreSQL',
+    questionType: 'multiple_choice',
+    contentPreview: '以下哪些属于 ACID 属性？',
+    favorite: true,
+    longTermReview: true,
+    note: 'review ACID',
+    source: 'manual',
+    createdAt: '2026-07-14T10:00:00.000Z',
+    updatedAt: '2026-07-14T10:00:00.000Z',
+  } as const;
 }

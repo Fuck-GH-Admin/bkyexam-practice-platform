@@ -93,4 +93,21 @@ describe('initial database migration', () => {
     expect(sql).toContain('wrong_questions_review_target BETWEEN 1 AND 100');
     expect(sql).toContain('student_learning_goals_updated_at_idx');
   });
+
+  it('creates per-question review marks for favorites and long-term review', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0009_question_bookmarks.sql'), 'utf8');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS question_bookmarks');
+    expect(sql).toContain('student_id uuid NOT NULL REFERENCES students(id) ON DELETE CASCADE');
+    expect(sql).toContain('question_id uuid NOT NULL REFERENCES questions(id)');
+    expect(sql).toContain('bank_id uuid NOT NULL REFERENCES classifications(id)');
+    expect(sql).toContain('favorite boolean NOT NULL DEFAULT false');
+    expect(sql).toContain('long_term_review boolean NOT NULL DEFAULT false');
+    expect(sql).toContain("source text NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'practice_review', 'wrongbook'))");
+    expect(sql).toContain('CHECK (favorite = true OR long_term_review = true)');
+    expect(sql).toContain('UNIQUE (student_id, question_id, bank_id)');
+    expect(sql).toContain('question_bookmarks_student_updated_at_idx');
+    expect(sql).toContain('question_bookmarks_student_bank_idx');
+    expect(sql).toContain('question_bookmarks_question_id_idx');
+  });
 });
