@@ -9,8 +9,9 @@
 - 本地质量门以 `npm run verify:docker` 为准。
 - 本地 PostgreSQL 备份恢复演练以 `npm run ops:backup-restore:docker` 为准。
 - B9.11 新增 `npm run ops:deployment-evidence`，可以生成 deployment evidence 模板并对完整证据执行 production-ready 校验。
-- 远端 GitHub Actions 首次验收和 branch protection 仍需在分支推送/PR 创建后由项目 owner 记录。
-- 在远端 CI 与 branch protection 未确认前，不应把当前后端状态视为公开生产可发布。
+- B9.12 已推送 `codex/practice-platform-stabilization`，并完成 GitHub Actions `Quality` 首次远端验收。
+- `main` branch protection / required checks 仍未启用，PR 仍未创建，目标环境 production gate / deployment smoke / 性能压测证据仍缺失。
+- 因此当前只适合继续 staging/远端验证；不应把当前后端状态视为公开生产可发布。
 
 ## 1. Current Local Gate Evidence
 
@@ -26,7 +27,7 @@
 | Legacy student password migration tests | `npm run test -w @bkyexam-practice/api -- legacyStudentPasswordMigration` | dry-run/apply/credential output/CLI transaction PASS | B9.9 local PASS |
 | Deployment evidence CLI | `npm run ops:deployment-evidence -- --template` | JSON evidence template PASS | B9.11 local PASS |
 
-B9.9/B9.10 最新本地证据：
+B9.9/B9.10/B9.11 最新本地证据：
 
 - `npm run verify:docker`：通过，包含 shared 26、API 431、Web 31，共 488 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
 - `npm run ops:backup-restore:docker`：通过，`0011_admin_identity_security.sql` 已纳入 migration drill，source/restored count 一致。
@@ -35,25 +36,29 @@ B9.9/B9.10 最新本地证据：
 - `npm run ops:deployment-evidence -- --template`：通过，可生成待填写 production deployment evidence JSON。
 - Web build artifact：`dist/assets/index-9CEFB64M.js` 约 `320.47 kB`（gzip `92.79 kB`），CSS `dist/assets/index-CC2OWsF5.css` 约 `20.26 kB`（gzip `4.98 kB`）。
 
-## 1.1 B9.11 Remote Audit Snapshot
+## 1.1 B9.12 Remote Publication Snapshot
 
-2026-07-15 通过 `gh` 与远端 Git 查询得到：
+2026-07-15 在用户确认后推送当前工作分支，并通过 `gh` 与远端 Git 查询得到：
 
 | Item | Result |
 | --- | --- |
 | Repository | `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform` |
 | Default branch | `main` |
-| Last remote push | `2026-07-07T04:21:20Z` |
-| Remote `codex/practice-platform-stabilization` branch | not found |
-| Remote workflows | none listed |
-| Remote workflow runs | none listed |
-| `main` branch protection | not protected |
+| Remote branch | `codex/practice-platform-stabilization` exists |
+| Remote branch commit | `96f0dc090adb44dba21ba65354af823cafd48d44` |
+| Remote workflow | `Quality` active, workflow id `313324672`, path `.github/workflows/quality.yml` |
+| Workflow run | `29373386558`, success, `2026-07-14T22:33:35Z` -> `2026-07-14T22:35:03Z` |
+| Workflow run URL | `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558` |
+| Job `quality` | success, `2026-07-14T22:33:37Z` -> `2026-07-14T22:35:02Z`, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558/job/87221554824` |
+| Job `postgres-integration` | success, `2026-07-14T22:33:39Z` -> `2026-07-14T22:34:15Z`, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558/job/87221554819` |
+| Pull request | none for `codex/practice-platform-stabilization` |
+| `main` branch protection | not protected; GitHub API returned `Branch not protected` |
 
-结论：B9.11 已把远端阻断项明确化，但当前仍 **不能** 视为公开生产可发布。需要后续推送分支/PR、让 remote CI 首次跑绿，并由项目 owner 设置 branch protection / required checks。
+结论：远端 CI 首次验收已对 commit `96f0dc0` 跑绿，`remote CI absent` 不再是当前分支的 blocker。当前仍 **不能** 视为公开生产可发布，因为 branch protection / required checks、PR review、目标环境 production gate、deployment smoke、外部监控与性能压测证据仍未闭环。
 
 ## 2. Remote CI Evidence Template
 
-> 远端仓库当前已存在 `.github/workflows/quality.yml`，包含 `quality` 与 `postgres-integration` jobs。以下信息需在 push/PR 后补齐。
+> 远端仓库当前已存在 `.github/workflows/quality.yml`，包含 `quality` 与 `postgres-integration` jobs。B9.12 首次远端运行见上方快照；后续每个 release candidate 都应重新填写以下模板，以最新 commit 的 run 为准。
 
 ```yaml
 remote_ci_evidence:

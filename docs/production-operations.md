@@ -242,11 +242,11 @@ curl -fsS http://127.0.0.1:3000/api/health/metrics
 - 默认分支禁止直接 push。
 - PR 需要至少一次 review 或由项目 owner 明确豁免。
 
-该项当前仍需推送分支/PR 后完成。B9.11 已新增本地证据校验：
+该项已在 B9.12 完成当前工作分支的首次远端 CI 验收，但 release 前仍需 PR/branch protection/required checks 证据。B9.11 已新增本地证据校验：
 
 ```powershell
 npm run ops:deployment-evidence -- --template
 npm run ops:deployment-evidence -- --evidence=artifacts/production-evidence/deployment-evidence.json --require-ready
 ```
 
-B9.11 远端审计显示：当前远端没有 `codex/practice-platform-stabilization` 分支、没有 workflow runs，且 `main` branch protection 未启用。因此当前不能公开生产发布。可填写模板见 [`ci-gate-evidence.md`](ci-gate-evidence.md)，完整证据 runbook 见 [`production-deployment-evidence.md`](production-deployment-evidence.md)。
+B9.12 远端验证显示：`codex/practice-platform-stabilization` 已推送，GitHub Actions `Quality` run `29373386558` 通过，`quality` 与 `postgres-integration` jobs 均 success；但当前没有 PR，且 `main` branch protection 未启用。因此当前不能公开生产发布。可填写模板见 [`ci-gate-evidence.md`](ci-gate-evidence.md)，完整证据 runbook 见 [`production-deployment-evidence.md`](production-deployment-evidence.md)。

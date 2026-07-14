@@ -5,6 +5,20 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
+
+- [x] 推送 `codex/practice-platform-stabilization` 到 `origin`。
+- [x] 远端分支 commit `96f0dc090adb44dba21ba65354af823cafd48d44` 已触发 GitHub Actions。
+- [x] `Quality` workflow run `29373386558` 通过。
+- [x] `quality` job 通过。
+- [x] `postgres-integration` job 通过。
+- [x] `docs/ci-gate-evidence.md` 和 `docs/production-deployment-evidence.md` 已记录远端验证证据。
+- [x] 未创建 PR，未修改 `main` branch protection，未声明公开生产可发布。
+
+后续代码阶段：
+
+- [ ] B9.13 Branch Protection / Staging Production Gate Evidence（需要用户确认是否创建 PR、配置分支保护、以及提供/确定 staging/prod-like 目标环境）。
+
 ## Completed Backend B9.11 Production Deployment Evidence / Remote CI Closure — 2026-07-15
 
 - [x] 新增 `npm run ops:deployment-evidence`。
@@ -13,10 +27,6 @@
 - [x] 新增 `docs/production-deployment-evidence.md`。
 - [x] 更新 `docs/ci-gate-evidence.md`，记录当前远端审计：远端工作分支不存在、workflow/runs 为空、`main` 未启用 branch protection。
 - [x] 不擅自推送远端分支、不擅自创建 PR、不擅自修改 branch protection。
-
-后续代码阶段：
-
-- [ ] B9.12 Remote Publication / PR CI Run（需要用户确认是否推送/开 PR）。
 
 ## Completed Backend B9.9/B9.10 Identity Migration And Admin Security — 2026-07-15
 
@@ -104,7 +114,8 @@
 
 - [ ] 不接入 Prometheus/外部 metrics store。
 - [ ] 不接入正式 alerting。
-- [ ] 不推送远端分支或替项目 owner 设置 branch protection；远端状态仍需后续实际确认。
+- [x] 已在 B9.12 推送远端分支并完成当前分支首次远端 CI 验收。
+- [ ] 不替项目 owner 设置 branch protection；`main` 保护与 required checks 仍需后续实际确认。
 
 ## Completed Backend B9.2 — 2026-07-14
 

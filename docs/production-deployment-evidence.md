@@ -1,8 +1,8 @@
 # Production Deployment Evidence Runbook
 
-状态：**B9.11 已建立，2026-07-15。**
+状态：**B9.12 已记录首次远端 CI 验收，2026-07-15。**
 
-本文把“能不能公开生产发布”的最后一层证据固定成可执行命令和可审计 JSON。它不代表当前已经可公开发布；它用于阻止缺少远端 CI、branch protection、目标环境 production gate 或 rollback 证据的发布。
+本文把“能不能公开生产发布”的最后一层证据固定成可执行命令和可审计 JSON。它不代表当前已经可公开发布；它用于阻止缺少远端 CI、branch protection、目标环境 production gate、rollback、deployment smoke 或性能验证证据的发布。
 
 ## 1. 生成证据模板
 
@@ -56,32 +56,38 @@ Exit code：
 
 ## 4. 当前远端状态审计结论
 
-2026-07-15 使用 `gh` 和远端 Git 查询得到：
+2026-07-15 在用户确认后推送当前工作分支，使用 `gh` 和远端 Git 查询得到：
 
 - Repository: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform`
 - Default branch: `main`
-- Remote pushedAt: `2026-07-07T04:21:20Z`
-- Remote `codex/practice-platform-stabilization` branch: **不存在**
-- Remote workflows: **空**
-- Remote workflow runs: **空**
+- Remote branch: `codex/practice-platform-stabilization`
+- Remote branch commit: `96f0dc090adb44dba21ba65354af823cafd48d44`
+- Remote workflow: `Quality` active, workflow id `313324672`, path `.github/workflows/quality.yml`
+- Remote workflow run: **success**，run `29373386558`
+- Workflow run URL: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558`
+- Job `quality`: **success**，job `87221554824`
+- Job `postgres-integration`: **success**，job `87221554819`
+- Pull request for the branch: **不存在**
 - `main` branch protection: **未启用**（GitHub API 返回 `Branch not protected`）
 
 因此当前状态是：
 
 ```text
 production-ready = false
-blockers = remote branch not pushed, remote CI absent, main branch not protected, target env evidence absent
+remote_ci = passed for initial branch commit 96f0dc0
+blockers = main branch not protected, pull request/review absent, target env production gate absent, deployment smoke absent, external monitoring/performance evidence absent
 ```
 
-本阶段只固定证据工具和审计事实，不替项目 owner 擅自推送分支、开 PR 或修改 branch protection。
+本阶段已完成“推送分支 + 远端 CI 首次跑绿”。仍未创建 PR，也未替项目 owner 修改 branch protection 或部署到真实目标环境。
 
 ## 5. 进入正式前端前的建议
 
 在正式前端设计前，建议先完成：
 
-1. 推送当前工作分支或创建 PR。
-2. 确认 GitHub Actions 首次运行 `quality` 和 `postgres-integration`。
-3. 设置 default branch protection 和 required checks。
-4. 对 staging/prod-like 数据库跑完整 production gate。
-5. 若仍有旧无密码账号，执行 legacy student password migration 并重新跑 production gate。
-6. 保存本 runbook 的 evidence JSON 和 report JSON。
+1. 创建 PR 或保持 release branch 流程明确化。
+2. 设置 default branch protection 和 required checks，至少要求 `quality` 与 `postgres-integration`。
+3. 对 staging/prod-like 数据库跑完整 production gate。
+4. 若仍有旧无密码账号，执行 legacy student password migration 并重新跑 production gate。
+5. 跑目标环境 health/readiness/metrics/admin login/student login/create practice session smoke。
+6. 补一轮最低限度性能证据：关键 API 基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
+7. 保存本 runbook 的 evidence JSON 和 report JSON。

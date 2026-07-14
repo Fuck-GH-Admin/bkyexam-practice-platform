@@ -170,8 +170,9 @@ Warning rule：
 artifacts/production-gate/<date>/
 ```
 
-## 6. B9.9/B9.10 后仍未完成
+## 6. B9.12 后仍未完成
 
 - 尚未实现更细粒度 login route rate limit。
-- 尚未完成远端 CI/branch protection 实际确认。
+- 当前分支远端 CI 已首次通过，但尚未完成 branch protection / required checks 实际确认。
+- 尚未完成目标环境 production gate、deployment smoke、外部监控告警和性能压测证据。
 - 尚未开始正式管理端前端。

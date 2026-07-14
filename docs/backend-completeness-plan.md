@@ -18,10 +18,10 @@
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 86%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate dry-run、旧账号迁移 CLI、部署证据校验 CLI 与管理员锁定测试已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture 与远端 CI 首次验收。 |
+| 后端工程可验证性 | **约 88%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate dry-run、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试与当前分支首次远端 CI 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、性能压测和 release 分支保护验收。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
 | 完整平台后端 | **约 81–84%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定和生产 gate runbook 已落地，但全题型、管理前端、推荐策略和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 80%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型；仍缺外部监控告警、远端 CI/branch protection 实际确认、正式旧账号迁移执行证据和正式部署验收。 |
+| 公开生产后端就绪 | **约 82%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型和当前分支首次远端 CI；仍缺 branch protection/required checks、外部监控告警、性能压测、正式旧账号迁移执行证据和正式部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -1402,24 +1402,55 @@ review_items
 - 不擅自修改 branch protection。
 - 不声明公开生产可发布；当前远端证据仍是 blocker。
 
+### Phase B9.12 — Remote Publication / CI Validation
+
+状态：**已完成首次远端 CI 验收，2026-07-15。**
+
+实际落地：
+
+- 已推送 `codex/practice-platform-stabilization` 到 `origin`。
+- 远端分支 commit：`96f0dc090adb44dba21ba65354af823cafd48d44`。
+- GitHub Actions workflow：
+  - name：`Quality`
+  - id：`313324672`
+  - path：`.github/workflows/quality.yml`
+  - state：`active`
+- Workflow run：
+  - run id：`29373386558`
+  - conclusion：`success`
+  - URL：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558`
+- Job evidence：
+  - `quality`：success，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558/job/87221554824`
+  - `postgres-integration`：success，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558/job/87221554819`
+- `docs/ci-gate-evidence.md` 与 `docs/production-deployment-evidence.md` 已记录本次远端验证事实。
+
+仍保留不做：
+
+- 不创建 PR。
+- 不修改 `main` branch protection。
+- 不部署到真实目标环境。
+- 不声明公开生产可发布；当前 blocker 已从“远端 CI 缺失”变为“branch protection/required checks、目标环境 production gate、deployment smoke、外部监控和性能证据缺失”。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.12 Remote Publication / PR CI Run**，在用户确认后推送当前分支或创建 PR，让 GitHub Actions 首次跑绿，并配置/记录 branch protection。
+> **B9.13 Branch Protection / Staging Production Gate Evidence**，在用户确认后创建 PR 或明确 release branch 流程，配置/记录 branch protection required checks，并对 staging/prod-like 数据库跑完整 production gate、deployment smoke 与最低限度性能证据。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-chore: publish branch for remote ci evidence
+chore: record staging production gate evidence
 ```
 
 范围建议只包含：
 
-- 推送当前 `codex/practice-platform-stabilization` 分支或创建 PR。
-- 等待 `.github/workflows/quality.yml` 的 `quality` 与 `postgres-integration` 远端运行。
-- 记录 workflow run URL。
-- 由项目 owner 确认或配置 branch protection required checks。
+- 创建 PR 或明确本项目是否采用 release branch 直推流程。
+- 由项目 owner 确认或配置 `main` branch protection required checks。
+- 对 staging/prod-like `DATABASE_URL` 运行 `npm run ops:production-gate`，保存 report。
+- 若存在 legacy passwordless students，执行旧账号迁移 CLI 后重新跑 gate。
+- 对目标环境运行 health/readiness/metrics/admin login/student login/create practice session smoke。
+- 补一轮最小性能证据：关键 API 响应基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
 - 把结果填入 `ops:deployment-evidence` evidence JSON。
 - 本阶段仍不做正式前端。
 
@@ -1435,7 +1466,7 @@ chore: publish branch for remote ci evidence
 - 不引入微服务
 - 不引入复杂消息队列
 
-这样可以把“远端证据缺失”推进到“远端 CI 真实闭环”，再考虑目标环境 production gate 或正式前端信息架构。
+这样可以把“远端 CI 真实闭环”推进到“目标环境可发布证据闭环”，再考虑正式前端信息架构。
 
 ## 7. 阶段提交规则
 
@@ -1452,6 +1483,6 @@ chore: publish branch for remote ci evidence
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警、目标环境旧账号迁移执行证据和远端 CI/branch protection 实际确认。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI 首次验收与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警、性能压测、目标环境旧账号迁移执行证据和 branch protection/required checks 实际确认。**
 
-最合理的下一步是继续后端生产闭环：在用户确认后做 B9.12 remote publication / PR CI run；正式前端仍应等远端 CI、目标环境 gate、身份迁移证据和管理端信息架构稳定后再进入设计实现。
+最合理的下一步是继续后端生产闭环：在用户确认后做 B9.13 branch protection / staging production gate evidence；正式前端仍应等目标环境 gate、身份迁移证据、性能边界和管理端信息架构稳定后再进入设计实现。
