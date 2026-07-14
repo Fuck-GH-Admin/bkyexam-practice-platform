@@ -18,10 +18,10 @@
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 88%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate dry-run、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试与当前分支首次远端 CI 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、性能压测和 release 分支保护验收。 |
+| 后端工程可验证性 | **约 89%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate dry-run、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI 与 `main` required checks 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、性能压测和目标环境 gate。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
 | 完整平台后端 | **约 81–84%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定和生产 gate runbook 已落地，但全题型、管理前端、推荐策略和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 82%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型和当前分支首次远端 CI；仍缺 branch protection/required checks、外部监控告警、性能压测、正式旧账号迁移执行证据和正式部署验收。 |
+| 公开生产后端就绪 | **约 84%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI 与 `main` branch protection/required checks；仍缺 PR review、外部监控告警、性能压测、正式旧账号迁移执行证据和正式部署验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -1431,22 +1431,57 @@ review_items
 - 不部署到真实目标环境。
 - 不声明公开生产可发布；当前 blocker 已从“远端 CI 缺失”变为“branch protection/required checks、目标环境 production gate、deployment smoke、外部监控和性能证据缺失”。
 
+### Phase B9.13 — PR / Branch Protection / Required Checks
+
+状态：**已完成 PR 与 branch protection 闭环，2026-07-15。**
+
+实际落地：
+
+- 已创建 PR `#2`：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`。
+- PR base/head：`main` <- `codex/practice-platform-stabilization`。
+- PR head commit：`07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`。
+- PR 状态：
+  - state：`OPEN`
+  - mergeability：`MERGEABLE`
+  - review decision：`REVIEW_REQUIRED`
+- PR workflow run：
+  - run id：`29376220149`
+  - conclusion：`success`
+  - URL：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149`
+- Job evidence：
+  - `quality`：success，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129856`
+  - `postgres-integration`：success，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129819`
+- 已启用 `main` branch protection：
+  - required status checks：`quality`, `postgres-integration`
+  - strict checks：enabled
+  - required approving reviews：`1`
+  - dismiss stale reviews：enabled
+  - admin enforcement：enabled
+  - required conversation resolution：enabled
+  - force pushes / deletions：disabled
+- `docs/ci-gate-evidence.md` 与 `docs/production-deployment-evidence.md` 已记录本次 PR / branch protection 验证事实。
+
+仍保留不做：
+
+- 不合并 PR。
+- 不替代 owner/reviewer 完成 review。
+- 不部署到真实目标环境。
+- 不声明公开生产可发布；当前 blocker 已从“branch protection/required checks 缺失”变为“PR review、目标环境 production gate、legacy migration closure、deployment smoke、rollback plan、外部监控和性能证据缺失”。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.13 Branch Protection / Staging Production Gate Evidence**，在用户确认后创建 PR 或明确 release branch 流程，配置/记录 branch protection required checks，并对 staging/prod-like 数据库跑完整 production gate、deployment smoke 与最低限度性能证据。
+> **B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence**，在用户确认目标环境后，对 staging/prod-like 数据库跑完整 production gate、legacy migration closure、deployment smoke 与最低限度性能证据。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-chore: record staging production gate evidence
+chore: record staging deployment gate evidence
 ```
 
 范围建议只包含：
 
-- 创建 PR 或明确本项目是否采用 release branch 直推流程。
-- 由项目 owner 确认或配置 `main` branch protection required checks。
 - 对 staging/prod-like `DATABASE_URL` 运行 `npm run ops:production-gate`，保存 report。
 - 若存在 legacy passwordless students，执行旧账号迁移 CLI 后重新跑 gate。
 - 对目标环境运行 health/readiness/metrics/admin login/student login/create practice session smoke。
@@ -1466,7 +1501,7 @@ chore: record staging production gate evidence
 - 不引入微服务
 - 不引入复杂消息队列
 
-这样可以把“远端 CI 真实闭环”推进到“目标环境可发布证据闭环”，再考虑正式前端信息架构。
+这样可以把“PR/branch protection 真实闭环”推进到“目标环境可发布证据闭环”，再考虑正式前端信息架构。
 
 ## 7. 阶段提交规则
 
@@ -1483,6 +1518,6 @@ chore: record staging production gate evidence
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI 首次验收与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警、性能压测、目标环境旧账号迁移执行证据和 branch protection/required checks 实际确认。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review、外部监控告警、性能压测和目标环境旧账号迁移执行证据。**
 
-最合理的下一步是继续后端生产闭环：在用户确认后做 B9.13 branch protection / staging production gate evidence；正式前端仍应等目标环境 gate、身份迁移证据、性能边界和管理端信息架构稳定后再进入设计实现。
+最合理的下一步是继续后端生产闭环：在用户确认目标环境后做 B9.14 staging production gate / deployment smoke / performance evidence；正式前端仍应等目标环境 gate、身份迁移证据、性能边界和管理端信息架构稳定后再进入设计实现。

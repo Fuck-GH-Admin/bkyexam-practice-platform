@@ -1,6 +1,6 @@
 # Production Deployment Evidence Runbook
 
-状态：**B9.12 已记录首次远端 CI 验收，2026-07-15。**
+状态：**B9.13 已记录 PR / branch protection / required checks，2026-07-15。**
 
 本文把“能不能公开生产发布”的最后一层证据固定成可执行命令和可审计 JSON。它不代表当前已经可公开发布；它用于阻止缺少远端 CI、branch protection、目标环境 production gate、rollback、deployment smoke 或性能验证证据的发布。
 
@@ -56,38 +56,56 @@ Exit code：
 
 ## 4. 当前远端状态审计结论
 
-2026-07-15 在用户确认后推送当前工作分支，使用 `gh` 和远端 Git 查询得到：
+2026-07-15 在用户确认后推送当前工作分支、创建 PR 并配置 `main` branch protection，使用 `gh` 和远端 Git 查询得到：
 
 - Repository: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform`
 - Default branch: `main`
 - Remote branch: `codex/practice-platform-stabilization`
-- Remote branch commit: `96f0dc090adb44dba21ba65354af823cafd48d44`
+- Remote branch commit: `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`
 - Remote workflow: `Quality` active, workflow id `313324672`, path `.github/workflows/quality.yml`
-- Remote workflow run: **success**，run `29373386558`
-- Workflow run URL: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29373386558`
-- Job `quality`: **success**，job `87221554824`
-- Job `postgres-integration`: **success**，job `87221554819`
-- Pull request for the branch: **不存在**
-- `main` branch protection: **未启用**（GitHub API 返回 `Branch not protected`）
+- Pull request: `#2`，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`
+- PR state: **open**
+- PR mergeability: `MERGEABLE`
+- PR review decision: `REVIEW_REQUIRED`
+- PR workflow run: **success**，run `29376220149`
+- Workflow run URL: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149`
+- Job `quality`: **success**，job `87230129856`
+- Job `postgres-integration`: **success**，job `87230129819`
+- `main` branch protection: **已启用**
+- Required status checks: `quality`, `postgres-integration`
+- Strict checks: **enabled**
+- Required approving reviews: `1`
+- Admin enforcement: **enabled**
+- Required conversation resolution: **enabled**
+- Force pushes / deletions: **disabled**
 
 因此当前状态是：
 
 ```text
 production-ready = false
-remote_ci = passed for initial branch commit 96f0dc0
-blockers = main branch not protected, pull request/review absent, target env production gate absent, deployment smoke absent, external monitoring/performance evidence absent
+remote_ci = passed for PR commit 07a7892
+branch_protection = enabled
+blockers = PR review absent, target env production gate absent, legacy migration closure absent, rollback plan absent, deployment smoke absent, external monitoring/performance evidence absent
 ```
 
-本阶段已完成“推送分支 + 远端 CI 首次跑绿”。仍未创建 PR，也未替项目 owner 修改 branch protection 或部署到真实目标环境。
+B9.13 evidence CLI snapshot：
+
+```text
+npm run ops:deployment-evidence -- --evidence=<b9.13-pr-branch-protection.json> --require-ready
+exit = 2
+summary = 10 pass, 0 warn, 4 fail
+remaining failing checks = production_gate_passed, legacy_student_migration_closed, rollback_plan_confirmed, deployment_smoke_passed
+```
+
+本阶段已完成“推送分支 + PR + branch protection + required checks + PR CI 跑绿”。仍未 review/merge，也未部署到真实目标环境。
 
 ## 5. 进入正式前端前的建议
 
 在正式前端设计前，建议先完成：
 
-1. 创建 PR 或保持 release branch 流程明确化。
-2. 设置 default branch protection 和 required checks，至少要求 `quality` 与 `postgres-integration`。
-3. 对 staging/prod-like 数据库跑完整 production gate。
-4. 若仍有旧无密码账号，执行 legacy student password migration 并重新跑 production gate。
-5. 跑目标环境 health/readiness/metrics/admin login/student login/create practice session smoke。
-6. 补一轮最低限度性能证据：关键 API 基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
-7. 保存本 runbook 的 evidence JSON 和 report JSON。
+1. 完成 PR review / merge 决策。
+2. 对 staging/prod-like 数据库跑完整 production gate。
+3. 若仍有旧无密码账号，执行 legacy student password migration 并重新跑 production gate。
+4. 跑目标环境 health/readiness/metrics/admin login/student login/create practice session smoke。
+5. 补一轮最低限度性能证据：关键 API 基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
+6. 保存本 runbook 的 evidence JSON 和 report JSON。

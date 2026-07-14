@@ -242,11 +242,11 @@ curl -fsS http://127.0.0.1:3000/api/health/metrics
 - 默认分支禁止直接 push。
 - PR 需要至少一次 review 或由项目 owner 明确豁免。
 
-该项已在 B9.12 完成当前工作分支的首次远端 CI 验收，但 release 前仍需 PR/branch protection/required checks 证据。B9.11 已新增本地证据校验：
+该项已在 B9.13 完成 PR CI 与 `main` branch protection / required checks 验收，但 release 前仍需 review、目标环境 production gate、deployment smoke、rollback plan 与性能证据。B9.11 已新增本地证据校验：
 
 ```powershell
 npm run ops:deployment-evidence -- --template
 npm run ops:deployment-evidence -- --evidence=artifacts/production-evidence/deployment-evidence.json --require-ready
 ```
 
-B9.12 远端验证显示：`codex/practice-platform-stabilization` 已推送，GitHub Actions `Quality` run `29373386558` 通过，`quality` 与 `postgres-integration` jobs 均 success；但当前没有 PR，且 `main` branch protection 未启用。因此当前不能公开生产发布。可填写模板见 [`ci-gate-evidence.md`](ci-gate-evidence.md)，完整证据 runbook 见 [`production-deployment-evidence.md`](production-deployment-evidence.md)。
+B9.13 远端验证显示：PR `#2` 已创建，GitHub Actions `Quality` pull_request run `29376220149` 通过，`quality` 与 `postgres-integration` jobs 均 success；`main` branch protection 已启用，required checks 包含 `quality` 与 `postgres-integration`，required approving reviews 为 `1`。当前仍因 review、目标环境 production gate、deployment smoke、rollback plan、外部监控和性能证据缺失而不能公开生产发布。可填写模板见 [`ci-gate-evidence.md`](ci-gate-evidence.md)，完整证据 runbook 见 [`production-deployment-evidence.md`](production-deployment-evidence.md)。

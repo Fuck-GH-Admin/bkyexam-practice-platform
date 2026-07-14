@@ -10,7 +10,8 @@
 - 本地 PostgreSQL 备份恢复演练以 `npm run ops:backup-restore:docker` 为准。
 - B9.11 新增 `npm run ops:deployment-evidence`，可以生成 deployment evidence 模板并对完整证据执行 production-ready 校验。
 - B9.12 已推送 `codex/practice-platform-stabilization`，并完成 GitHub Actions `Quality` 首次远端验收。
-- `main` branch protection / required checks 仍未启用，PR 仍未创建，目标环境 production gate / deployment smoke / 性能压测证据仍缺失。
+- B9.13 已创建 PR #2，并启用 `main` branch protection / required checks：`quality` 与 `postgres-integration`。
+- 当前 PR CI 已跑绿，但仍需 review；目标环境 production gate / deployment smoke / 性能压测证据仍缺失。
 - 因此当前只适合继续 staging/远端验证；不应把当前后端状态视为公开生产可发布。
 
 ## 1. Current Local Gate Evidence
@@ -56,9 +57,35 @@ B9.9/B9.10/B9.11 最新本地证据：
 
 结论：远端 CI 首次验收已对 commit `96f0dc0` 跑绿，`remote CI absent` 不再是当前分支的 blocker。当前仍 **不能** 视为公开生产可发布，因为 branch protection / required checks、PR review、目标环境 production gate、deployment smoke、外部监控与性能压测证据仍未闭环。
 
+## 1.2 B9.13 PR / Branch Protection Snapshot
+
+2026-07-15 在用户确认后创建 PR 并配置 `main` branch protection：
+
+| Item | Result |
+| --- | --- |
+| Pull request | `#2`，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2` |
+| PR base/head | `main` <- `codex/practice-platform-stabilization` |
+| PR head commit | `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` |
+| PR state | open |
+| PR mergeability | `MERGEABLE` |
+| PR review decision | `REVIEW_REQUIRED` |
+| PR workflow run | `29376220149`, success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149` |
+| Job `quality` | success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129856` |
+| Job `postgres-integration` | success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129819` |
+| `main` branch protection | enabled |
+| Required status checks | `quality`, `postgres-integration` |
+| Strict required checks | enabled |
+| Required approving reviews | `1` |
+| Dismiss stale reviews | enabled |
+| Admin enforcement | enabled |
+| Required conversation resolution | enabled |
+| Force pushes / deletions | disabled |
+
+结论：远端 CI、PR 和 branch protection 已完成第一轮闭环。当前仍 **不能** 视为公开生产可发布，因为 review、目标环境 production gate、legacy migration closure、rollback plan、deployment smoke、外部监控和性能压测证据仍未闭环。
+
 ## 2. Remote CI Evidence Template
 
-> 远端仓库当前已存在 `.github/workflows/quality.yml`，包含 `quality` 与 `postgres-integration` jobs。B9.12 首次远端运行见上方快照；后续每个 release candidate 都应重新填写以下模板，以最新 commit 的 run 为准。
+> 远端仓库当前已存在 `.github/workflows/quality.yml`，包含 `quality` 与 `postgres-integration` jobs。B9.12/B9.13 首次远端运行见上方快照；后续每个 release candidate 都应重新填写以下模板，以最新 commit 的 run 为准。
 
 ```yaml
 remote_ci_evidence:

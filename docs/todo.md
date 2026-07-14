@@ -5,6 +5,23 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.13 PR / Branch Protection / Required Checks — 2026-07-15
+
+- [x] 创建 PR `#2`：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`。
+- [x] PR head commit `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` 已触发 pull_request CI。
+- [x] PR `Quality` workflow run `29376220149` 通过。
+- [x] PR `quality` job 通过。
+- [x] PR `postgres-integration` job 通过。
+- [x] `main` branch protection 已启用。
+- [x] required status checks 已配置：`quality`、`postgres-integration`。
+- [x] required approving reviews 已配置为 `1`，dismiss stale reviews、admin enforcement、required conversation resolution 已启用。
+- [x] force pushes / deletions 已禁用。
+- [x] 未合并 PR，未替代 owner/reviewer 完成 review，未声明公开生产可发布。
+
+后续代码阶段：
+
+- [ ] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（需要提供/确定 staging/prod-like 目标环境）。
+
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 
 - [x] 推送 `codex/practice-platform-stabilization` 到 `origin`。
@@ -14,10 +31,6 @@
 - [x] `postgres-integration` job 通过。
 - [x] `docs/ci-gate-evidence.md` 和 `docs/production-deployment-evidence.md` 已记录远端验证证据。
 - [x] 未创建 PR，未修改 `main` branch protection，未声明公开生产可发布。
-
-后续代码阶段：
-
-- [ ] B9.13 Branch Protection / Staging Production Gate Evidence（需要用户确认是否创建 PR、配置分支保护、以及提供/确定 staging/prod-like 目标环境）。
 
 ## Completed Backend B9.11 Production Deployment Evidence / Remote CI Closure — 2026-07-15
 
