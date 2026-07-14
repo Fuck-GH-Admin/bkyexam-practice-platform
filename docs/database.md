@@ -159,6 +159,8 @@ Stores student identities.
 - `password_hash`: nullable password hash placeholder for later auth work.
 - `created_at`: creation timestamp.
 
+正式身份策略已冻结在 [`identity-security-strategy.md`](identity-security-strategy.md)。后续 B9.5 migration 会在保留旧账号的前提下扩展 `students`，目标字段包括 `class_name`、`group_name`、`status`、`password_reset_required`、登录失败计数、临时锁定时间和 `last_login_at`。当前已知运营规则：`202502040201` 到 `202502040230` 属于 `2班`，其余学生班级/分组暂未定。
+
 ### `practice_attempts`
 
 Stores submitted answers.

@@ -221,11 +221,12 @@
 当前问题：
 
 - 当前登录接近“用户名即身份”。
-- 没有正式密码策略。
-- 没有学校账号/邀请码/SSO 决策。
-- 没有找回账号。
+- 正式身份策略已在 B9.4 冻结：管理员批量创建学生、用户名/学号 + 密码、管理员重置密码、`className/groupName` 轻量字段、旧账号保留。
+- 但密码登录、学生账号管理 API、旧账号迁移和失败锁定尚未落地代码。
+- 不做学校账号/邀请码/SSO 作为当前阶段；邀请码/SSO 留作远期。
+- 没有学生自助找回账号。
 - 没有账号合并。
-- Admin identity/RBAC/audit foundation 和初始 `super_admin` bootstrap 已有，但缺少管理员账号管理和生产级安全策略。
+- Admin identity/RBAC/audit foundation、初始 `super_admin` bootstrap 和 Admin User manage 已有，但管理员登录失败锁定、生产参数和更完整账号安全策略尚未落地。
 
 影响：
 
@@ -1172,25 +1173,50 @@ review_items
 - 不推送远端分支，也不替项目 owner 设置 branch protection；远端 CI 首次通过与 required checks 仍需后续实际记录。
 - 不创建正式 Admin UI 或学生前端新页面。
 
+### Phase B9.4 — Identity Security Strategy
+
+状态：**策略文档已完成，2026-07-15。**
+
+实际决策：
+
+- 学生账号来源：管理员批量创建/导入；不开放公网自助注册。
+- 登录凭据：用户名/学号 + 密码，继续使用 `loginName` 作为唯一标识。
+- 密码找回：管理员重置密码；暂不做邮箱/短信找回。
+- 学生组织字段：先加 `className` / `groupName` 文本字段，不建正式 school/class/enrollment 模型。
+- 已知班级规则：`202502040201`–`202502040230` 属于 `2班`，其余暂未定。
+- 登录失败策略：启用失败计数和临时锁定，但按内部试用要求放宽。
+- 旧账号：保留历史学生与学习数据，通过后续迁移/临时密码进入正式模式。
+
+新增文档：
+
+- [`identity-security-strategy.md`](identity-security-strategy.md)
+
+仍保留不做：
+
+- 本阶段不改登录行为。
+- 不做正式前端。
+- 不做公网注册、邮箱找回、短信找回、SSO、MFA。
+- 不做复杂组织树。
+
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **正式身份安全策略**，或继续 B9.4 远端 CI / branch protection 实际确认。
+> **B9.5 Student Identity Data Model**，先把正式学生身份的数据层和 contract 落地。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-docs: record production identity security strategy
+feat: add student identity security model
 ```
 
 范围建议只包含：
 
-- 学生身份从“用户名即身份”升级前的安全决策。
-- 管理员密码策略、会话策略和恢复流程。
-- Cookie/CSRF/rate-limit 生产参数。
-- secrets 管理与部署配置边界。
-- 远端 CI 与 branch protection 若可用，则补实际证据记录。
+- migration 扩展 `students`：`class_name`、`group_name`、`status`、`password_reset_required`、失败计数、锁定时间、`last_login_at`。
+- shared Auth student DTO 增加 `className/groupName/passwordResetRequired`。
+- repository/service 识别 legacy account，但不删除旧数据。
+- route/unit/PostgreSQL integration 覆盖旧账号保留、新字段和基础密码 hash/lock 状态。
+- 本阶段仍不做正式前端。
 
 不做：
 
@@ -1222,6 +1248,6 @@ docs: record production identity security strategy
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；完整平台后端还缺正式身份、模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警和远端 CI/branch protection 实际确认。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log 与 metrics smoke endpoint 已落地；正式身份策略已冻结但代码未落地；完整平台后端还缺学生密码登录/账号管理、模块化、非客观题、推荐策略/完整长期档案、管理前端、外部监控告警和远端 CI/branch protection 实际确认。**
 
-最合理的下一步是继续后端闭环：优先做正式身份安全策略，或在远端仓库条件允许时完成 CI/branch protection 实际验收；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。
+最合理的下一步是继续后端闭环：优先做 B9.5 Student Identity Data Model，再做 Admin Student Manage API 和 password login enforcement；正式前端仍应等管理后端 command/query 与页面语义稳定后再进入设计实现。

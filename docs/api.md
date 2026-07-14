@@ -197,7 +197,7 @@ Request：
 }
 ```
 
-当前 PostgreSQL 实现允许首次使用用户名时自动创建学生。正式生产身份策略尚未确定。
+当前 PostgreSQL 实现仍允许首次使用用户名时自动创建学生，这是内部 MVP 行为。正式身份策略已在 [`identity-security-strategy.md`](identity-security-strategy.md) 冻结：后续生产模式将改为管理员批量创建学生，学生用用户名/学号 + 密码登录，旧账号保留但不继续依赖无密码登录。
 
 Response：
 
@@ -224,6 +224,8 @@ Errors：
 
 - `400`：缺少 `loginName` 或字段类型错误。
 - `401`：凭据验证失败。
+
+目标正式 response 还会包含 `className` / `groupName` 与 `passwordResetRequired`，并新增学生修改密码接口；这些属于后续 B9.5–B9.7 实现范围。
 
 ### `GET /api/auth/me`
 

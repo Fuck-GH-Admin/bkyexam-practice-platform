@@ -155,7 +155,7 @@ With `USE_DATABASE=false`, the API can serve in-memory development data for basi
 The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
 
 - operational policy and UI for administrator account lifecycle; backend Admin User manage API and one-time `super_admin` bootstrap already exist;
-- strong student identity policy;
+- student identity implementation; the policy is fixed in [`identity-security-strategy.md`](identity-security-strategy.md), but password login and Admin Student Manage APIs are not yet implemented;
 - secrets management;
 - PostgreSQL backup and restore drill;
 - external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;

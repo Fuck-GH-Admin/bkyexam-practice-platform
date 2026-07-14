@@ -59,6 +59,7 @@ PostgreSQL / memory repository
 
 当前未实现 shared schema：
 
+- Student identity security expansion：`className/groupName/passwordResetRequired`、Admin Student Manage、student password change/reset。
 - Production alert payload。
 
 ## Frozen V1 Semantics
@@ -205,4 +206,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；reset import、异步队列、正式告警 payload 和正式 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Admin Auth、Admin User manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate、Question Review 与 Audit Log read shared Zod schema/route 已实现；正式学生身份扩展、Admin Student Manage、reset import、异步队列、正式告警 payload 和正式 Admin UI 尚未实现。

@@ -197,6 +197,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [后端完成度与下一步计划](docs/backend-completeness-plan.md)
 - [Admin 后端 Contract 设计](docs/admin-backend-contract.md)
 - [Admin Console IA Gate](docs/admin-console-ia.md)
+- [正式身份安全策略](docs/identity-security-strategy.md)
 - [版本化 API Contract](docs/contracts.md)
 - [API](docs/api.md)
 - [数据库](docs/database.md)

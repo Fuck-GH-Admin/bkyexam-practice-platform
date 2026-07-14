@@ -13,7 +13,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
-- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook 与 `/api/health/metrics` smoke endpoint；完整监控告警、远端 CI 保护和正式部署验收仍未完成。**
+- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint 与正式身份安全策略文档；学生密码登录代码、完整监控告警、远端 CI 保护和正式部署验收仍未完成。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -21,7 +21,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 93%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；账户、归档和部分 UX 未完成 |
-| 公开生产就绪度 | **约 66%** | 已补第一个管理员 bootstrap、Admin User manage API、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook 与 metrics smoke endpoint；仍缺正式身份策略、远端 CI 首次验收、外部监控告警和正式部署验收 |
+| 公开生产就绪度 | **约 67%** | 已补第一个管理员 bootstrap、Admin User manage API、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint 和正式身份安全策略文档；仍缺学生密码登录/账号管理代码、远端 CI 首次验收、外部监控告警和正式部署验收 |
 | 完整产品愿景 | **约 72%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
@@ -306,7 +306,7 @@ PracticeSessionService
 
 ### P0 Before Public Production
 
-- 当前登录策略接近“用户名即身份”，不适合公开环境。
+- 当前登录实现仍接近“用户名即身份”，不适合公开环境；B9.4 已冻结正式身份策略：管理员批量创建学生、用户名/学号 + 密码、管理员重置密码、`className/groupName` 轻量字段、旧账号保留。
 - 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap，但仍缺正式运营 UI、导入 reset/队列化和完整审核流程。
 - 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、隔离 backup/restore drill、结构化 request log 和 metrics smoke endpoint；仍没有真实生产数据量级恢复演练、外部监控和告警。
 - 没有对正式域名部署进行本轮验收。

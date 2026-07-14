@@ -5,6 +5,24 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.4 Strategy — 2026-07-15
+
+- [x] 冻结正式身份安全策略文档：`docs/identity-security-strategy.md`。
+- [x] 决定学生账号来源为管理员批量创建/导入，不开放公网自助注册。
+- [x] 决定学生登录凭据为用户名/学号 + 密码。
+- [x] 决定密码找回由管理员重置，暂不做邮箱/短信找回。
+- [x] 决定学生轻量组织字段为 `className` / `groupName` 文本字段。
+- [x] 记录 `202502040201`–`202502040230` 属于 `2班`，其余暂未定。
+- [x] 决定登录失败策略放宽但保留失败计数和临时锁定。
+- [x] 决定旧账号保留，不清空历史学生和学习数据。
+- [x] 不新增前端页面，不提前做最终视觉。
+
+后续代码阶段：
+
+- [ ] B9.5 Student Identity Data Model。
+- [ ] B9.6 Admin Student Manage API。
+- [ ] B9.7 Password Login Enforcement。
+
 ## Completed Backend B9.3 — 2026-07-15
 
 - [x] 新增 shared v1 `MetricsResponseV1Schema`。
@@ -297,7 +315,7 @@
 - [x] 设计并实现练习历史 API 和结果详情入口。
 - [x] 增加 URL router 与可链接页面。
 - [ ] 固定登录、无数据、加载、保存失败、提交失败、session 已完成等状态。
-- [ ] 决定正式身份策略：用户名自动创建、密码、学校账号或邀请码。
+- [x] 决定正式身份策略：管理员批量创建学生、用户名/学号 + 密码、管理员重置密码、`className/groupName` 轻量字段、旧账号保留。
 - [ ] 对当前练习台做可用性测试，不做大规模视觉换肤。
 
 完成标准：

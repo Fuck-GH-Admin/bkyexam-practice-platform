@@ -159,6 +159,7 @@ Preflight:
   npm run ops:backup-restore:docker: PASS/FAIL
   remote_ci: PASS/FAIL
   branch_protection_checked: YES/NO
+  identity_security_strategy_checked: YES/NO
 
 Deploy:
   npm ci: PASS/FAIL
