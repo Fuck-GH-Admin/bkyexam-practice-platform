@@ -61,13 +61,13 @@ Exit code：
 - Repository: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform`
 - Default branch: `main`
 - Remote branch: `codex/practice-platform-stabilization`
-- Remote branch commit: `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`
+- Initial B9.13 evidence commit: `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`
 - Remote workflow: `Quality` active, workflow id `313324672`, path `.github/workflows/quality.yml`
 - Pull request: `#2`，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`
 - PR state: **open**
 - PR mergeability: `MERGEABLE`
 - PR review decision: `REVIEW_REQUIRED`
-- PR workflow run: **success**，run `29376220149`
+- Initial PR workflow run: **success**，run `29376220149`
 - Workflow run URL: `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149`
 - Job `quality`: **success**，job `87230129856`
 - Job `postgres-integration`: **success**，job `87230129819`
@@ -83,7 +83,7 @@ Exit code：
 
 ```text
 production-ready = false
-remote_ci = passed for PR commit 07a7892
+remote_ci = passed for initial B9.13 PR evidence commit 07a7892
 branch_protection = enabled
 blockers = PR review absent, target env production gate absent, legacy migration closure absent, rollback plan absent, deployment smoke absent, external monitoring/performance evidence absent
 ```
@@ -96,6 +96,8 @@ exit = 2
 summary = 10 pass, 0 warn, 4 fail
 remaining failing checks = production_gate_passed, legacy_student_migration_closed, rollback_plan_confirmed, deployment_smoke_passed
 ```
+
+后续提交应以 PR #2 最新 status checks 为准；本节固定的是 B9.13 首次 PR / branch protection 证据快照。
 
 本阶段已完成“推送分支 + PR + branch protection + required checks + PR CI 跑绿”。仍未 review/merge，也未部署到真实目标环境。
 

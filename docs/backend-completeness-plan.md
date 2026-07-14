@@ -1439,12 +1439,12 @@ review_items
 
 - 已创建 PR `#2`：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`。
 - PR base/head：`main` <- `codex/practice-platform-stabilization`。
-- PR head commit：`07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`。
+- B9.13 初次 PR 证据 commit：`07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84`。
 - PR 状态：
   - state：`OPEN`
   - mergeability：`MERGEABLE`
   - review decision：`REVIEW_REQUIRED`
-- PR workflow run：
+- 初次 PR workflow run：
   - run id：`29376220149`
   - conclusion：`success`
   - URL：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149`
@@ -1460,6 +1460,7 @@ review_items
   - required conversation resolution：enabled
   - force pushes / deletions：disabled
 - `docs/ci-gate-evidence.md` 与 `docs/production-deployment-evidence.md` 已记录本次 PR / branch protection 验证事实。
+- 后续提交以 PR `#2` 最新 status checks 为准，不要求每次文档提交都改写初次证据快照。
 
 仍保留不做：
 

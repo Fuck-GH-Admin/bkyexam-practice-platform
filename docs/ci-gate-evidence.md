@@ -65,11 +65,11 @@ B9.9/B9.10/B9.11 最新本地证据：
 | --- | --- |
 | Pull request | `#2`，`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2` |
 | PR base/head | `main` <- `codex/practice-platform-stabilization` |
-| PR head commit | `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` |
+| Initial PR evidence commit | `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` |
 | PR state | open |
 | PR mergeability | `MERGEABLE` |
 | PR review decision | `REVIEW_REQUIRED` |
-| PR workflow run | `29376220149`, success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149` |
+| Initial PR workflow run | `29376220149`, success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149` |
 | Job `quality` | success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129856` |
 | Job `postgres-integration` | success, `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29376220149/job/87230129819` |
 | `main` branch protection | enabled |
@@ -81,7 +81,7 @@ B9.9/B9.10/B9.11 最新本地证据：
 | Required conversation resolution | enabled |
 | Force pushes / deletions | disabled |
 
-结论：远端 CI、PR 和 branch protection 已完成第一轮闭环。当前仍 **不能** 视为公开生产可发布，因为 review、目标环境 production gate、legacy migration closure、rollback plan、deployment smoke、外部监控和性能压测证据仍未闭环。
+结论：远端 CI、PR 和 branch protection 已完成第一轮闭环。后续提交应以 PR #2 最新 status checks 为准，而不是要求每次文档提交都改写本快照。当前仍 **不能** 视为公开生产可发布，因为 review、目标环境 production gate、legacy migration closure、rollback plan、deployment smoke、外部监控和性能压测证据仍未闭环。
 
 ## 2. Remote CI Evidence Template
 

@@ -8,7 +8,7 @@
 ## Completed Backend B9.13 PR / Branch Protection / Required Checks — 2026-07-15
 
 - [x] 创建 PR `#2`：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`。
-- [x] PR head commit `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` 已触发 pull_request CI。
+- [x] B9.13 初次 PR 证据 commit `07a7892b0a6ea5e50fdeb5f4ec60090bdd54dc84` 已触发 pull_request CI。
 - [x] PR `Quality` workflow run `29376220149` 通过。
 - [x] PR `quality` job 通过。
 - [x] PR `postgres-integration` job 通过。
@@ -16,6 +16,7 @@
 - [x] required status checks 已配置：`quality`、`postgres-integration`。
 - [x] required approving reviews 已配置为 `1`，dismiss stale reviews、admin enforcement、required conversation resolution 已启用。
 - [x] force pushes / deletions 已禁用。
+- [x] 后续提交以 PR `#2` 最新 status checks 为准，不要求每次文档提交都改写初次证据快照。
 - [x] 未合并 PR，未替代 owner/reviewer 完成 review，未声明公开生产可发布。
 
 后续代码阶段：
