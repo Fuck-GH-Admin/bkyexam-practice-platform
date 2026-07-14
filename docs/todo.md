@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.11 Production Deployment Evidence / Remote CI Closure — 2026-07-15
+
+- [x] 新增 `npm run ops:deployment-evidence`。
+- [x] 支持 `--template` 生成生产部署 evidence JSON 模板。
+- [x] 支持 `--evidence=<file> --require-ready` 校验 local gates、production gate、legacy migration、remote CI、branch protection、rollback 和 smoke 证据。
+- [x] 新增 `docs/production-deployment-evidence.md`。
+- [x] 更新 `docs/ci-gate-evidence.md`，记录当前远端审计：远端工作分支不存在、workflow/runs 为空、`main` 未启用 branch protection。
+- [x] 不擅自推送远端分支、不擅自创建 PR、不擅自修改 branch protection。
+
+后续代码阶段：
+
+- [ ] B9.12 Remote Publication / PR CI Run（需要用户确认是否推送/开 PR）。
+
 ## Completed Backend B9.9/B9.10 Identity Migration And Admin Security — 2026-07-15
 
 - [x] 新增 `npm run ops:legacy-student-password-migration`。
@@ -17,10 +30,6 @@
 - [x] 管理员登录失败按默认 10 次 / 30 分钟窗口 / 15 分钟锁定；锁定返回 `423` 并写 audit。
 - [x] 管理员成功登录或被重置密码时清空失败/锁定状态。
 - [x] 不新增正式前端、不开放公网注册、不实现邮箱/短信找回。
-
-后续代码阶段：
-
-- [ ] B9.11 Production Deployment Evidence / Remote CI Closure。
 
 ## Completed Backend B9.8 Production Gate / Migration Runbook — 2026-07-15
 

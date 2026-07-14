@@ -87,6 +87,7 @@ npm run ops:backup-restore:docker
 ```sh
 npm run ops:production-gate -- --skip-db
 npm run ops:legacy-student-password-migration -- --limit=50
+npm run ops:deployment-evidence -- --template
 ```
 
 真实 PostgreSQL integration profile 使用独立临时数据库，不会接触开发数据库。安装 Docker 后执行：
@@ -216,6 +217,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [部署](docs/deployment.md)
 - [生产运维演练](docs/production-operations.md)
 - [Production Gate 与旧账号迁移 Runbook](docs/production-gate-runbook.md)
+- [生产部署证据 Runbook](docs/production-deployment-evidence.md)
 - [CI Gate / 部署证据模板](docs/ci-gate-evidence.md)
 - [路线图](docs/todo.md)
 

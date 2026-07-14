@@ -2,12 +2,13 @@
 
 状态日期：**2026-07-15**
 
-本文是 B9.3 的 CI / branch protection / deployment checklist 证据模板。它用于把“是否已经可以公开生产发布”的判断从口头确认变成可审计记录。
+本文是 B9.3 创建、B9.11 扩展的 CI / branch protection / deployment checklist 证据模板。它用于把“是否已经可以公开生产发布”的判断从口头确认变成可审计记录。
 
 当前结论：
 
 - 本地质量门以 `npm run verify:docker` 为准。
 - 本地 PostgreSQL 备份恢复演练以 `npm run ops:backup-restore:docker` 为准。
+- B9.11 新增 `npm run ops:deployment-evidence`，可以生成 deployment evidence 模板并对完整证据执行 production-ready 校验。
 - 远端 GitHub Actions 首次验收和 branch protection 仍需在分支推送/PR 创建后由项目 owner 记录。
 - 在远端 CI 与 branch protection 未确认前，不应把当前后端状态视为公开生产可发布。
 
@@ -17,20 +18,38 @@
 | --- | --- | --- | --- |
 | Shared build | `npm run build:shared` | PASS | B9.8 local PASS |
 | Shared contracts | `npm run test -w @bkyexam-practice/shared` | 2 files / 26 tests PASS | B9.8 local PASS |
-| API route/unit | `npm run test -w @bkyexam-practice/api` | 57 files / 425 tests PASS | B9.9/B9.10 local PASS |
+| API route/unit | `npm run test -w @bkyexam-practice/api` | 58 files / 431 tests PASS | B9.11 local PASS |
 | Typecheck | `npm run typecheck` | shared/api/web/e2e TS PASS | B9.8 local PASS |
-| Full repository gate | `npm run verify:docker` | 61 Vitest files / 482 tests + typecheck + build + 3 Playwright + 1 PostgreSQL integration PASS | B9.9/B9.10 local PASS |
-| Backup restore drill | `npm run ops:backup-restore:docker` | 11 migrations + pg_dump + restore + count compare PASS | B9.9/B9.10 local PASS |
+| Full repository gate | `npm run verify:docker` | 62 Vitest files / 488 tests + typecheck + build + 3 Playwright + 1 PostgreSQL integration PASS | B9.11 local PASS |
+| Backup restore drill | `npm run ops:backup-restore:docker` | 11 migrations + pg_dump + restore + count compare PASS | B9.11 local PASS |
 | Production gate dry-run | `npm run ops:production-gate -- --skip-db` | JSON report and exit 0 with production-safe fixture env | B9.10 local PASS |
 | Legacy student password migration tests | `npm run test -w @bkyexam-practice/api -- legacyStudentPasswordMigration` | dry-run/apply/credential output/CLI transaction PASS | B9.9 local PASS |
+| Deployment evidence CLI | `npm run ops:deployment-evidence -- --template` | JSON evidence template PASS | B9.11 local PASS |
 
 B9.9/B9.10 最新本地证据：
 
-- `npm run verify:docker`：通过，包含 shared 26、API 425、Web 31，共 482 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
+- `npm run verify:docker`：通过，包含 shared 26、API 431、Web 31，共 488 个 Vitest 测试；Playwright 3 项；PostgreSQL integration 1 项。
 - `npm run ops:backup-restore:docker`：通过，`0011_admin_identity_security.sql` 已纳入 migration drill，source/restored count 一致。
 - `npm run ops:production-gate -- --skip-db`：在 production-safe fixture env 下通过；真实发布仍必须连接目标 `DATABASE_URL` 跑完整 gate。
 - `npm run test -w @bkyexam-practice/api -- legacyStudentPasswordMigration`：通过，迁移工具不在 JSON/audit 输出明文临时密码。
+- `npm run ops:deployment-evidence -- --template`：通过，可生成待填写 production deployment evidence JSON。
 - Web build artifact：`dist/assets/index-9CEFB64M.js` 约 `320.47 kB`（gzip `92.79 kB`），CSS `dist/assets/index-CC2OWsF5.css` 约 `20.26 kB`（gzip `4.98 kB`）。
+
+## 1.1 B9.11 Remote Audit Snapshot
+
+2026-07-15 通过 `gh` 与远端 Git 查询得到：
+
+| Item | Result |
+| --- | --- |
+| Repository | `https://github.com/Fuck-GH-Admin/bkyexam-practice-platform` |
+| Default branch | `main` |
+| Last remote push | `2026-07-07T04:21:20Z` |
+| Remote `codex/practice-platform-stabilization` branch | not found |
+| Remote workflows | none listed |
+| Remote workflow runs | none listed |
+| `main` branch protection | not protected |
+
+结论：B9.11 已把远端阻断项明确化，但当前仍 **不能** 视为公开生产可发布。需要后续推送分支/PR、让 remote CI 首次跑绿，并由项目 owner 设置 branch protection / required checks。
 
 ## 2. Remote CI Evidence Template
 

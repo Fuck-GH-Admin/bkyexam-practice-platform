@@ -30,7 +30,8 @@
     "verify:db": "npm run verify && npm run test:integration:db",
     "verify:docker": "npm run verify && npm run test:integration:db:docker",
     "ops:production-gate": "npm run ops:production-gate -w @bkyexam-practice/api --",
-    "ops:legacy-student-password-migration": "npm run ops:legacy-student-password-migration -w @bkyexam-practice/api --"
+    "ops:legacy-student-password-migration": "npm run ops:legacy-student-password-migration -w @bkyexam-practice/api --",
+    "ops:deployment-evidence": "npm run ops:deployment-evidence -w @bkyexam-practice/api --"
   },
   "engines": {
     "node": ">=24.0.0"

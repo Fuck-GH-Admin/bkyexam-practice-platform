@@ -164,7 +164,7 @@ The deployment shape is documented, but the current codebase is not yet publicly
 - PostgreSQL backup and restore drill;
 - external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;
 - rate-limit/CSRF production policy tuning beyond the current configurable minimum implementation;
-- first successful remote run and branch protection for the repository CI workflow;
+- first successful remote run and branch protection for the repository CI workflow; B9.11 evidence tooling now detects that remote CI/branch protection are still missing;
 - one repeatable deployment/rollback procedure on the target host.
 
 The local backup/restore drill is now executable:
@@ -185,4 +185,10 @@ The legacy passwordless student migration tool is executable:
 npm run ops:legacy-student-password-migration -- --limit=50
 ```
 
-Detailed backup, restore, migration, deployment, observability smoke, and CI checklists are maintained in [`production-operations.md`](production-operations.md), [`production-gate-runbook.md`](production-gate-runbook.md), and [`ci-gate-evidence.md`](ci-gate-evidence.md).
+The deployment evidence validator is executable:
+
+```sh
+npm run ops:deployment-evidence -- --template
+```
+
+Detailed backup, restore, migration, deployment, observability smoke, and CI checklists are maintained in [`production-operations.md`](production-operations.md), [`production-gate-runbook.md`](production-gate-runbook.md), [`production-deployment-evidence.md`](production-deployment-evidence.md), and [`ci-gate-evidence.md`](ci-gate-evidence.md).
