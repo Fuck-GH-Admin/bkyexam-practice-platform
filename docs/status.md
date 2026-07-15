@@ -13,7 +13,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
-- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、Admin Student Manage API、学生密码登录 enforcement、生产 gate CLI、旧账号迁移写入 CLI 与 runbook、生产部署证据校验 CLI；B9.13 已完成 PR、PR CI、`main` branch protection / required checks；B9.14 已完成真实服务器 staging 部署、目标数据库 production gate、旧账号迁移、正式 2班学生账号初始化、HTTPS 功能 smoke、轻量性能证据和 deployment evidence ready；B9.15 已完成服务器侧 synthetic healthcheck timer、实机 post-deploy backup/restore drill、staging load baseline、PR review/merge 决策记录、凭据交付 runbook 和管理平台 IA/account ops 审查稿；仍缺第三方通知目标/外部监控接入、持续性能压测、PR human approval/merge 与正式生产发布验收。**
+- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、Admin Student Manage API、学生密码登录 enforcement、生产 gate CLI、旧账号迁移写入 CLI 与 runbook、生产部署证据校验 CLI；B9.13 已完成 PR、PR CI、`main` branch protection / required checks；B9.14 已完成真实服务器 staging 部署、目标数据库 production gate、旧账号迁移、正式 2班学生账号初始化、HTTPS 功能 smoke、轻量性能证据和 deployment evidence ready；B9.15 已完成服务器侧 synthetic healthcheck timer、实机 post-deploy backup/restore drill、staging load baseline、PR review/merge 决策记录、凭据交付 runbook、管理平台 IA/account ops 审查稿和 B9.16 前端开工前审查包；仍缺第三方通知目标/外部监控接入、持续性能压测、PR human approval/merge、学生首次改密前端入口与正式生产发布验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -21,8 +21,8 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 94%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；B9.14 已在 staging 完成学生登录和创建练习 smoke；归档、部分 UX 和最终前端仍未完成 |
-| 公开生产就绪度 | **约 90%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、管理员登录失败锁定、生产 gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、PR CI、`main` branch protection / required checks、B9.14 真实服务器 staging 部署证据，以及 B9.15 synthetic healthcheck、实机 restore drill、staging load baseline、凭据交付 runbook 和 PR 决策记录；仍缺 PR human approval/merge、第三方告警通知接入、持续性能压测和正式生产发布验收 |
-| 完整产品愿景 | **约 83%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线和管理平台 IA 初稿已落地，但分母仍包含管理前端、最终学生前端、全题型、运营与生产能力 |
+| 公开生产就绪度 | **约 90%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、管理员登录失败锁定、生产 gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、PR CI、`main` branch protection / required checks、B9.14 真实服务器 staging 部署证据，以及 B9.15 synthetic healthcheck、实机 restore drill、staging load baseline、凭据交付 runbook、PR 决策记录和 B9.16 前端开工前审查包；仍缺 PR human approval/merge、第三方告警通知接入、持续性能压测、学生首次改密前端入口和正式生产发布验收 |
+| 完整产品愿景 | **约 83%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线、管理平台 IA 初稿和 B9.16 前端开工前审查包已落地，但分母仍包含管理前端、最终学生前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -137,6 +137,18 @@ B9.15 目标环境证据文件保存在服务器：
 ```
 
 B9.15 没有声明已接入第三方通知目标；当前完成的是服务器侧 synthetic monitor、systemd alert hook 和可审计证据。
+
+B9.16 pre-frontend review packet：
+
+```text
+formal frontend visual work = hold
+student P0 activation gap = first password change / account identity surface
+admin first useful slice = Student Accounts + System Status
+recommended admin app shape = separate apps/admin
+review packet = docs/frontend-kickoff-review.md
+```
+
+B9.16 没有声明已开始正式前端实现；当前完成的是前端开工前的信息架构、页面顺序和 owner 审核问题清单。
 
 全量题库慢速 smoke：
 
@@ -376,7 +388,7 @@ PracticeSessionService
 
 ### P0 Before Public Production
 
-- 学生密码登录 enforcement、旧账号迁移审计 gate、旧账号迁移写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks 与 B9.14 目标环境迁移执行证据已落地；公开生产前仍需正式改密前端入口、PR human approval/merge、第三方告警通知接入和最终发布参数验收。
+- 学生密码登录 enforcement、旧账号迁移审计 gate、旧账号迁移写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks、B9.14 目标环境迁移执行证据与 B9.16 前端开工前审查包已落地；公开生产前仍需正式改密前端入口、PR human approval/merge、第三方告警通知接入和最终发布参数验收。
 - 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap 与管理平台 IA/account ops 审查稿，但仍缺正式运营 UI、导入 reset/队列化和完整审核流程。
 - 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、隔离 backup/restore drill、结构化 request log、metrics smoke endpoint、服务器侧 synthetic healthcheck timer、实机 restore drill 和最低限度 staging load baseline；仍没有第三方告警通知目标、长期性能压测和正式生产数据量级恢复策略。
 - 已对 `https://exam.acgbot.cc.cd` 做 staging smoke、load baseline 与 restore drill；仍未声明正式公开生产发布完成。

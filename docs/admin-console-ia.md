@@ -284,4 +284,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.15 运维基线、凭据交付流程和本 IA 已形成可审核稿；下一步仍应先做静态 IA/流程审核，不直接进入正式 Admin 视觉实现。
+当前建议：B9.15 运维基线、凭据交付流程、本 IA 与 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md) 已形成可审核稿；下一步仍应先做学生账号启用最小前端和 Admin 静态 wireframe 审核，不直接进入正式 Admin 视觉实现。

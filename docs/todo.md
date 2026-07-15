@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.16 Pre-Frontend Review Packet — 2026-07-15
+
+- [x] 新增 `docs/frontend-kickoff-review.md`，固定正式前端开工前的学生端/管理端审查范围。
+- [x] 明确正式视觉重做继续暂缓；下一步只建议做学生账号启用最小 UI。
+- [x] 固定学生端 P0 缺口：首次改密、账号身份显示、改密错误状态、auth gate。
+- [x] 固定 Learning 前端 IA 候选：推荐 `/learning` 一级入口，首页只放摘要。
+- [x] 固定管理端边界：推荐独立 `apps/admin`，第一版优先 Student Accounts + System Status。
+- [x] 更新 `student-information-architecture.md`、`admin-console-ia.md`、`product-boundaries.md` 和 `status.md` 的前端开工前说明。
+- [x] 未创建正式 `apps/admin`；未重做学生端视觉；未声明前端已完成。
+
 ## Completed Backend B9.15 Staging Operations / PR / Credential / Admin IA — 2026-07-15
 
 - [x] 服务器侧 synthetic healthcheck 已安装：`bkyexam-healthcheck.timer` active/enabled，每 5 分钟检查 `health/readiness/metrics`。
@@ -56,7 +66,7 @@
 - [x] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（`exam.acgbot.cc.cd`）已完成：production gate `ok=true`、legacy passwordless `0`、HTTPS smoke PASS、deployment evidence `ready=true`。
 - [x] B9.15 Staging Operations Hardening：服务器侧 synthetic monitor/systemd alert hook、systemd/nginx/env runbook 复核、低成本 load baseline、实机 backup/restore drill 已完成；第三方通知目标仍待配置。
 - [x] PR #2 review / merge 决策材料已完成：CI green，实际 merge 仍等待 required approving review。
-- [x] 前端正式设计仍暂缓；管理平台信息架构、账号运营流程和学生端必要功能审查稿已完成，后续再进入前端设计评审。
+- [x] 前端正式设计仍暂缓；B9.16 已完成前端开工前审查包。下一步建议 B9.17 只做学生账号启用最小 UI，不直接做整体视觉。
 
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 

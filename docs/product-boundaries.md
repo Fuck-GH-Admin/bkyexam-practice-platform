@@ -43,7 +43,7 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流，建议后续创建 `apps/admin`。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)。Admin User manage 后端已完成；正式前端仍需等待 Import true mode 决策、Admin User UI 行为审核和 IA checklist 审核。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；正式前端仍需先确认 Student Accounts、System Status、Import true mode 暂缓策略和 IA checklist。
 
 ### API / Data Platform
 
@@ -100,6 +100,7 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 当前缺失：
 
+- 学生首次改密/账号启用入口；B9.16 建议作为 B9.17 最小学生前端补齐。
 - 账户说明、身份安全和数据归属提示。
 - 学习统计后端概览、趋势、目标、错题复习反馈信号、题目收藏和长期复习标记已具备；仍缺前端呈现、推荐策略和更完整长期进步反馈。
 - active session 的归档/放弃操作与超过首屏 20 条时的“更多”交互。

@@ -1,7 +1,7 @@
 # Student Information Architecture v1
 
 **状态：已定稿，作为学生端 P1 的实现与验收边界。**  
-**更新时间：2026-07-11**
+**更新时间：2026-07-15**
 
 这份文档先固定学生“看见什么、从哪里进入、能否回到哪里”的产品结构；它不规定最终的视觉风格。最终视觉设计必须建立在这些稳定的对象、路由和状态之上，而不是反过来用页面样式决定业务结构。
 
@@ -173,3 +173,24 @@ GET /api/practice/sessions?status=active|completed&limit=1..50&offset>=0
 - 跨题库错题再练的“展示题库”精细归因。
 
 这些项在学生流程稳定、真实使用路径清楚后，再由独立设计阶段处理。
+
+## 8. B9.16 前端开工前补充：账号启用
+
+正式身份安全策略已经落地后，学生端 P0 需要补一个“账号启用”入口，但这仍不等于开始最终视觉重做。
+
+建议新增或确认的入口：
+
+| URL / Surface | 状态 | 目的 |
+| --- | --- | --- |
+| `/account/password` | B9.16 提议，B9.17 可实现 | `passwordResetRequired=true` 时强制学生修改临时密码 |
+| 用户菜单 / 首页身份卡 | B9.16 提议，B9.17 可实现 | 展示 loginName、displayName、className、groupName 和是否待改密 |
+| `/learning` | B9.16 提议，后续 P1 | 承载 Learning Dashboard/Trends/Goals/Review Marks，而不是继续堆到首页 |
+
+账号启用规则：
+
+- 登录响应或 `GET /api/auth/me` 返回 `passwordResetRequired=true` 时，学生必须先进入改密流程。
+- 改密使用 `POST /api/auth/password/change`；成功后重新加载 `auth me` 并回到原目标页或首页。
+- 改密页只处理当前密码、新密码、确认新密码和错误状态，不加入注册、找回、邮箱/短信验证。
+- 管理员重置密码后学生再次进入同一流程。
+
+完整前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。

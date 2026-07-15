@@ -68,7 +68,7 @@ npm run ops:legacy-student-password-migration -- --limit=50
 
 ## 1.3 Staging Synthetic Healthcheck
 
-B9.15 ? staging ????????? API ??? synthetic monitor?
+B9.15 已在 staging 服务器安装独立于应用进程的 synthetic monitor：
 
 ```bash
 systemctl status bkyexam-healthcheck.timer
@@ -76,17 +76,22 @@ journalctl -u bkyexam-healthcheck.service -n 50 --no-pager
 tail -20 /var/log/bkyexam-healthcheck/checks.jsonl
 ```
 
-?? 5 ???? `/api/health`?`/api/health/readiness` ? `/api/health/metrics`????? oneshot service ??? 0???? `bkyexam-healthcheck-alert@.service` ?? daemon.err journal???? webhook/email/IM ???? owner ?????????
+该 timer 每 5 分钟检查 `/api/health`、`/api/health/readiness` 和 `/api/health/metrics`。检查失败时 oneshot service 返回非 0，并触发 `bkyexam-healthcheck-alert@.service` 写入 daemon.err journal。当前尚未接入 webhook/email/IM；接收端需要 owner 后续提供。
 
 ## 1.4 Staging Load Baseline
 
-B9.15 ???????????
+B9.15 新增可重复的轻量 staging load baseline：
 
 ```powershell
-npm run ops:staging-load-baseline --   --base-url=https://exam.acgbot.cc.cd   --credentials-csv=/root/bkyexam-credentials/LATEST   --iterations=3   --require-thresholds   --output=/srv/bkyexam-backups/<run>/load-baseline.json
+npm run ops:staging-load-baseline -- `
+  --base-url=https://exam.acgbot.cc.cd `
+  --credentials-csv=/root/bkyexam-credentials/LATEST `
+  --iterations=3 `
+  --require-thresholds `
+  --output=/srv/bkyexam-backups/<run>/load-baseline.json
 ```
 
-??????????? health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me?
+该脚本输出脱敏 JSON，不打印密码。完整凭据模式覆盖 health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me；`--no-auth` 模式只跑公开 health/readiness/metrics/banks。
 
 ## 2. Production Backup Procedure
 

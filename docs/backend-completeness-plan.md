@@ -20,8 +20,8 @@
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
 | 后端工程可验证性 | **约 92%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI、`main` required checks 与 B9.14 真实服务器 staging evidence 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、外部监控告警和系统性性能压测。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 84–86%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 公开生产后端就绪 | **约 88%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence；仍缺 PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。 |
+| 完整平台后端 | **约 84–86%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
+| 公开生产后端就绪 | **约 90%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence、B9.15 运维基线和 B9.16 前端开工前审查包；仍缺 PR review/merge、第三方外部告警通知、持续性能压测、学生首次改密前端入口和正式生产发布验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -36,7 +36,7 @@ HTTP smoke = PASS
 deployment evidence = ready=true, 14 pass / 0 warn / 0 fail
 ```
 
-B9.15 staging ???????
+B9.15 staging 运维基线摘要
 
 ```text
 synthetic healthcheck timer = active/enabled
@@ -1521,38 +1521,37 @@ review_items
 
 ## 6. 推荐下一步具体执行
 
-如果继续本规划，下一步建议执行：
+B9.15 已完成目标环境运维基线；B9.16 已完成前端开工前审查包。当前建议下一步执行：
 
-> **B9.15 Staging Operations Hardening / Monitoring / Load Baseline**，在 B9.14 已完成的目标环境基础上，补外部监控告警最小闭环、systemd/nginx runbook 复核、低成本压测脚本、实机 backup/restore 复核和发布回滚演练记录。
+> **B9.17 Student Activation Minimum UI**，在不重做视觉、不创建完整管理端的前提下，补齐学生首次改密、账号身份显示和 auth gate，让 staging 中 43 个临时密码账号具备完整启用闭环。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-docs: approve pre-frontend product gates
+feat: add student account activation flow
 ```
 
 范围建议只包含：
 
-- 复核 systemd/nginx/env/backup runbook，确保恢复步骤不是只存在本次对话。
-- 补一个可重复的轻量 API load baseline：health/readiness/banks/login/practice create。
-- 记录 PostgreSQL 热点查询与当前索引观察，不急着重构。
-- 接入或至少设计外部 uptime/alerting 最小方案。
-- 复核凭据交付流程：谁拿 admin/student 初始密码、如何要求首次改密、旧账号密码如何处理。
-- 本阶段仍不做正式前端视觉。
+- 登录后识别 `passwordResetRequired=true`。
+- 提供 `/account/password` 或等价 blocking page，调用 `POST /api/auth/password/change`。
+- 显示 loginName、displayName、className、groupName 和待改密状态。
+- 改密成功后刷新 `GET /api/auth/me`，回到原目标页或首页。
+- 覆盖当前密码错误、新密码不一致、新密码过短、网络失败和会话失效。
+- 补 router/auth gate/unit 或 Playwright smoke。
 
 不做：
 
-- 不创建 `apps/admin`
-- 不改正式 UI
-- 不开放 public 管理员注册
-- 不开放 public 学生注册
-- 不实现邮箱/短信找回
-- 不改 true import reset gate；reset/队列化另设阶段
-- 不改学生端业务语义
-- 不引入微服务
-- 不引入复杂消息队列
+- 不整体重做学生端视觉。
+- 不创建完整 `apps/admin`。
+- 不开放 public 注册/找回。
+- 不实现邮箱/短信找回。
+- 不做 Learning Dashboard 完整 UI。
+- 不做 Admin Import reset/异步队列/取消重试。
+- 不改 true import reset gate。
+- 不引入复杂设计系统或微服务。
 
-这样可以把“目标环境可发布证据闭环”推进到“可运维、可观察、可回滚”的发布基线，再考虑正式前端信息架构。
+这样可以先解决账号启用主链路，再进入 Admin 静态 wireframe 或管理端骨架。
 
 ## 7. 阶段提交规则
 
@@ -1571,4 +1570,4 @@ docs: approve pre-frontend product gates
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是继续后端运维闭环：做 B9.15 staging operations hardening / monitoring / load baseline；正式前端仍应等目标环境运维基线、凭据交付流程、性能边界和管理端信息架构稳定后再进入设计实现。
+最合理的下一步是 B9.17 Student Activation Minimum UI：不重做视觉，只补学生首次改密/账号启用闭环；正式视觉和完整 Admin 前端仍应等 B9.16 审查问题确认后再进入设计实现。
