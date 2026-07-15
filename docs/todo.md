@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.15 Staging Operations / PR / Credential / Admin IA — 2026-07-15
+
+- [x] 服务器侧 synthetic healthcheck 已安装：`bkyexam-healthcheck.timer` active/enabled，每 5 分钟检查 `health/readiness/metrics`。
+- [x] healthcheck 最新结果 `ok=true`，日志保存在 `/var/log/bkyexam-healthcheck/checks.jsonl`。
+- [x] post-deploy backup/restore drill 已在目标服务器通过，关键业务表计数一致。
+- [x] 轻量 staging load baseline 已通过：27 checks / 0 failures，覆盖 health/readiness/metrics/banks/student login/me/practice create/admin login/me。
+- [x] 新增 `npm run ops:staging-load-baseline` 和 `scripts/run-staging-load-baseline.mjs`，支持无凭据 smoke、凭据 CSV、阈值检查和 JSON 证据输出。
+- [x] PR #2 merge 决策记录已写入：CI green，但受 `main` required approving review=1 阻塞，当前不绕过、不合并。
+- [x] 凭据交付、首次改密、管理员重置密码和旧账号保留策略已写入 runbook。
+- [x] 管理平台 IA 已补 Student Accounts、Account Operations Flow 和权限矩阵；正式前端仍暂缓。
+- [x] 证据记录在 `docs/staging-operations-hardening.md`、`docs/pr-review-merge-decision.md`、`docs/credential-delivery-runbook.md`、`docs/admin-console-ia.md` 与服务器 `/srv/bkyexam-backups/b9.15-20260715104214/`。
+- [x] 未声明第三方通知目标已接入；未声明 PR 已 review/merge；未声明正式公开生产发布完成。
+
 ## Completed Backend B9.14 Staging Deployment Evidence — 2026-07-15
 
 - [x] 真实服务器目标：`https://exam.acgbot.cc.cd` / `root@47.88.33.54`。
@@ -41,9 +54,9 @@
 后续代码阶段：
 
 - [x] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（`exam.acgbot.cc.cd`）已完成：production gate `ok=true`、legacy passwordless `0`、HTTPS smoke PASS、deployment evidence `ready=true`。
-- [ ] B9.15 Staging Operations Hardening：外部监控/告警最小闭环、systemd/nginx runbook 复核、低成本压测脚本、实机 backup/restore 复核。
-- [ ] PR #2 review / merge 决策。
-- [ ] 前端正式设计仍暂缓；先完成管理平台信息架构、账号运营流程和学生端必要功能审查。
+- [x] B9.15 Staging Operations Hardening：服务器侧 synthetic monitor/systemd alert hook、systemd/nginx/env runbook 复核、低成本 load baseline、实机 backup/restore drill 已完成；第三方通知目标仍待配置。
+- [x] PR #2 review / merge 决策材料已完成：CI green，实际 merge 仍等待 required approving review。
+- [x] 前端正式设计仍暂缓；管理平台信息架构、账号运营流程和学生端必要功能审查稿已完成，后续再进入前端设计评审。
 
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 

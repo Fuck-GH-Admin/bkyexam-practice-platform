@@ -1,6 +1,6 @@
 # Admin Console IA Gate
 
-状态日期：**2026-07-14**
+状态日期：**2026-07-15**
 
 本文件是管理端正式前端前的信息架构闸门。它不是视觉设计稿，也不是 `apps/admin` 实现计划；目的是先固定页面、权限、数据和状态，避免再次出现 UI 设计途中反向改后端语义。
 
@@ -8,8 +8,8 @@
 
 正式 Admin 前端仍不应立即开工。当前可以进入“静态信息架构审核”：
 
-- 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review、System Status、Audit Logs、Admin Users。
-- 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`。
+- 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review、System Status、Audit Logs、Admin Users、Admin Students。
+- 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`；B9.14 staging 已创建 `admin` 并初始化 `202502040201`–`202502040230` 的 `2班` 学生账号。
 - 仍缺正式 Admin 前端；true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
 - 因此前端之前必须先确认管理端页面分区和各页面状态，不做视觉精修。
 
@@ -36,6 +36,11 @@ Admin Console
   Admin Users
     Bootstrap Done State
     List / Detail / Create / Disable / Role Update
+  Student Accounts
+    List / Detail
+    Create / Bulk Create
+    Reset Password / Revoke Sessions
+    Class / Group Filters
 ```
 
 ## 3. Permission Matrix
@@ -49,6 +54,7 @@ Admin Console
 | System Status | `system_status:read` | none | operator, super_admin |
 | Audit Logs | `audit_log:read` | none | super_admin |
 | Admin Users | `admin_user:manage` | create/disable/role/password update | super_admin |
+| Student Accounts | `student_account:read` | `student_account:write`, `student_account:reset_password`, `student_account:revoke_session` | operator, super_admin |
 
 ## 4. Page Contracts
 
@@ -181,16 +187,87 @@ Next UI decisions:
 - Whether disable should require a typed confirmation.
 - How to show last-super-admin guard errors.
 
+
+### 4.8 Student Accounts
+
+Current:
+
+- HTTP Admin Student Manage API exists: list/detail/create/bulk-create/update/reset-password/revoke-sessions.
+- `operator` and `super_admin` can run day-to-day student account operations.
+- `content_editor` does not receive student account permissions by default.
+- B9.14 staging provisioned `202502040201`–`202502040230` as `2班` and migrated 13 legacy passwordless accounts.
+
+APIs:
+
+- `GET /api/admin/students`
+- `GET /api/admin/students/:studentId`
+- `POST /api/admin/students`
+- `POST /api/admin/students/bulk-create`
+- `PATCH /api/admin/students/:studentId`
+- `POST /api/admin/students/:studentId/reset-password`
+- `POST /api/admin/students/:studentId/revoke-sessions`
+
+Must show:
+
+- loginName / displayName
+- className / groupName
+- status
+- passwordResetRequired
+- lastLoginAt
+- failedLoginCount / lockedUntil
+- createdAt / updatedAt
+
+Primary operations:
+
+1. Create one student.
+2. Bulk create by JSON paste/upload, max 200 per request.
+3. Edit displayName/status/className/groupName.
+4. Reset password and force `passwordResetRequired=true`.
+5. Revoke sessions after reset or suspicious login.
+
+Required states:
+
+- duplicate loginName in bulk create.
+- partial success with created/skipped/failed rows.
+- disabled student cannot login.
+- locked student shows lock expiry.
+- reset password must not display password after confirmation unless operator explicitly generated it in that moment.
+- old passwordless accounts should never appear after production gate; if they do, show migration warning.
+
+### 4.9 Account Operations Flow
+
+Operator flow for initial class rollout:
+
+```text
+Prepare roster -> Bulk create students -> Download/record generated credentials in secure channel only -> Deliver per student -> Student first login -> Force password change -> Monitor passwordResetRequired count
+```
+
+Operator flow for forgotten password:
+
+```text
+Find student -> Confirm identity out-of-band -> Reset password -> Revoke sessions -> Deliver temporary password -> Student changes password
+```
+
+Super admin flow for admin account:
+
+```text
+Create admin -> Assign least role -> Deliver temporary password -> Admin logs in -> Rotate password -> Audit log review
+```
+
+UI must not include public self-registration, public password recovery, email/SMS recovery, or student password export as a default action.
+
 ## 5. Static Wireframe Checklist
 
 Before building `apps/admin`, confirm these with static sketches or tables:
 
 - [ ] Navigation labels and grouping.
+- [ ] Student Accounts section placement and operator visibility.
 - [ ] Which roles can see each nav item.
 - [ ] Empty/loading/error states for each page.
 - [ ] Table columns and default sort for each list.
 - [ ] Detail drawer/page contents.
 - [ ] Write action confirmation dialogs.
+- [ ] Student reset-password confirmation and one-time temporary password handling.
 - [ ] Conflict and partial-success UI.
 - [ ] Audit diff presentation.
 - [ ] No student-only field leaks into admin routes by accident.
@@ -201,9 +278,10 @@ Before building `apps/admin`, confirm these with static sketches or tables:
 Only start formal Admin frontend when all are true:
 
 - Admin User manage UI behavior is reviewed against the implemented API.
+- Admin Student manage UI behavior and credential delivery runbook are reviewed together.
 - Import true mode decision is made or explicitly deferred.
 - IA checklist above is reviewed.
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：继续后端学生学习统计或生产安全/运维前置项；暂不启动正式 Admin 前端。
+当前建议：B9.15 运维基线、凭据交付流程和本 IA 已形成可审核稿；下一步仍应先做静态 IA/流程审核，不直接进入正式 Admin 视觉实现。

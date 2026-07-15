@@ -36,6 +36,17 @@ HTTP smoke = PASS
 deployment evidence = ready=true, 14 pass / 0 warn / 0 fail
 ```
 
+B9.15 staging ???????
+
+```text
+synthetic healthcheck timer = active/enabled
+backup/restore drill = PASS
+load baseline = PASS, 27 checks / 0 failures
+PR #2 decision record = review required, CI green
+credential delivery runbook = completed
+admin IA review draft = completed
+```
+
 ## 2. 已完成且被验证的后端能力
 
 ### 2.1 Database And Import
@@ -1517,7 +1528,7 @@ review_items
 具体第一阶段 commit 目标可定为：
 
 ```text
-chore: record staging ops hardening baseline
+docs: approve pre-frontend product gates
 ```
 
 范围建议只包含：

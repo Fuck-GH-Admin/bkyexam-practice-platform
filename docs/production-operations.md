@@ -66,6 +66,28 @@ npm run ops:legacy-student-password-migration -- --limit=50
 
 默认 dry-run。正式迁移必须显式 `--apply`，并提供统一临时密码环境变量或 `--credentials-out=artifacts/.../credentials.csv` 生成每人独立临时密码。迁移会只更新 `password_hash IS NULL` 的学生，强制 `password_reset_required=true`，清空失败/锁定状态，并默认撤销未过期 student session。完整说明见 [`legacy-student-password-migration.md`](legacy-student-password-migration.md)。
 
+## 1.3 Staging Synthetic Healthcheck
+
+B9.15 ? staging ????????? API ??? synthetic monitor?
+
+```bash
+systemctl status bkyexam-healthcheck.timer
+journalctl -u bkyexam-healthcheck.service -n 50 --no-pager
+tail -20 /var/log/bkyexam-healthcheck/checks.jsonl
+```
+
+?? 5 ???? `/api/health`?`/api/health/readiness` ? `/api/health/metrics`????? oneshot service ??? 0???? `bkyexam-healthcheck-alert@.service` ?? daemon.err journal???? webhook/email/IM ???? owner ?????????
+
+## 1.4 Staging Load Baseline
+
+B9.15 ???????????
+
+```powershell
+npm run ops:staging-load-baseline --   --base-url=https://exam.acgbot.cc.cd   --credentials-csv=/root/bkyexam-credentials/LATEST   --iterations=3   --require-thresholds   --output=/srv/bkyexam-backups/<run>/load-baseline.json
+```
+
+??????????? health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me?
+
 ## 2. Production Backup Procedure
 
 生产备份建议使用 custom format，并将输出写到受限目录：
