@@ -1536,24 +1536,35 @@ B9.19 实际落地：
 - Admin unit tests 与 Playwright admin smoke。
 - 文档：[`admin-operational-mvp.md`](admin-operational-mvp.md)。
 
+B9.20 已完成 Admin P1 工作流与后端缺口审查，文档见 [`admin-p1-workflow-gap-review.md`](admin-p1-workflow-gap-review.md)。
+
+B9.20 结论：
+
+- **Bank Mappings P1 UI 可以优先做**：list/detail/edit/bulk-status、optimistic concurrency、无客观题禁止发布、partial bulk result 和 audit 都已有后端语义。
+- **Import Jobs 先做 dry-run/history/error-report UI**：true import write/reset/cancel/retry 不应先做完整 UI，因为当前 runner 仍是 request 内同步执行，没有独立 worker、cancel/retry endpoint 或 reset 事务策略。
+- **Question Review 可先做 preview-level flag/exclusion UI**：完整审核器还缺 full question detail、批量操作、override 层和导入覆盖策略。
+- **System Status 不承载账号运营统计**：如需要 Admin Dashboard 总览，后续新增独立 ops summary API。
+
 当前建议下一步执行：
 
-> **B9.20 Admin P1 Workflow UI Review / Backend Gap Check**，先在已运行的 `apps/admin` 骨架上确认 Bank Mappings、Import Jobs、Question Review 三条工作流还缺哪些后端字段、状态和 command，再决定是继续做 P1 管理 UI，还是先补 import queue/reset/cancel/retry 后端。
+> **B9.21 Admin Bank Mappings P1 UI**，在 `apps/admin` 里落地题库整理 list/filter/page、detail/edit、publish/hidden/deprecated、bulk status partial result、permission-gated controls 与 mock smoke。
 
-B9.20 建议范围：
+B9.21 建议范围：
 
-- 对照现有 shared Admin Bank Mapping contract，设计并验证 list/detail/edit/bulk-status UI 所需字段。
-- 对照 Import Jobs contract，确认 dry-run/import gate/error-report 的页面状态，明确是否必须先补异步队列与 cancel/retry。
-- 对照 Question Review contract，确认 flag/exclusion 操作流是否足够运营使用。
-- 评估是否新增 Admin dashboard summary API，而不是把账号运营统计塞进 System Status。
-- 继续不做最终视觉 polish；只做功能与状态验证。
+- Bank Mappings list/filter/page。
+- Detail/Edit drawer 或页面。
+- optimistic concurrency 保存与 `409` 冲突提示。
+- `objectiveQuestionCount=0` 禁止发布提示。
+- visible/status 发布控制与 content_editor 权限降级。
+- bulk status updated/failed 局部结果。
+- Admin unit tests + Playwright mock smoke。
 
-不做：
+B9.21 不做：
 
-- 不直接进入完整设计系统。
-- 不开放 public 注册/找回。
-- 不在未确认 reset/队列语义前实现 import reset UI。
-- 不把学生端和管理端合并为一个导航。
+- 不做 Import true write/reset/cancel/retry。
+- 不做 full question editor 或手工修题 override 层。
+- 不做 Audit diff polish。
+- 不进入最终视觉系统。
 ## 7. 阶段提交规则
 
 每个阶段都遵守：
@@ -1571,4 +1582,4 @@ B9.20 建议范围：
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.20 Admin P1 Workflow UI Review / Backend Gap Check：在已落地的 `apps/admin` 账号运营入口基础上，继续确认题库整理、导入任务和题目质检 UI 是否需要新增后端字段或先补队列/reset/cancel/retry；最终视觉仍后置。
+最合理的下一步是 B9.21 Admin Bank Mappings P1 UI：在已落地的 `apps/admin` 账号运营入口基础上，先实现题库整理 list/filter/detail/edit/bulk status，并继续把 Import true write/reset/cancel/retry 与完整 Question Review editor 后置；最终视觉仍后置。

@@ -5,6 +5,15 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.20 Admin P1 Workflow UI Review / Backend Gap Check — 2026-07-15
+
+- [x] 新增 `docs/admin-p1-workflow-gap-review.md`。
+- [x] 对照 shared v1 Admin Bank Mapping contract，确认 list/detail/edit/bulk-status UI 字段和状态足够支撑 P1。
+- [x] 确认 Bank Mappings 是下一阶段最稳的管理端 P1 UI 候选；无阻塞性后端缺口。
+- [x] 对照 Import Jobs contract 和 service，确认 dry-run/history/error-report UI 可做，但 true import write/reset/cancel/retry 需要先补异步队列和控制后端。
+- [x] 对照 Question Review contract，确认可先做 preview-level flag/exclusion UI；完整审核器仍缺 full question detail/override 层。
+- [x] 明确 Admin dashboard summary 不应塞入 System Status；如需要账号运营统计，后续新增独立 ops summary API。
+- [x] 不实现最终视觉，不新增业务代码，不改变 API contract。
 ## Completed Frontend B9.19 Admin Operational MVP — 2026-07-15
 
 - [x] 创建独立 `apps/admin` workspace，Vite dev server 固定 5174。

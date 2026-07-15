@@ -14,6 +14,7 @@ B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完�
 - true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
 - B9.18 static wireframe review: [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
 - B9.19 runtime slice: [`admin-operational-mvp.md`](./admin-operational-mvp.md)。
+- B9.20 P1 workflow/gap review: [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，结论是优先做 Bank Mappings P1 UI，Import true write/reset/cancel/retry 后置。
 
 ## 2. 第一版 Sitemap
 
@@ -286,4 +287,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；下一步先做 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认，不直接进入完整 Admin 视觉实现。
+当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认。下一步优先做 Bank Mappings P1 UI；Import true write/reset/cancel/retry、完整 Question Review editor 和最终视觉继续后置。
