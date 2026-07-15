@@ -3,6 +3,7 @@ import type {
   AdminAuditLogEntryV1,
   AdminBankMappingListItemV1,
   AdminImportJobV1,
+  AdminManagedUserV1,
   AdminPermissionV1,
   AdminQuestionReviewItemV1,
   AdminStudentV1,
@@ -10,6 +11,8 @@ import type {
 
 import {
   buildAdminPath,
+  buildAdminUserBadges,
+  buildAdminUserListQuery,
   buildAuditLogBadges,
   buildAuditLogListQuery,
   buildBankMappingListQuery,
@@ -48,6 +51,11 @@ describe('admin route helpers', () => {
       kind: 'audit-logs',
       auditLogId: '99999999-9999-4999-8999-999999999999',
     });
+    expect(parseAdminRoute('/admin/users/create')).toEqual({ kind: 'admin-users', panel: 'create' });
+    expect(parseAdminRoute('/admin/users/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')).toEqual({
+      kind: 'admin-users',
+      adminId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
     expect(buildAdminPath({ kind: 'students', studentId: 'student-1' })).toBe('/admin/students/student-1');
     expect(buildAdminPath({ kind: 'bank-mappings', bankId: '11111111-1111-4111-8111-111111111111' })).toBe(
       '/admin/bank-mappings/11111111-1111-4111-8111-111111111111',
@@ -60,6 +68,10 @@ describe('admin route helpers', () => {
     );
     expect(buildAdminPath({ kind: 'audit-logs', auditLogId: '99999999-9999-4999-8999-999999999999' })).toBe(
       '/admin/audit-logs/99999999-9999-4999-8999-999999999999',
+    );
+    expect(buildAdminPath({ kind: 'admin-users', panel: 'create' })).toBe('/admin/users/create');
+    expect(buildAdminPath({ kind: 'admin-users', adminId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })).toBe(
+      '/admin/users/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     );
   });
 
@@ -77,6 +89,13 @@ describe('admin route helpers', () => {
       'system',
       'students',
       'import-jobs',
+    ]);
+
+    expect(buildVisibleAdminNavigation([...operatorPermissions, 'admin_user:manage']).map((item) => item.key)).toEqual([
+      'system',
+      'students',
+      'import-jobs',
+      'admin-users',
     ]);
   });
 });
@@ -243,6 +262,36 @@ describe('audit log helpers', () => {
       'success',
       'admin_user',
       'system-actor',
+    ]);
+  });
+});
+
+describe('admin user helpers', () => {
+  test('builds admin user query and badges', () => {
+    expect(buildAdminUserListQuery({
+      keyword: 'admin',
+      status: 'active',
+      role: 'super_admin',
+    }, 20, 20)).toBe(
+      'limit=20&offset=20&keyword=admin&status=active&role=super_admin',
+    );
+
+    const adminUser: AdminManagedUserV1 = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      loginName: 'admin',
+      displayName: '平台管理员',
+      status: 'active',
+      roles: ['super_admin', 'operator'],
+      permissions: ['admin:self:read', 'admin_user:manage'],
+      createdAt: '2026-07-15T10:00:00.000Z',
+      updatedAt: '2026-07-15T10:00:00.000Z',
+      lastLoginAt: null,
+    };
+
+    expect(buildAdminUserBadges(adminUser)).toEqual([
+      'active',
+      'super_admin',
+      'operator',
     ]);
   });
 });

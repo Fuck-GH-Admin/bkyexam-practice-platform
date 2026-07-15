@@ -15,7 +15,7 @@ Bank Mappings = implemented in B9.21
 Import Jobs dry-run/history = implemented in B9.22
 Question Review = implemented in B9.23
 Audit Logs = implemented in B9.24
-Admin Users = placeholder only
+Admin Users = implemented in B9.25
 visual polish = deferred
 ```
 
@@ -33,7 +33,7 @@ B9.19 已创建独立 `apps/admin` workspace。它与学生端 `apps/web` 分离
 - `/admin/students/bulk-create` JSON/CSV paste 批量创建学生。
 - Sidebar 根据当前管理员 `permissions` 过滤可见导航。
 - 直接访问无权限页面时显示 403 panel。
-- Bank Mappings 已在 B9.21 升级为 P1 功能页；Import Jobs dry-run/history 已在 B9.22 升级为功能页；Question Review preview 已在 B9.23 升级为功能页；Audit Logs read-only 已在 B9.24 升级为功能页；Admin Users 仍只做 placeholder，不开放半成品写操作。
+- Bank Mappings 已在 B9.21 升级为 P1 功能页；Import Jobs dry-run/history 已在 B9.22 升级为功能页；Question Review preview 已在 B9.23 升级为功能页；Audit Logs read-only 已在 B9.24 升级为功能页；Admin Users 已在 B9.25 升级为功能页。
 
 ### Contract parsing
 
@@ -66,6 +66,10 @@ B9.19 已创建独立 `apps/admin` workspace。它与学生端 `apps/web` 分离
 - `AdminQuestionReviewDetailResponseV1Schema`
 - `UpdateAdminQuestionReviewRequestV1Schema`
 - `AdminAuditLogListResponseV1Schema`
+- `AdminUserListResponseV1Schema`
+- `AdminUserDetailResponseV1Schema`
+- `CreateAdminUserRequestV1Schema`
+- `UpdateAdminUserRequestV1Schema`
 - `ApiErrorResponseV1Schema`
 
 ### System Status
@@ -124,7 +128,6 @@ B9.19 不声明完成以下内容：
 - Import Jobs dry-run/history UI 已在 B9.22 补齐；true import 操作 UI 仍未做。
 - Question Review preview UI 已在 B9.23 补齐；完整 editor/override 仍未做。
 - Audit Logs read-only UI 已在 B9.24 补齐；复杂 diff/export 仍未做。
-- Admin Users UI。
 - import reset、异步 worker、cancel/retry。
 - public student registration / recovery。
 - public admin registration。
@@ -132,12 +135,12 @@ B9.19 不声明完成以下内容：
 
 ## 5. 下一步建议
 
-B9.19 后续已经完成 B9.20 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI 与 B9.24 Audit Logs read-only UI。最新记录见 [`admin-p1-workflow-gap-review.md`](admin-p1-workflow-gap-review.md)、[`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)、[`admin-import-jobs-dry-run-ui.md`](admin-import-jobs-dry-run-ui.md)、[`admin-question-review-preview-ui.md`](admin-question-review-preview-ui.md) 与 [`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md)。原 B9.20 建议是先用真实 `apps/admin` 骨架验证：
+B9.19 后续已经完成 B9.20 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI、B9.24 Audit Logs read-only UI 与 B9.25 Admin Users management UI。最新记录见 [`admin-p1-workflow-gap-review.md`](admin-p1-workflow-gap-review.md)、[`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)、[`admin-import-jobs-dry-run-ui.md`](admin-import-jobs-dry-run-ui.md)、[`admin-question-review-preview-ui.md`](admin-question-review-preview-ui.md)、[`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md) 与 [`admin-users-management-ui.md`](admin-users-management-ui.md)。原 B9.20 建议是先用真实 `apps/admin` 骨架验证：
 
 1. Bank Mappings list/detail/edit 的最小 UI 是否需要新增后端字段。
 2. Import Jobs list/detail/error-report 的 UI 是否需要异步/队列前先补状态字段。
 3. Question Review list/detail/flag/exclusion 的 UI 是否足够运营使用。
-4. Admin Users 是否应进入下一版，还是继续只靠 CLI/API。
+4. Admin Users 已落地，是否进一步做 MFA/SSO 或邀请流。
 5. 是否需要一个 Admin dashboard summary API，避免 System Status 承担账号运营统计。
 
-仍建议暂缓最终视觉精修：当前管理端已经可以运营学生账号、题库整理、导入 dry-run/history、质检 preview 和审计日志只读查询，但 Admin Users、完整 Question Review editor/override 与导入 reset/queue/control 还未通过可运行界面或后端控制语义闭环。
+仍建议暂缓最终视觉精修：当前管理端已经可以运营学生账号、题库整理、导入 dry-run/history、质检 preview、审计日志只读查询和 Admin Users 管理，但完整 Question Review editor/override 与导入 reset/queue/control 还未通过可运行界面或后端控制语义闭环。

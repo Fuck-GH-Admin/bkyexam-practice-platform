@@ -107,11 +107,11 @@ B9.23 不声明完成以下内容：
 - 质检历史复杂筛选 UI。
 - 与下一次导入冲突的 ownership/override 策略。
 - Audit Logs UI。
-- Admin Users UI。
+- Admin Users UI（已在 B9.25 完成）。
 - 最终视觉设计系统。
 
 ## 5. 后续记录
 
 B9.23 后，B9.24 已完成 Audit Logs read-only UI，文档见 [`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md)。
 
-B9.24 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview 和 Audit Logs read-only。下一步建议进入 Admin Users management UI。
+B9.25 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only 和 Admin Users management UI。下一步建议进入完整 Question Review editor / override。

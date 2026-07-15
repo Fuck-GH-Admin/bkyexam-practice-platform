@@ -93,21 +93,18 @@ B9.24 不声明完成以下内容：
 - 审计日志导出。
 - 审计统计 dashboard。
 - Audit retention / archival policy。
-- Admin Users UI。
+- Admin Users UI（已在 B9.25 完成）。
 - 完整 Question Review editor / override 层。
 - 最终视觉设计系统。
 
 ## 5. 下一步建议
 
-B9.24 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview 和 Audit Logs read-only。
+B9.25 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only 和 Admin Users management UI。
 
-下一步建议做 **B9.25 Admin Users management UI**：
+下一步建议做 **B9.26 完整 Question Review editor / override**：
 
-- Admin Users list/filter/page。
-- Detail/edit status、roles、displayName。
-- Create admin user。
-- Reset/update admin password。
-- 渲染 last-super-admin guard / partial error。
-- 不做 MFA/SSO，不做最终视觉。
+- Question Review 真正的编辑器与 override 层。
+- Import true write / reset / cancel / retry。
+- 最终视觉系统。
 
-这样可以把已有 Admin User manage API 暴露出来，完成 super_admin 日常账号管理的最小 UI 闭环。
+Admin Users management UI 已在 B9.25 完成；下一步应优先补仍未闭环的题目编辑/导入控制语义。

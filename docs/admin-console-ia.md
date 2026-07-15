@@ -10,7 +10,7 @@ B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完�
 
 - 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review、System Status、Audit Logs、Admin Users、Admin Students。
 - 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`；B9.14 staging 已创建 `admin` 并初始化 `202502040201`–`202502040230` 的 `2班` 学生账号。
-- B9.19 已实现 Admin Login、System Status 与 Student Accounts Operational MVP；B9.21/B9.22/B9.23/B9.24 已补 Bank Mappings、Import Jobs dry-run/history、Question Review preview 与 Audit Logs read-only；仍缺 Admin Users 完整 UI，以及 Question Review editor/override。
+- B9.19 已实现 Admin Login、System Status 与 Student Accounts Operational MVP；B9.21/B9.22/B9.23/B9.24/B9.25 已补 Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only 与 Admin Users management UI；仍缺 Question Review editor/override。
 - true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
 - B9.18 static wireframe review: [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
 - B9.19 runtime slice: [`admin-operational-mvp.md`](./admin-operational-mvp.md)。
@@ -19,6 +19,7 @@ B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完�
 - B9.22 Import Jobs dry-run/history UI: [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，已落地 list/create dry-run/detail/error-report，true import/reset/cancel/retry 后置。
 - B9.23 Question Review preview UI: [`admin-question-review-preview-ui.md`](./admin-question-review-preview-ui.md)，已落地 list/filter/detail preview、add flag、resolve/ignore 和 excludedFromPractice，完整 editor/override 后置。
 - B9.24 Audit Logs read-only UI: [`admin-audit-logs-readonly-ui.md`](./admin-audit-logs-readonly-ui.md)，已落地 list/filter/detail preview 和 before/after/metadata JSON preview，复杂 diff/export 后置。
+- B9.25 Admin Users management UI: [`admin-users-management-ui.md`](./admin-users-management-ui.md)，已落地 list/filter/detail/create/update/password/status/roles，MFA/SSO/invite flow 后置。
 
 ## 2. 第一版 Sitemap
 
@@ -183,16 +184,16 @@ Admin Console
 Current:
 
 - `npm run admin:bootstrap` creates the first `super_admin`.
-- HTTP Admin User manage API exists: list/detail/create/update.
+- HTTP Admin User manage API exists and B9.25 has a matching list/detail/create/update/password/status/roles UI.
 - Public admin registration remains closed.
 - Lifecycle writes audit `admin_user.create` / `admin_user.update`.
 - Backend prevents disabling/removing the last active `super_admin`.
 
-Next UI decisions:
+Remaining UI decisions:
 
-- How to present role changes and password reset confirmation.
-- Whether disable should require a typed confirmation.
-- How to show last-super-admin guard errors.
+- Whether to add MFA/SSO or invite flow later.
+- How to surface last-super-admin guard errors more explicitly.
+- Whether to add richer admin profile summaries.
 
 
 ### 4.8 Student Accounts
@@ -291,4 +292,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI；B9.22 已完成 Import Jobs dry-run/history UI；B9.23 已完成 Question Review preview UI；B9.24 已完成 Audit Logs read-only UI。下一步优先做 Admin Users management UI；Import true write/reset/cancel/retry、完整 Question Review editor、MFA/SSO 和最终视觉继续后置。
+当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI；B9.22 已完成 Import Jobs dry-run/history UI；B9.23 已完成 Question Review preview UI；B9.24 已完成 Audit Logs read-only UI；B9.25 已完成 Admin Users management UI。下一步优先做完整 Question Review editor / override 与 Import true write/reset/cancel/retry，MFA/SSO 和最终视觉继续后置。

@@ -14,6 +14,8 @@ import {
   AdminStudentDetailResponseV1Schema,
   AdminStudentListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
+  AdminUserDetailResponseV1Schema,
+  AdminUserListResponseV1Schema,
   ApiErrorResponseV1Schema,
   BulkUpdateAdminBankMappingStatusRequestV1Schema,
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
@@ -21,12 +23,14 @@ import {
   BulkCreateAdminStudentsResponseV1Schema,
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
+  CreateAdminUserRequestV1Schema,
   CreateAdminStudentRequestV1Schema,
   ResetAdminStudentPasswordRequestV1Schema,
   ResetAdminStudentPasswordResponseV1Schema,
   RevokeAdminStudentSessionsResponseV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
+  UpdateAdminUserRequestV1Schema,
   UpdateAdminStudentRequestV1Schema,
   type AdminAuditLogEntryV1,
   type AdminAuditLogResultV1,
@@ -42,6 +46,9 @@ import {
   type AdminQuestionFlagTypeV1,
   type AdminQuestionReviewFlagV1,
   type AdminQuestionReviewItemV1,
+  type AdminManagedUserStatusV1,
+  type AdminManagedUserV1,
+  type AdminRoleV1,
   type AdminStudentStatusV1,
   type AdminStudentV1,
   type AdminSystemStatusResponseV1,
@@ -54,7 +61,7 @@ import {
 type Parser<T> = { parse: (payload: unknown) => T };
 
 type AdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
-type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs';
+type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
 type PlaceholderAdminNavKey = Exclude<AdminNavKey, ImplementedAdminNavKey>;
 
 type AdminRoute =
@@ -65,6 +72,7 @@ type AdminRoute =
   | { kind: 'import-jobs'; jobId?: string; panel?: 'create' }
   | { kind: 'question-review'; questionId?: string }
   | { kind: 'audit-logs'; auditLogId?: string }
+  | { kind: 'admin-users'; adminId?: string; panel?: 'create' }
   | { kind: 'placeholder'; key: PlaceholderAdminNavKey }
   | { kind: 'unknown'; path: string };
 
@@ -122,6 +130,12 @@ type AuditLogFilters = {
   createdTo: string;
 };
 
+type AdminUserFilters = {
+  keyword: string;
+  status: '' | AdminManagedUserStatusV1;
+  role: '' | AdminRoleV1;
+};
+
 const defaultStudentFilters: StudentFilters = {
   keyword: '',
   className: '',
@@ -163,6 +177,14 @@ const defaultAuditLogFilters: AuditLogFilters = {
   createdFrom: '',
   createdTo: '',
 };
+
+const defaultAdminUserFilters: AdminUserFilters = {
+  keyword: '',
+  status: '',
+  role: '',
+};
+
+const adminRoleOptions = ['super_admin', 'operator', 'content_editor'] as const satisfies readonly AdminRoleV1[];
 
 const defaultImportSourceDir = 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank';
 
@@ -231,8 +253,8 @@ const adminNavigation: Array<{
     label: 'Admin Users',
     path: '/admin/users',
     permissions: ['admin_user:manage'],
-    implemented: false,
-    description: '管理员账号管理 UI 后续阶段开放。',
+    implemented: true,
+    description: '管理员账号管理：列表、创建、角色/状态维护与密码重置。',
   },
 ];
 
@@ -278,6 +300,12 @@ export function parseAdminRoute(pathname: string): AdminRoute {
     const auditLogId = decodeURIComponent(path.slice('/admin/audit-logs/'.length));
     return { kind: 'audit-logs', auditLogId };
   }
+  if (path === '/admin/users') return { kind: 'admin-users' };
+  if (path === '/admin/users/create') return { kind: 'admin-users', panel: 'create' };
+  if (path.startsWith('/admin/users/')) {
+    const adminId = decodeURIComponent(path.slice('/admin/users/'.length));
+    return { kind: 'admin-users', adminId };
+  }
   const placeholder = adminNavigation.find((item) => item.path === path && !item.implemented);
   if (placeholder) return { kind: 'placeholder', key: placeholder.key as PlaceholderAdminNavKey };
   return { kind: 'unknown', path };
@@ -308,6 +336,11 @@ export function buildAdminPath(route: AdminRoute): string {
   if (route.kind === 'audit-logs') {
     if (route.auditLogId) return `/admin/audit-logs/${encodeURIComponent(route.auditLogId)}`;
     return '/admin/audit-logs';
+  }
+  if (route.kind === 'admin-users') {
+    if (route.panel === 'create') return '/admin/users/create';
+    if (route.adminId) return `/admin/users/${encodeURIComponent(route.adminId)}`;
+    return '/admin/users';
   }
   if (route.kind === 'placeholder') {
     return adminNavigation.find((item) => item.key === route.key)?.path ?? '/admin/system';
@@ -388,6 +421,16 @@ export function buildAuditLogListQuery(filters: AuditLogFilters, limit: number, 
   return params.toString();
 }
 
+export function buildAdminUserListQuery(filters: AdminUserFilters, limit: number, offset: number): string {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  addOptionalParam(params, 'keyword', filters.keyword);
+  addOptionalParam(params, 'status', filters.status);
+  addOptionalParam(params, 'role', filters.role);
+  return params.toString();
+}
+
 export function parseBulkStudentInput(input: string): BulkStudentDraft[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
@@ -449,6 +492,10 @@ export function buildAuditLogBadges(entry: AdminAuditLogEntryV1): string[] {
   const actionGroup = entry.action.includes('.') ? entry.action.split('.')[0] : '';
   if (actionGroup && !badges.includes(actionGroup)) badges.push(actionGroup);
   return badges;
+}
+
+export function buildAdminUserBadges(adminUser: AdminManagedUserV1): string[] {
+  return [adminUser.status, ...adminUser.roles];
 }
 
 export function App() {
@@ -592,6 +639,13 @@ export function App() {
         />
       ) : route.kind === 'audit-logs' ? (
         <AuditLogsPage
+          route={route}
+          navigate={navigate}
+          onSessionExpired={expireSession}
+        />
+      ) : route.kind === 'admin-users' ? (
+        <AdminUsersPage
+          admin={admin}
           route={route}
           navigate={navigate}
           onSessionExpired={expireSession}
@@ -2274,6 +2328,449 @@ function JsonPreview({ title, value }: { title: string; value: unknown }) {
   );
 }
 
+function AdminUsersPage({
+  admin,
+  route,
+  navigate,
+  onSessionExpired,
+}: {
+  admin: AdminUserV1;
+  route: Extract<AdminRoute, { kind: 'admin-users' }>;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+  onSessionExpired: () => void;
+}) {
+  const canWrite = admin.permissions.includes('admin_user:manage');
+  const [draftFilters, setDraftFilters] = useState<AdminUserFilters>(defaultAdminUserFilters);
+  const [filters, setFilters] = useState<AdminUserFilters>(defaultAdminUserFilters);
+  const [offset, setOffset] = useState(0);
+  const [adminUsers, setAdminUsers] = useState<AdminManagedUserV1[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const limit = 20;
+
+  const loadAdminUsers = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildAdminUserListQuery(filters, limit, offset);
+      const response = await requestJson(`/api/admin/users?${query}`, AdminUserListResponseV1Schema);
+      setAdminUsers(response.adminUsers);
+      setHasMore(response.page.hasMore);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, offset, onSessionExpired]);
+
+  useEffect(() => {
+    void loadAdminUsers();
+  }, [loadAdminUsers]);
+
+  function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOffset(0);
+    setFilters(draftFilters);
+  }
+
+  function refreshAfterMutation(adminId?: string) {
+    void loadAdminUsers();
+    if (adminId) navigate(`/admin/users/${adminId}`);
+  }
+
+  return (
+    <section className="admin-page">
+      <PageHeader
+        eyebrow="Identity operations"
+        title="Admin Users"
+        description="B9.25 实现管理员账号管理 UI：列表、创建、角色/状态维护与密码重置；MFA、SSO、细粒度权限编辑和最终视觉继续后置。"
+        action={(
+          <div className="button-row">
+            <button type="button" onClick={() => navigate('/admin/users/create')}>创建管理员</button>
+            <button className="ghost" type="button" onClick={() => void loadAdminUsers()} disabled={loading}>刷新列表</button>
+          </div>
+        )}
+      />
+
+      <section className="admin-card">
+        <form className="admin-user-filters" onSubmit={submitFilters}>
+          <label>关键字
+            <input value={draftFilters.keyword} onChange={(event) => setDraftFilters({ ...draftFilters, keyword: event.target.value })} placeholder="loginName / displayName" />
+          </label>
+          <label>状态
+            <select value={draftFilters.status} onChange={(event) => setDraftFilters({ ...draftFilters, status: event.target.value as AdminUserFilters['status'] })}>
+              <option value="">全部</option>
+              <option value="active">active</option>
+              <option value="disabled">disabled</option>
+            </select>
+          </label>
+          <label>角色
+            <select value={draftFilters.role} onChange={(event) => setDraftFilters({ ...draftFilters, role: event.target.value as AdminUserFilters['role'] })}>
+              <option value="">全部</option>
+              {adminRoleOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+            </select>
+          </label>
+          <button type="submit">应用过滤</button>
+        </form>
+      </section>
+
+      <div className="student-layout">
+        <section className="admin-card student-list-card">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Admins</p>
+              <h2>管理员列表</h2>
+            </div>
+            <span className="muted">offset {offset}</span>
+          </div>
+          {error ? <ErrorPanel message={error} onRetry={() => void loadAdminUsers()} /> : null}
+          {loading ? <p className="muted">正在加载管理员账号…</p> : null}
+          {!loading && !error && adminUsers.length === 0 ? <InfoPanel title="没有匹配管理员" detail="可以调整 keyword/status/role 过滤后重新查询。" /> : null}
+          {adminUsers.length > 0 ? <AdminUserTable adminUsers={adminUsers} navigate={navigate} /> : null}
+          <div className="pager">
+            <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
+            <span>offset {offset}</span>
+            <button className="ghost" type="button" disabled={!hasMore || loading} onClick={() => setOffset(offset + limit)}>下一页</button>
+          </div>
+        </section>
+
+        <aside className="admin-card student-side-panel">
+          {route.panel === 'create' ? (
+            <CreateAdminUserPanel
+              canWrite={canWrite}
+              onCreated={(createdAdmin) => refreshAfterMutation(createdAdmin.id)}
+              onSessionExpired={onSessionExpired}
+            />
+          ) : route.adminId ? (
+            <AdminUserDetailPanel
+              adminUserId={route.adminId}
+              currentAdmin={admin}
+              canWrite={canWrite}
+              onChanged={(changedAdmin) => refreshAfterMutation(changedAdmin.id)}
+              onSessionExpired={onSessionExpired}
+            />
+          ) : (
+            <InfoPanel title="选择一个管理员账号" detail="从左侧列表点击查看，或使用右上角创建入口。密码提交后不会保存或回显。" />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function AdminUserTable({
+  adminUsers,
+  navigate,
+}: {
+  adminUsers: AdminManagedUserV1[];
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Login name</th>
+            <th>Display name</th>
+            <th>Roles</th>
+            <th>Permissions</th>
+            <th>Created</th>
+            <th>Last login</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {adminUsers.map((adminUser) => (
+            <tr key={adminUser.id}>
+              <td>
+                <strong>{adminUser.loginName}</strong>
+                <br />
+                <span className="muted">{adminUser.id}</span>
+              </td>
+              <td>{adminUser.displayName}</td>
+              <td>
+                <div className="badge-row">
+                  {buildAdminUserBadges(adminUser).map((badge) => (
+                    <Badge key={badge} tone={adminUserBadgeTone(badge)}>{badge}</Badge>
+                  ))}
+                </div>
+              </td>
+              <td>{adminUser.permissions.length} permissions</td>
+              <td>{formatAdminDate(adminUser.createdAt)}</td>
+              <td>{formatAdminDate(adminUser.lastLoginAt)}</td>
+              <td><button className="ghost" type="button" onClick={() => navigate(`/admin/users/${adminUser.id}`)}>查看管理员 {adminUser.loginName}</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CreateAdminUserPanel({
+  canWrite,
+  onCreated,
+  onSessionExpired,
+}: {
+  canWrite: boolean;
+  onCreated: (adminUser: AdminManagedUserV1) => void;
+  onSessionExpired: () => void;
+}) {
+  const [loginName, setLoginName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [password, setPassword] = useState('');
+  const [roles, setRoles] = useState<AdminRoleV1[]>(['operator']);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite) return;
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      if (roles.length === 0) throw new Error('至少选择一个管理员角色。');
+      const normalizedLoginName = loginName.trim();
+      const request = CreateAdminUserRequestV1Schema.parse({
+        loginName: normalizedLoginName,
+        displayName: displayName.trim() || normalizedLoginName,
+        password,
+        roles: sortAdminRoles(roles),
+      });
+      const response = await requestJson('/api/admin/users', AdminUserDetailResponseV1Schema, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      setPassword('');
+      setMessage(`管理员已创建：${response.adminUser.loginName}。临时密码不会在提交后保存或回显。`);
+      onCreated(response.adminUser);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section>
+      <p className="eyebrow">Create Admin</p>
+      <h2>创建管理员</h2>
+      {!canWrite ? <ForbiddenInline /> : null}
+      <form className="stack-form" onSubmit={submit}>
+        <label>loginName *<input value={loginName} onChange={(event) => setLoginName(event.target.value)} required /></label>
+        <label>displayName<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="默认可与 loginName 一致" /></label>
+        <label>initial password *<input value={password} onChange={(event) => setPassword(event.target.value)} type="password" minLength={8} required /></label>
+        <AdminUserRoleSelector roles={roles} onChange={setRoles} disabled={!canWrite || submitting} />
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        {message ? <p className="form-success" role="status">{message}</p> : null}
+        <button type="submit" disabled={!canWrite || submitting}>{submitting ? '创建中…' : '创建管理员'}</button>
+      </form>
+    </section>
+  );
+}
+
+function AdminUserDetailPanel({
+  adminUserId,
+  currentAdmin,
+  canWrite,
+  onChanged,
+  onSessionExpired,
+}: {
+  adminUserId: string;
+  currentAdmin: AdminUserV1;
+  canWrite: boolean;
+  onChanged: (adminUser: AdminManagedUserV1) => void;
+  onSessionExpired: () => void;
+}) {
+  const [adminUser, setAdminUser] = useState<AdminManagedUserV1 | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [status, setStatus] = useState<AdminManagedUserStatusV1>('active');
+  const [roles, setRoles] = useState<AdminRoleV1[]>(['operator']);
+  const [newPassword, setNewPassword] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await requestJson(`/api/admin/users/${encodeURIComponent(adminUserId)}`, AdminUserDetailResponseV1Schema);
+      setAdminUser(response.adminUser);
+      setDisplayName(response.adminUser.displayName);
+      setStatus(response.adminUser.status);
+      setRoles(sortAdminRoles(response.adminUser.roles));
+      setNewPassword('');
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [adminUserId, onSessionExpired]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite || !adminUser) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      if (roles.length === 0) throw new Error('至少保留一个管理员角色。');
+      const request = UpdateAdminUserRequestV1Schema.parse({
+        displayName: displayName.trim() || adminUser.displayName,
+        status,
+        roles: sortAdminRoles(roles),
+      });
+      const response = await requestJson(`/api/admin/users/${encodeURIComponent(adminUser.id)}`, AdminUserDetailResponseV1Schema, {
+        method: 'PATCH',
+        body: JSON.stringify(request),
+      });
+      setAdminUser(response.adminUser);
+      setDisplayName(response.adminUser.displayName);
+      setStatus(response.adminUser.status);
+      setRoles(sortAdminRoles(response.adminUser.roles));
+      setMessage('管理员资料已保存。');
+      onChanged(response.adminUser);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function resetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite || !adminUser) return;
+    setResetting(true);
+    setError('');
+    setMessage('');
+    try {
+      const request = UpdateAdminUserRequestV1Schema.parse({ password: newPassword });
+      const response = await requestJson(`/api/admin/users/${encodeURIComponent(adminUser.id)}`, AdminUserDetailResponseV1Schema, {
+        method: 'PATCH',
+        body: JSON.stringify(request),
+      });
+      setAdminUser(response.adminUser);
+      setNewPassword('');
+      setMessage('管理员密码已重置；临时密码不会被保存或回显。');
+      onChanged(response.adminUser);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  if (loading) return <InfoPanel title="正在加载管理员详情" />;
+  if (error && !adminUser) return <ErrorPanel message={error} onRetry={() => void load()} />;
+  if (!adminUser) return <InfoPanel title="管理员不存在" detail="返回列表后重新选择。" />;
+
+  const isCurrentSessionAdmin = adminUser.id === currentAdmin.id;
+
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Admin User Detail</p>
+      <h2>{adminUser.loginName}</h2>
+      <div className="badge-row">
+        {buildAdminUserBadges(adminUser).map((badge) => <Badge key={badge} tone={adminUserBadgeTone(badge)}>{badge}</Badge>)}
+        {isCurrentSessionAdmin ? <Badge tone="warning">current-session</Badge> : null}
+      </div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {message ? <p className="form-success" role="status">{message}</p> : null}
+
+      <form className="stack-form" onSubmit={saveProfile}>
+        <h3>Identity</h3>
+        <label>loginName<input value={adminUser.loginName} disabled /></label>
+        <label>displayName<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={!canWrite} required /></label>
+        <label>status
+          <select value={status} onChange={(event) => setStatus(event.target.value as AdminManagedUserStatusV1)} disabled={!canWrite}>
+            <option value="active">active</option>
+            <option value="disabled">disabled</option>
+          </select>
+        </label>
+        <AdminUserRoleSelector roles={roles} onChange={setRoles} disabled={!canWrite || saving} />
+        <button type="submit" disabled={!canWrite || saving}>{saving ? '保存中…' : '保存管理员资料'}</button>
+      </form>
+
+      <section className="detail-section">
+        <h3>Permissions</h3>
+        <div className="badge-row">
+          {adminUser.permissions.map((permission) => <Badge key={permission}>{permission}</Badge>)}
+        </div>
+      </section>
+
+      <form className="stack-form danger-zone" onSubmit={resetPassword}>
+        <h3>Reset Password</h3>
+        <p className="muted">Target: {adminUser.loginName} / {adminUser.displayName}</p>
+        <label>New temporary password<input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" minLength={8} disabled={!canWrite} required /></label>
+        <button type="submit" className="danger" disabled={!canWrite || resetting}>{resetting ? '重置中…' : '确认重置管理员密码'}</button>
+      </form>
+
+      <section className="detail-section">
+        <h3>Audit summary</h3>
+        <dl className="key-values single">
+          <div><dt>id</dt><dd>{adminUser.id}</dd></div>
+          <div><dt>createdAt</dt><dd>{formatAdminDate(adminUser.createdAt)}</dd></div>
+          <div><dt>updatedAt</dt><dd>{formatAdminDate(adminUser.updatedAt)}</dd></div>
+          <div><dt>lastLoginAt</dt><dd>{formatAdminDate(adminUser.lastLoginAt)}</dd></div>
+        </dl>
+      </section>
+    </section>
+  );
+}
+
+function AdminUserRoleSelector({
+  roles,
+  onChange,
+  disabled,
+}: {
+  roles: AdminRoleV1[];
+  onChange: (roles: AdminRoleV1[]) => void;
+  disabled: boolean;
+}) {
+  function toggleRole(role: AdminRoleV1) {
+    if (roles.includes(role)) {
+      if (roles.length === 1) return;
+      onChange(sortAdminRoles(roles.filter((candidate) => candidate !== role)));
+      return;
+    }
+    onChange(sortAdminRoles([...roles, role]));
+  }
+
+  return (
+    <section className="option-grid">
+      <h3>Roles</h3>
+      {adminRoleOptions.map((role) => (
+        <label className="checkbox-label" key={role}>
+          <input
+            type="checkbox"
+            checked={roles.includes(role)}
+            disabled={disabled || (roles.length === 1 && roles.includes(role))}
+            onChange={() => toggleRole(role)}
+          />
+          {role}
+        </label>
+      ))}
+      <p className="muted">至少保留一个角色；权限由后端 RBAC 根据角色计算。</p>
+    </section>
+  );
+}
+
 function StudentAccountsPage({
   admin,
   route,
@@ -2846,7 +3343,7 @@ function PlaceholderPage({ routeKey }: { routeKey: PlaceholderAdminNavKey }) {
       />
       <InfoPanel
         title="此功能后续阶段开放"
-        detail="当前仅剩 Admin Users 仍为占位；此入口用于确认导航边界，不开放半成品写操作。"
+        detail="当前导航已尽量只暴露可运行页面；若后续新增占位入口，应先补契约和验证再开放写操作。"
       />
     </section>
   );
@@ -3001,6 +3498,7 @@ function getActiveNavKey(route: AdminRoute): AdminNavKey | null {
   if (route.kind === 'import-jobs') return 'import-jobs';
   if (route.kind === 'question-review') return 'question-review';
   if (route.kind === 'audit-logs') return 'audit-logs';
+  if (route.kind === 'admin-users') return 'admin-users';
   if (route.kind === 'placeholder') return route.key;
   return null;
 }
@@ -3066,6 +3564,19 @@ function auditLogBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'dange
   if (badge === 'failure') return 'danger';
   if (badge === 'system-actor') return 'warning';
   return 'neutral';
+}
+
+function adminUserBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'danger' {
+  if (badge === 'active') return 'ok';
+  if (badge === 'disabled') return 'danger';
+  if (badge === 'super_admin') return 'warning';
+  return 'neutral';
+}
+
+function sortAdminRoles(roles: readonly AdminRoleV1[]): AdminRoleV1[] {
+  return [...new Set(roles)].sort(
+    (left, right) => adminRoleOptions.indexOf(left) - adminRoleOptions.indexOf(right),
+  );
 }
 
 function formatImportJobProgress(job: AdminImportJobV1): string {

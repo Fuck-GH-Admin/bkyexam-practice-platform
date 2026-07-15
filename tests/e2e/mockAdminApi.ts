@@ -4,9 +4,11 @@ import type {
   AdminAuditLogEntryV1,
   AdminBankMappingDetailV1,
   AdminImportJobV1,
+  AdminManagedUserV1,
   AdminPermissionV1,
   AdminQuestionReviewFlagV1,
   AdminQuestionReviewItemV1,
+  AdminRoleV1,
   AdminStudentV1,
   BulkCreateAdminStudentItemV1,
 } from '@bkyexam-practice/shared';
@@ -19,6 +21,7 @@ export type MockAdminState = {
   importJobs: AdminImportJobV1[];
   questionReviews: AdminQuestionReviewItemV1[];
   auditLogs: AdminAuditLogEntryV1[];
+  adminUsers: AdminManagedUserV1[];
 };
 
 const adminId = '99999999-9999-4999-8999-999999999999';
@@ -129,6 +132,21 @@ export function createMockAdminState(): MockAdminState {
         before: null,
         after: { loginName: 'admin' },
         metadata: { source: 'bootstrap' },
+      }),
+    ],
+    adminUsers: [
+      buildAdminUser({
+        id: adminId,
+        loginName: 'admin',
+        displayName: '平台管理员',
+        roles: ['super_admin'],
+        lastLoginAt: '2026-07-15T08:00:00.000Z',
+      }),
+      buildAdminUser({
+        id: '99999999-9999-4999-8999-000000000003',
+        loginName: 'operator01',
+        displayName: '运营管理员',
+        roles: ['operator'],
       }),
     ],
   };
@@ -280,6 +298,100 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         auditLogs: pageItems.slice(0, limit),
         page: { limit, offset, hasMore: pageItems.length > limit },
       });
+    }
+
+    if (method === 'GET' && pathname === '/api/admin/users') {
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const status = url.searchParams.get('status');
+      const role = url.searchParams.get('role');
+      const keyword = url.searchParams.get('keyword')?.toLowerCase() ?? '';
+      const filtered = state.adminUsers.filter((adminUser) => {
+        if (status && adminUser.status !== status) return false;
+        if (role && !adminUser.roles.includes(role as AdminRoleV1)) return false;
+        if (keyword && !`${adminUser.loginName} ${adminUser.displayName}`.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      const pageItems = filtered.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        adminUsers: pageItems.slice(0, limit),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
+    }
+
+    if (method === 'POST' && pathname === '/api/admin/users') {
+      const body = readBody<{
+        loginName: string;
+        displayName: string;
+        password: string;
+        roles: AdminRoleV1[];
+      }>(route);
+      if (state.adminUsers.some((adminUser) => adminUser.loginName === body.loginName)) {
+        return fulfillJson(route, { error: 'Admin loginName already exists' }, 409);
+      }
+      const adminUser = buildAdminUser({
+        id: nextAdminUserId(state.adminUsers.length + 1),
+        loginName: body.loginName,
+        displayName: body.displayName,
+        roles: body.roles,
+      });
+      state.adminUsers.unshift(adminUser);
+      state.auditLogs.unshift(buildAuditLog({
+        id: nextAuditLogId(state.auditLogs.length + 1),
+        action: 'admin_user.create',
+        resourceType: 'admin_user',
+        resourceId: adminUser.id,
+        before: null,
+        after: { loginName: adminUser.loginName, displayName: adminUser.displayName, roles: adminUser.roles },
+        metadata: { passwordSet: Boolean(body.password) },
+      }));
+      return fulfillJson(route, { adminUser });
+    }
+
+    const adminUserMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)$/);
+    if (adminUserMatch) {
+      const targetAdminId = adminUserMatch[1];
+      const adminUser = state.adminUsers.find((item) => item.id === targetAdminId);
+      if (!adminUser) return fulfillJson(route, { error: 'Admin user not found' }, 404);
+
+      if (method === 'GET') {
+        return fulfillJson(route, { adminUser });
+      }
+
+      if (method === 'PATCH') {
+        const body = readBody<{
+          displayName?: string;
+          status?: AdminManagedUserV1['status'];
+          roles?: AdminRoleV1[];
+          password?: string;
+        }>(route);
+        const before = {
+          displayName: adminUser.displayName,
+          status: adminUser.status,
+          roles: [...adminUser.roles],
+        };
+        if (body.displayName !== undefined) adminUser.displayName = body.displayName;
+        if (body.status !== undefined) adminUser.status = body.status;
+        if (body.roles !== undefined) {
+          adminUser.roles = [...body.roles];
+          adminUser.permissions = permissionsForMockRoles(adminUser.roles);
+        }
+        adminUser.updatedAt = '2026-07-15T11:10:00.000Z';
+        state.auditLogs.unshift(buildAuditLog({
+          id: nextAuditLogId(state.auditLogs.length + 1),
+          action: 'admin_user.update',
+          resourceType: 'admin_user',
+          resourceId: adminUser.id,
+          before,
+          after: {
+            displayName: adminUser.displayName,
+            status: adminUser.status,
+            roles: adminUser.roles,
+          },
+          metadata: { passwordChanged: Boolean(body.password) },
+        }));
+        return fulfillJson(route, { adminUser });
+      }
     }
 
     if (method === 'GET' && pathname === '/api/admin/students') {
@@ -735,6 +847,73 @@ function buildAuditLog(input: {
     result: input.result ?? 'success',
     createdAt: now,
   };
+}
+
+function buildAdminUser(input: {
+  id: string;
+  loginName: string;
+  displayName: string;
+  roles: AdminRoleV1[];
+  lastLoginAt?: string | null;
+}): AdminManagedUserV1 {
+  const roles = [...new Set(input.roles)].sort();
+  return {
+    id: input.id,
+    loginName: input.loginName,
+    displayName: input.displayName,
+    status: 'active',
+    roles,
+    permissions: permissionsForMockRoles(roles),
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: input.lastLoginAt ?? null,
+  };
+}
+
+function permissionsForMockRoles(roles: readonly AdminRoleV1[]) {
+  const permissionSet = new Set<AdminPermissionV1>();
+  for (const role of roles) {
+    if (role === 'super_admin') {
+      for (const permission of allAdminPermissions) permissionSet.add(permission);
+      continue;
+    }
+    if (role === 'operator') {
+      for (const permission of [
+        'admin:self:read',
+        'bank_mapping:read',
+        'import_job:read',
+        'import_job:create',
+        'system_status:read',
+        'student_account:read',
+        'student_account:write',
+        'student_account:reset_password',
+        'student_account:revoke_session',
+      ] as const) {
+        permissionSet.add(permission);
+      }
+      continue;
+    }
+    for (const permission of [
+      'admin:self:read',
+      'bank_mapping:read',
+      'bank_mapping:write',
+      'bank_mapping:publish',
+      'question_review:read',
+      'question_review:write',
+    ] as const) {
+      permissionSet.add(permission);
+    }
+  }
+
+  return allAdminPermissions.filter((permission) => permissionSet.has(permission));
+}
+
+function nextAdminUserId(index: number) {
+  return `dddddddd-dddd-4ddd-8ddd-${String(index).padStart(12, '0')}`;
+}
+
+function nextAuditLogId(index: number) {
+  return `eeeeeeee-eeee-4eee-8eee-${String(index).padStart(12, '0')}`;
 }
 
 function nextStudentId(index: number) {

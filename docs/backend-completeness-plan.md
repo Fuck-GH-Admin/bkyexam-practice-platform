@@ -1529,7 +1529,7 @@ B9.19 实际落地：
 
 - 独立 `apps/admin` workspace。
 - Admin Login / logout / session guard / target route restore / 403 fallback。
-- RBAC-filtered sidebar；Bank Mappings、Import Jobs 和 Question Review 已逐步升级为功能页；Audit Logs / Admin Users placeholder。
+- RBAC-filtered sidebar；Bank Mappings、Import Jobs、Question Review、Audit Logs 和 Admin Users 已逐步升级为功能页。
 - System Status dashboard，使用 shared v1 response schema parse。
 - Student Accounts list/detail/create/bulk-create/update/reset-password/revoke-sessions。
 - Bulk create 支持 JSON 或简单 CSV paste，并渲染 created/skipped/failed partial result。
@@ -1583,8 +1583,6 @@ B9.23 实际落地：
 - Admin unit tests、stateful mock Admin API 和 Playwright smoke。
 - 继续不做 full question detail endpoint、完整题目编辑器、override 层、批量操作和最终视觉系统。
 
-当前建议下一步执行：
-
 B9.24 已完成 Admin Audit Logs read-only UI，文档见 [`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md)。
 
 B9.24 实际落地：
@@ -1596,18 +1594,15 @@ B9.24 实际落地：
 - Admin unit tests、stateful mock Admin API 和 Playwright smoke。
 - 继续不做复杂 diff viewer、导出、审计统计 dashboard 和最终视觉系统。
 
-当前建议下一步执行：
+B9.25 已完成 Admin Users management UI，文档见 [`admin-users-management-ui.md`](admin-users-management-ui.md)。
 
-> **B9.25 Admin Users management UI**，只做 admin user list/detail/create/update/password/status/roles 的最小 UI，不做 MFA/SSO 或最终视觉。
-
-B9.25 建议范围：
+B9.25 实际落地：
 
 - Admin Users list/filter/page。
 - Detail/edit displayName、status、roles。
 - Create admin user。
 - Update/reset admin password。
-- 渲染 last-super-admin guard 和禁用/降权失败。
-- Admin unit tests + Playwright mock smoke。
+- Admin unit tests、stateful mock Admin API 和 Playwright smoke。
 
 B9.25 不做：
 
@@ -1630,6 +1625,6 @@ B9.25 不做：
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview 和 Audit Logs read-only；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、Admin Users UI、完整 Question Review editor/override、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、完整 Question Review editor/override、Import true write/reset/cancel/retry、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.25 Admin Users management UI：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview 和审计日志只读入口基础上，把已有 Admin User manage API 暴露出来；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。
+最合理的下一步是完整 Question Review editor / override 或 Import true write/reset/cancel/retry：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview、审计日志只读和 Admin Users 管理基础上，补齐仍未闭环的题目编辑/导入控制语义；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。

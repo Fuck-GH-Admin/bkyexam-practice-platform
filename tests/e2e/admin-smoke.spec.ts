@@ -116,6 +116,25 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await expect(page.getByText('高等数学（校内版）')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Admin Users' }).click();
+  await expect(page.getByRole('heading', { name: 'Admin Users' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看管理员 operator01' })).toBeVisible();
+  await page.getByRole('button', { name: '查看管理员 operator01' }).click();
+  await expect(page.getByRole('heading', { name: 'operator01' })).toBeVisible();
+  await page.getByLabel('displayName').fill('运营管理员（已更新）');
+  await page.getByRole('button', { name: '保存管理员资料' }).click();
+  await expect(page.getByText('管理员资料已保存。')).toBeVisible();
+  await page.getByLabel('New temporary password').fill('admin-pass-456');
+  await page.getByRole('button', { name: '确认重置管理员密码' }).click();
+  await expect(page.getByText('管理员密码已重置；临时密码不会被保存或回显。')).toBeVisible();
+
+  await page.getByRole('button', { name: '创建管理员' }).click();
+  await page.getByLabel('loginName *').fill('auditbot');
+  await page.getByLabel('displayName').fill('审计机器人');
+  await page.getByLabel('initial password *').fill('audit-pass-123');
+  await page.locator('.student-side-panel').getByRole('button', { name: '创建管理员' }).click();
+  await expect(page.getByRole('heading', { name: 'auditbot' })).toBeVisible();
+
   expect(state.calls).toContain('POST /api/admin/auth/login');
   expect(state.calls).toContain('GET /api/admin/system/status');
   expect(state.calls).toContain('POST /api/admin/students');
@@ -129,6 +148,9 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   expect(state.calls).toContain('GET /api/admin/question-review');
   expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777');
   expect(state.calls).toContain('GET /api/admin/audit-logs');
+  expect(state.calls).toContain('GET /api/admin/users');
+  expect(state.calls).toContain('PATCH /api/admin/users/99999999-9999-4999-8999-000000000003');
+  expect(state.calls).toContain('POST /api/admin/users');
   expect(runtimeErrors).toEqual([]);
 });
 

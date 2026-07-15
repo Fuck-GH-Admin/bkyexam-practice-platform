@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.25 Admin Users management UI — 2026-07-15
+
+- [x] 新增 `docs/admin-users-management-ui.md`。
+- [x] `/admin/users` 从 placeholder 升级为功能性管理员管理页面。
+- [x] 实现 Admin Users list/filter/page，覆盖 keyword、status、role。
+- [x] 实现 `/admin/users/:adminId` detail/edit panel，支持 displayName、status、roles 和 password reset。
+- [x] 实现 `/admin/users/create` create panel，支持 loginName、displayName、password 和 roles。
+- [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
+- [x] 不做 MFA/SSO、不做邀请邮件/通知、不做复杂安全策略 UI、不做最终视觉。
+
 ## Completed Frontend B9.24 Admin Audit Logs read-only UI — 2026-07-15
 
 - [x] 新增 `docs/admin-audit-logs-readonly-ui.md`。
