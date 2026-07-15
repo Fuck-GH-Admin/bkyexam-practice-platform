@@ -7,6 +7,7 @@ import type {
   AdminManagedUserV1,
   AdminPermissionV1,
   AdminQuestionReviewFlagV1,
+  AdminQuestionReviewDetailV1,
   AdminQuestionReviewItemV1,
   AdminRoleV1,
   AdminStudentV1,
@@ -19,7 +20,7 @@ export type MockAdminState = {
   students: AdminStudentV1[];
   bankMappings: AdminBankMappingDetailV1[];
   importJobs: AdminImportJobV1[];
-  questionReviews: AdminQuestionReviewItemV1[];
+  questionReviews: AdminQuestionReviewDetailV1[];
   auditLogs: AdminAuditLogEntryV1[];
   adminUsers: AdminManagedUserV1[];
 };
@@ -181,7 +182,7 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
     if (method === 'GET' && pathname === '/api/admin/system/status') {
       return fulfillJson(route, {
         api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-        database: { ok: true, migrationCount: 11, currentMigration: '0011_admin_identity_security.sql' },
+        database: { ok: true, migrationCount: 12, currentMigration: '0012_question_review_overrides.sql' },
         corpus: {
           classifications: 2941,
           questions: 89922,
@@ -233,12 +234,59 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         });
       const pageItems = filtered.slice(offset, offset + limit + 1);
       return fulfillJson(route, {
-        questions: pageItems.slice(0, limit),
+        questions: pageItems.slice(0, limit).map(toQuestionReviewItem),
         page: { limit, offset, hasMore: pageItems.length > limit },
       });
     }
 
+    const questionOverrideMatch = pathname.match(/^\/api\/admin\/question-review\/([^/]+)\/override$/);
+    if (method === 'PATCH' && questionOverrideMatch) {
+      const questionId = questionOverrideMatch[1];
+      const question = state.questionReviews.find((item) => item.questionId === questionId);
+      if (!question) return fulfillJson(route, { error: 'Question not found' }, 404);
+      const body = readBody<{
+        expectedVersion: number;
+        content?: string;
+        answerRaw?: string;
+        analyzeRaw?: string | null;
+        optionContentOverrides?: Array<{ optionId: string; content: string }>;
+        note?: string;
+      }>(route);
+      if (body.expectedVersion !== question.overrideVersion) {
+        return fulfillJson(route, { error: 'Question override version conflict' }, 409);
+      }
+      if (body.content !== undefined) question.content = body.content;
+      if (body.answerRaw !== undefined) question.answerRaw = body.answerRaw;
+      if (body.analyzeRaw !== undefined) question.analyzeRaw = body.analyzeRaw;
+      for (const override of body.optionContentOverrides ?? []) {
+        const option = question.options.find((candidate) => candidate.id === override.optionId);
+        if (!option) return fulfillJson(route, { error: 'Question option not found' }, 404);
+        option.overrideContent = override.content;
+        option.effectiveContent = override.content;
+      }
+      question.overrideVersion += 1;
+      question.contentPreview = preview(question.content, 160);
+      question.answerPreview = preview(question.answerRaw, 120);
+      question.override = {
+        version: question.overrideVersion,
+        contentOverride: body.content ?? question.override?.contentOverride ?? null,
+        answerRawOverride: body.answerRaw ?? question.override?.answerRawOverride ?? null,
+        analyzeRawOverride: body.analyzeRaw ?? question.override?.analyzeRawOverride ?? null,
+        note: body.note ?? '',
+        updatedBy: { id: adminId, displayName: '平台管理员' },
+        updatedAt: '2026-07-15T11:00:00.000Z',
+      };
+      return fulfillJson(route, { question });
+    }
+
     const questionReviewMatch = pathname.match(/^\/api\/admin\/question-review\/([^/]+)$/);
+    if (method === 'GET' && questionReviewMatch) {
+      const questionId = questionReviewMatch[1];
+      const question = state.questionReviews.find((item) => item.questionId === questionId);
+      if (!question) return fulfillJson(route, { error: 'Question not found' }, 404);
+      return fulfillJson(route, { question });
+    }
+
     if (method === 'PATCH' && questionReviewMatch) {
       const questionId = questionReviewMatch[1];
       const question = state.questionReviews.find((item) => item.questionId === questionId);
@@ -789,7 +837,7 @@ function buildQuestionReview(input: {
   questionType: string;
   excludedFromPractice: boolean;
   flags: AdminQuestionReviewFlagV1[];
-}): AdminQuestionReviewItemV1 {
+}): AdminQuestionReviewDetailV1 {
   return {
     questionId: input.questionId,
     bankId: input.bankId,
@@ -800,6 +848,55 @@ function buildQuestionReview(input: {
     answerPreview: 'B',
     flags: input.flags,
     excludedFromPractice: input.excludedFromPractice,
+    content: '1 + 1 的正确答案是什么？',
+    answerRaw: 'B',
+    analyzeRaw: '基础加法题。',
+    options: [
+      {
+        id: '77777777-7777-4777-8777-000000000001',
+        sort: 1,
+        content: '1',
+        overrideContent: null,
+        effectiveContent: '1',
+      },
+      {
+        id: '77777777-7777-4777-8777-000000000002',
+        sort: 2,
+        content: '2',
+        overrideContent: null,
+        effectiveContent: '2',
+      },
+      {
+        id: '77777777-7777-4777-8777-000000000003',
+        sort: 3,
+        content: '3',
+        overrideContent: null,
+        effectiveContent: '3',
+      },
+      {
+        id: '77777777-7777-4777-8777-000000000004',
+        sort: 4,
+        content: '4',
+        overrideContent: null,
+        effectiveContent: '4',
+      },
+    ],
+    override: null,
+    overrideVersion: 0,
+  };
+}
+
+function toQuestionReviewItem(question: AdminQuestionReviewDetailV1): AdminQuestionReviewItemV1 {
+  return {
+    questionId: question.questionId,
+    bankId: question.bankId,
+    bankName: question.bankName,
+    questionType: question.questionType,
+    contentPreview: question.contentPreview,
+    optionCount: question.optionCount,
+    answerPreview: question.answerPreview,
+    flags: question.flags,
+    excludedFromPractice: question.excludedFromPractice,
   };
 }
 
@@ -820,6 +917,10 @@ function buildQuestionReviewFlag(input: {
     resolvedAt: null,
     resolvedBy: null,
   };
+}
+
+function preview(value: string, maxLength: number) {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
 function buildAuditLog(input: {

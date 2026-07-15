@@ -134,13 +134,14 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
             COALESCE(bank_mappings.subject_category, '') AS subject_category,
             COALESCE(bank_mappings.subject_name, '') AS subject_name,
             questions.normalized_type,
-            LEFT(regexp_replace(COALESCE(questions.content, ''), '\s+', ' ', 'g'), 120) AS content_preview,
+            LEFT(regexp_replace(COALESCE(question_overrides.content_override, questions.content, ''), '\s+', ' ', 'g'), 120) AS content_preview,
             wrong_questions.wrong_count,
             wrong_questions.last_answer,
             wrong_questions.mastered,
             wrong_questions.last_wrong_at
           FROM wrong_questions
           JOIN questions ON questions.id = wrong_questions.question_id
+          LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
           LEFT JOIN bank_mappings ON bank_mappings.bank_id = wrong_questions.bank_id
           WHERE ${filters.join(' AND ')}
           ORDER BY wrong_questions.last_wrong_at DESC, wrong_questions.id
@@ -162,15 +163,16 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
             COALESCE(bank_mappings.subject_category, '') AS subject_category,
             COALESCE(bank_mappings.subject_name, '') AS subject_name,
             questions.normalized_type,
-            questions.content,
-            questions.answer_raw,
-            questions.analyze_raw,
+            COALESCE(question_overrides.content_override, questions.content) AS content,
+            COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_raw,
+            COALESCE(question_overrides.analyze_raw_override, questions.analyze_raw) AS analyze_raw,
             wrong_questions.wrong_count,
             wrong_questions.last_answer,
             wrong_questions.mastered,
             wrong_questions.last_wrong_at
           FROM wrong_questions
           JOIN questions ON questions.id = wrong_questions.question_id
+          LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
           LEFT JOIN bank_mappings ON bank_mappings.bank_id = wrong_questions.bank_id
           WHERE wrong_questions.student_id = $1
             AND wrong_questions.id = $2
@@ -183,10 +185,15 @@ export function createPgWrongQuestionRepository(client: QueryClient): WrongQuest
 
       const optionResult = (await client.query(
         `
-          SELECT id, question_id, sort, content
+          SELECT
+            question_options.id,
+            question_options.question_id,
+            question_options.sort,
+            COALESCE(question_option_overrides.content_override, question_options.content) AS content
           FROM question_options
-          WHERE question_id = $1
-          ORDER BY sort, id
+          LEFT JOIN question_option_overrides ON question_option_overrides.option_id = question_options.id
+          WHERE question_options.question_id = $1
+          ORDER BY question_options.sort, question_options.id
         `,
         [row.question_id],
       )) as QueryRows<WrongQuestionOptionRow>;

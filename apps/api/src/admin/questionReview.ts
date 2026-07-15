@@ -1,9 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AddAdminQuestionReviewFlagV1,
+  AdminQuestionReviewDetailV1,
   AdminQuestionReviewFlagV1,
   AdminQuestionReviewItemV1,
+  AdminQuestionReviewOptionV1,
   ListAdminQuestionReviewsRequestV1,
+  UpdateAdminQuestionOverrideRequestV1,
   UpdateAdminQuestionReviewRequestV1,
 } from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
@@ -33,8 +36,8 @@ export interface UpdateAdminQuestionReviewInput {
 export type UpdateAdminQuestionReviewResult =
   | {
     status: 'updated';
-    before: AdminQuestionReviewItemV1;
-    after: AdminQuestionReviewItemV1;
+    before: AdminQuestionReviewDetailV1;
+    after: AdminQuestionReviewDetailV1;
     addedFlags: AdminQuestionReviewFlagV1[];
     resolvedFlags: AdminQuestionReviewFlagV1[];
     ignoredFlags: AdminQuestionReviewFlagV1[];
@@ -42,9 +45,27 @@ export type UpdateAdminQuestionReviewResult =
   | { status: 'question_not_found' }
   | { status: 'flag_not_found' };
 
+export interface UpdateAdminQuestionOverrideInput {
+  questionId: string;
+  changes: UpdateAdminQuestionOverrideRequestV1;
+  actor: AdminQuestionReviewActor;
+}
+
+export type UpdateAdminQuestionOverrideResult =
+  | {
+    status: 'updated';
+    before: AdminQuestionReviewDetailV1;
+    after: AdminQuestionReviewDetailV1;
+  }
+  | { status: 'question_not_found' }
+  | { status: 'version_conflict'; current: AdminQuestionReviewDetailV1 }
+  | { status: 'option_not_found' };
+
 export interface AdminQuestionReviewRepository {
   listQuestionReviews(filters: AdminQuestionReviewListFilters): Promise<AdminQuestionReviewPage>;
+  getQuestionReview(questionId: string): Promise<AdminQuestionReviewDetailV1 | null>;
   updateQuestionReview(input: UpdateAdminQuestionReviewInput): Promise<UpdateAdminQuestionReviewResult>;
+  updateQuestionOverride(input: UpdateAdminQuestionOverrideInput): Promise<UpdateAdminQuestionOverrideResult>;
 }
 
 interface QueryRows<T> {
@@ -71,6 +92,34 @@ interface QuestionContextRow {
   content_preview: string;
   option_count: string | number;
   answer_preview: string;
+}
+
+interface QuestionCoreRow {
+  question_id: string;
+  bank_id: string;
+  bank_name: string;
+  question_type: string;
+  option_count: string | number;
+  effective_content: string;
+  effective_answer_raw: string;
+  effective_analyze_raw: string | null;
+  override_version: string | number | null;
+  content_override: string | null;
+  answer_raw_override: string | null;
+  analyze_raw_override: string | null;
+  override_note: string | null;
+  override_updated_at: Date | string | null;
+  override_updated_by_admin_id: string | null;
+  override_updated_by_display_name: string | null;
+  excluded_from_practice: boolean | null;
+}
+
+interface QuestionOptionRow {
+  id: string;
+  question_id: string;
+  sort: string | number;
+  content: string;
+  override_content: string | null;
 }
 
 interface FlagRow {
@@ -101,23 +150,68 @@ function cloneFlag(flag: AdminQuestionReviewFlagV1): AdminQuestionReviewFlagV1 {
   };
 }
 
-function cloneQuestion(question: AdminQuestionReviewItemV1): AdminQuestionReviewItemV1 {
+function cloneQuestionItem(question: AdminQuestionReviewItemV1): AdminQuestionReviewItemV1 {
   return {
     ...question,
     flags: question.flags.map(cloneFlag),
   };
 }
 
+function cloneQuestionDetail(question: AdminQuestionReviewDetailV1): AdminQuestionReviewDetailV1 {
+  return {
+    ...cloneQuestionItem(question),
+    content: question.content,
+    answerRaw: question.answerRaw,
+    analyzeRaw: question.analyzeRaw,
+    options: question.options.map((option) => ({ ...option })),
+    override: question.override
+      ? {
+        ...question.override,
+        updatedBy: question.override.updatedBy ? { ...question.override.updatedBy } : null,
+      }
+      : null,
+    overrideVersion: question.overrideVersion,
+  };
+}
+
+function detailFromItem(question: AdminQuestionReviewItemV1): AdminQuestionReviewDetailV1 {
+  return {
+    ...cloneQuestionItem(question),
+    content: question.contentPreview,
+    answerRaw: question.answerPreview,
+    analyzeRaw: null,
+    options: [],
+    override: null,
+    overrideVersion: 0,
+  };
+}
+
+function itemFromDetail(question: AdminQuestionReviewDetailV1): AdminQuestionReviewItemV1 {
+  return {
+    questionId: question.questionId,
+    bankId: question.bankId,
+    bankName: question.bankName,
+    questionType: question.questionType,
+    contentPreview: question.contentPreview,
+    optionCount: question.optionCount,
+    answerPreview: question.answerPreview,
+    flags: question.flags.map(cloneFlag),
+    excludedFromPractice: question.excludedFromPractice,
+  };
+}
+
 export function createMemoryAdminQuestionReviewRepository(
-  questions: readonly AdminQuestionReviewItemV1[] = [],
+  questions: readonly (AdminQuestionReviewItemV1 | AdminQuestionReviewDetailV1)[] = [],
 ): AdminQuestionReviewRepository {
-  const records = questions.map(cloneQuestion);
+  const records = questions.map((question) => (
+    'options' in question ? cloneQuestionDetail(question) : detailFromItem(question)
+  ));
 
   return {
     async listQuestionReviews(filters) {
       const filtered = records
         .map((question) => ({
-          ...cloneQuestion(question),
+          ...cloneQuestionDetail(question),
           flags: question.flags.filter((flag) => flagMatchesFilters(flag, filters)),
         }))
         .filter((question) => {
@@ -130,6 +224,8 @@ export function createMemoryAdminQuestionReviewRepository(
               question.bankName,
               question.contentPreview,
               question.answerPreview,
+              question.content,
+              question.answerRaw,
             ].some((value) => value.toLocaleLowerCase().includes(keyword));
           }
 
@@ -138,7 +234,7 @@ export function createMemoryAdminQuestionReviewRepository(
       const pageItems = filtered.slice(filters.offset, filters.offset + filters.limit + 1);
 
       return {
-        questions: pageItems.slice(0, filters.limit).map(cloneQuestion),
+        questions: pageItems.slice(0, filters.limit).map(itemFromDetail),
         page: {
           limit: filters.limit,
           offset: filters.offset,
@@ -147,11 +243,16 @@ export function createMemoryAdminQuestionReviewRepository(
       };
     },
 
+    async getQuestionReview(questionId) {
+      const question = records.find((candidate) => candidate.questionId === questionId);
+      return question ? cloneQuestionDetail(question) : null;
+    },
+
     async updateQuestionReview(input) {
       const index = records.findIndex((question) => question.questionId === input.questionId);
       if (index < 0) return { status: 'question_not_found' };
 
-      const before = cloneQuestion(records[index]);
+      const before = cloneQuestionDetail(records[index]);
       const flagIds = new Set(before.flags.map((flag) => flag.id));
       if (
         input.changes.resolveFlagIds.some((flagId) => !flagIds.has(flagId))
@@ -185,21 +286,71 @@ export function createMemoryAdminQuestionReviewRepository(
       });
       nextFlags = [...nextFlags, ...addedFlags];
 
-      const after: AdminQuestionReviewItemV1 = {
+      const after: AdminQuestionReviewDetailV1 = {
         ...before,
         flags: nextFlags,
         excludedFromPractice: input.changes.excludedFromPractice ?? before.excludedFromPractice,
       };
-      records[index] = cloneQuestion(after);
+      records[index] = cloneQuestionDetail(after);
 
       return {
         status: 'updated',
         before,
-        after: cloneQuestion(after),
+        after: cloneQuestionDetail(after),
         addedFlags,
         resolvedFlags: nextFlags.filter((flag) => resolvedIds.has(flag.id)).map(cloneFlag),
         ignoredFlags: nextFlags.filter((flag) => ignoredIds.has(flag.id)).map(cloneFlag),
       };
+    },
+
+    async updateQuestionOverride(input) {
+      const index = records.findIndex((question) => question.questionId === input.questionId);
+      if (index < 0) return { status: 'question_not_found' };
+
+      const before = cloneQuestionDetail(records[index]);
+      if (before.overrideVersion !== input.changes.expectedVersion) {
+        return { status: 'version_conflict', current: before };
+      }
+
+      const optionIds = new Set(before.options.map((option) => option.id));
+      if (input.changes.optionContentOverrides.some((option) => !optionIds.has(option.optionId))) {
+        return { status: 'option_not_found' };
+      }
+
+      const now = new Date().toISOString();
+      const nextOptions = before.options.map((option) => {
+        const override = input.changes.optionContentOverrides.find((candidate) => candidate.optionId === option.id);
+        if (!override) return { ...option };
+        return {
+          ...option,
+          overrideContent: override.content,
+          effectiveContent: override.content,
+        };
+      });
+      const after: AdminQuestionReviewDetailV1 = {
+        ...before,
+        content: input.changes.content ?? before.content,
+        answerRaw: input.changes.answerRaw ?? before.answerRaw,
+        analyzeRaw: input.changes.analyzeRaw === undefined ? before.analyzeRaw : input.changes.analyzeRaw,
+        options: nextOptions,
+        overrideVersion: before.overrideVersion + 1,
+        override: {
+          version: before.overrideVersion + 1,
+          contentOverride: input.changes.content ?? before.override?.contentOverride ?? null,
+          answerRawOverride: input.changes.answerRaw ?? before.override?.answerRawOverride ?? null,
+          analyzeRawOverride: input.changes.analyzeRaw === undefined
+            ? before.override?.analyzeRawOverride ?? null
+            : input.changes.analyzeRaw,
+          note: input.changes.note,
+          updatedBy: { id: input.actor.id, displayName: input.actor.displayName },
+          updatedAt: now,
+        },
+      };
+      after.contentPreview = preview(after.content, 160);
+      after.answerPreview = preview(after.answerRaw, 120);
+      records[index] = cloneQuestionDetail(after);
+
+      return { status: 'updated', before, after: cloneQuestionDetail(after) };
     },
   };
 }
@@ -227,8 +378,8 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
       if (filters.keyword) {
         const pattern = `%${escapeLikePattern(filters.keyword.toLocaleLowerCase())}%`;
         addFilter(params, questionWhere, (placeholder) => `(
-          lower(questions.content) LIKE ${placeholder} ESCAPE '\\'
-          OR lower(questions.answer_raw) LIKE ${placeholder} ESCAPE '\\'
+          lower(COALESCE(question_overrides.content_override, questions.content)) LIKE ${placeholder} ESCAPE '\\'
+          OR lower(COALESCE(question_overrides.answer_raw_override, questions.answer_raw)) LIKE ${placeholder} ESCAPE '\\'
           OR lower(questions.searchable_text) LIKE ${placeholder} ESCAPE '\\'
         )`, pattern);
       }
@@ -253,6 +404,7 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
             SELECT questions.id AS question_id, max(filtered_flags.updated_at) AS last_reviewed_at
             FROM questions
             JOIN filtered_flags ON filtered_flags.question_id = questions.id
+            LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
             WHERE ${questionWhere.length > 0 ? questionWhere.join(' AND ') : 'TRUE'}
             GROUP BY questions.id
             ORDER BY max(filtered_flags.updated_at) DESC, questions.id DESC
@@ -275,9 +427,9 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
             COALESCE((array_agg(filtered_flags.bank_id ORDER BY filtered_flags.created_at DESC))[1], questions.classification_id) AS bank_id,
             COALESCE((array_agg(bank_mappings.bank_name ORDER BY filtered_flags.created_at DESC))[1], '未映射题库') AS bank_name,
             questions.normalized_type AS question_type,
-            questions.content AS content_preview,
+            COALESCE(question_overrides.content_override, questions.content) AS content_preview,
             COALESCE(option_counts.option_count, 0) AS option_count,
-            questions.answer_raw AS answer_preview,
+            COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_preview,
             COALESCE(question_exclusions.excluded_from_practice, false) AS excluded_from_practice,
             COALESCE(jsonb_agg(jsonb_build_object(
               'id', filtered_flags.id,
@@ -305,6 +457,7 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
           FROM matching_questions
           JOIN questions ON questions.id = matching_questions.question_id
           JOIN filtered_flags ON filtered_flags.question_id = questions.id
+          LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
           LEFT JOIN bank_mappings ON bank_mappings.bank_id = filtered_flags.bank_id
           LEFT JOIN option_counts ON option_counts.question_id = questions.id
           LEFT JOIN question_exclusions ON question_exclusions.question_id = questions.id
@@ -314,6 +467,8 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
             questions.normalized_type,
             questions.content,
             questions.answer_raw,
+            question_overrides.content_override,
+            question_overrides.answer_raw_override,
             option_counts.option_count,
             question_exclusions.excluded_from_practice,
             matching_questions.last_reviewed_at
@@ -333,6 +488,10 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
       };
     },
 
+    async getQuestionReview(questionId) {
+      return loadQuestionDetail(client, questionId);
+    },
+
     async updateQuestionReview(input) {
       const transactionClient = await checkoutTransactionClient(client);
       let transactionStarted = false;
@@ -348,8 +507,12 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
           return { status: 'question_not_found' };
         }
 
-        let before = await findQuestionReviewById(transactionClient, input.questionId);
-        before ??= questionFromContext(context, []);
+        const before = await loadQuestionDetail(transactionClient, input.questionId);
+        if (!before) {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'question_not_found' };
+        }
         const currentExcluded = before.excludedFromPractice;
         const addedFlags: AdminQuestionReviewFlagV1[] = [];
         const resolvedFlags: AdminQuestionReviewFlagV1[] = [];
@@ -426,7 +589,7 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
           }
         }
 
-        const after = await findQuestionReviewById(transactionClient, input.questionId);
+        const after = await loadQuestionDetail(transactionClient, input.questionId);
         if (!after) {
           throw new Error(`Question review disappeared after update: ${input.questionId}`);
         }
@@ -442,6 +605,56 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
           resolvedFlags,
           ignoredFlags,
         };
+      } catch (error) {
+        if (transactionStarted) {
+          await transactionClient.query('ROLLBACK');
+        }
+
+        throw error;
+      } finally {
+        transactionClient.release?.();
+      }
+    },
+
+    async updateQuestionOverride(input) {
+      const transactionClient = await checkoutTransactionClient(client);
+      let transactionStarted = false;
+
+      try {
+        await transactionClient.query('BEGIN');
+        transactionStarted = true;
+
+        const before = await loadQuestionDetail(transactionClient, input.questionId);
+        if (!before) {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'question_not_found' };
+        }
+        if (before.overrideVersion !== input.changes.expectedVersion) {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'version_conflict', current: before };
+        }
+        if (!await allOptionsBelongToQuestion(transactionClient, input.questionId, input.changes.optionContentOverrides.map((option) => option.optionId))) {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'option_not_found' };
+        }
+
+        await upsertQuestionOverride(transactionClient, input);
+        for (const option of input.changes.optionContentOverrides) {
+          await upsertQuestionOptionOverride(transactionClient, input.questionId, option.optionId, option.content, input.actor.id);
+        }
+
+        const after = await loadQuestionDetail(transactionClient, input.questionId);
+        if (!after) {
+          throw new Error(`Question review disappeared after override update: ${input.questionId}`);
+        }
+
+        await transactionClient.query('COMMIT');
+        transactionStarted = false;
+
+        return { status: 'updated', before, after };
       } catch (error) {
         if (transactionStarted) {
           await transactionClient.query('ROLLBACK');
@@ -539,10 +752,11 @@ async function loadQuestionContext(
         COALESCE(bank_for_question.bank_id, fallback_classification.id) AS bank_id,
         COALESCE(bank_for_question.bank_name, fallback_classification.name, '未映射题库') AS bank_name,
         questions.normalized_type AS question_type,
-        questions.content AS content_preview,
+        COALESCE(question_overrides.content_override, questions.content) AS content_preview,
         COALESCE(option_counts.option_count, 0) AS option_count,
-        questions.answer_raw AS answer_preview
+        COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_preview
       FROM questions
+      LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
       LEFT JOIN bank_for_question ON true
       LEFT JOIN fallback_classification ON true
       LEFT JOIN option_counts ON option_counts.question_id = questions.id
@@ -555,104 +769,130 @@ async function loadQuestionContext(
   return result.rows[0] ?? null;
 }
 
-async function findQuestionReviewById(
+async function loadQuestionDetail(
   client: QueryClient,
   questionId: string,
-): Promise<AdminQuestionReviewItemV1 | null> {
+): Promise<AdminQuestionReviewDetailV1 | null> {
+  const core = await loadQuestionCore(client, questionId);
+  if (!core) return null;
+  const flags = await loadQuestionFlags(client, questionId);
+  const options = await loadQuestionOptions(client, questionId);
+
+  return mapQuestionDetail(core, flags, options);
+}
+
+async function loadQuestionCore(client: QueryClient, questionId: string): Promise<QuestionCoreRow | null> {
   const result = (await client.query(
     `
-      WITH question_context AS (
-        WITH RECURSIVE ancestors AS (
-          SELECT classifications.id, classifications.name, classifications.parent_id, 0 AS depth
-          FROM questions
-          JOIN classifications ON classifications.id = questions.classification_id
-          WHERE questions.id = $1
-          UNION ALL
-          SELECT classifications.id, classifications.name, classifications.parent_id, ancestors.depth + 1
-          FROM classifications
-          JOIN ancestors ON ancestors.parent_id = classifications.id
-        ), bank_for_question AS (
-          SELECT bank_mappings.bank_id, bank_mappings.bank_name
-          FROM ancestors
-          JOIN bank_mappings ON bank_mappings.bank_id = ancestors.id
-          ORDER BY ancestors.depth ASC
-          LIMIT 1
-        ), fallback_classification AS (
-          SELECT ancestors.id, ancestors.name
-          FROM ancestors
-          ORDER BY ancestors.depth ASC
-          LIMIT 1
-        ), option_counts AS (
-          SELECT question_id, count(*) AS option_count
-          FROM question_options
-          WHERE question_id = $1
-          GROUP BY question_id
-        )
-        SELECT
-          questions.id AS question_id,
-          COALESCE(bank_for_question.bank_id, fallback_classification.id) AS bank_id,
-          COALESCE(bank_for_question.bank_name, fallback_classification.name, '未映射题库') AS bank_name,
-          questions.normalized_type AS question_type,
-          questions.content AS content_preview,
-          COALESCE(option_counts.option_count, 0) AS option_count,
-          questions.answer_raw AS answer_preview
+      WITH RECURSIVE ancestors AS (
+        SELECT classifications.id, classifications.name, classifications.parent_id, 0 AS depth
         FROM questions
-        LEFT JOIN bank_for_question ON true
-        LEFT JOIN fallback_classification ON true
-        LEFT JOIN option_counts ON option_counts.question_id = questions.id
+        JOIN classifications ON classifications.id = questions.classification_id
         WHERE questions.id = $1
-      ), flags AS (
-        SELECT
-          question_quality_flags.*,
-          created_by.display_name AS created_by_display_name,
-          resolved_by.display_name AS resolved_by_display_name
-        FROM question_quality_flags
-        LEFT JOIN admin_users created_by ON created_by.id = question_quality_flags.created_by_admin_id
-        LEFT JOIN admin_users resolved_by ON resolved_by.id = question_quality_flags.resolved_by_admin_id
-        WHERE question_quality_flags.question_id = $1
+        UNION ALL
+        SELECT classifications.id, classifications.name, classifications.parent_id, ancestors.depth + 1
+        FROM classifications
+        JOIN ancestors ON ancestors.parent_id = classifications.id
+      ), bank_for_question AS (
+        SELECT bank_mappings.bank_id, bank_mappings.bank_name
+        FROM ancestors
+        JOIN bank_mappings ON bank_mappings.bank_id = ancestors.id
+        ORDER BY ancestors.depth ASC
+        LIMIT 1
+      ), fallback_classification AS (
+        SELECT ancestors.id, ancestors.name
+        FROM ancestors
+        ORDER BY ancestors.depth ASC
+        LIMIT 1
+      ), option_counts AS (
+        SELECT question_id, count(*) AS option_count
+        FROM question_options
+        WHERE question_id = $1
+        GROUP BY question_id
       )
       SELECT
-        question_context.question_id,
-        question_context.bank_id,
-        question_context.bank_name,
-        question_context.question_type,
-        question_context.content_preview,
-        question_context.option_count,
-        question_context.answer_preview,
-        COALESCE(bool_or(flags.excluded_from_practice) FILTER (WHERE flags.status = 'open'), false) AS excluded_from_practice,
-        COALESCE(jsonb_agg(jsonb_build_object(
-          'id', flags.id,
-          'type', flags.flag_type,
-          'severity', flags.severity,
-          'status', flags.status,
-          'note', flags.note,
-          'createdAt', to_jsonb(flags.created_at),
-          'createdBy', CASE
-            WHEN flags.created_by_admin_id IS NULL THEN NULL
-            ELSE jsonb_build_object('id', flags.created_by_admin_id, 'displayName', flags.created_by_display_name)
-          END,
-          'resolvedAt', to_jsonb(flags.resolved_at),
-          'resolvedBy', CASE
-            WHEN flags.resolved_by_admin_id IS NULL THEN NULL
-            ELSE jsonb_build_object('id', flags.resolved_by_admin_id, 'displayName', flags.resolved_by_display_name)
-          END
-        ) ORDER BY flags.created_at DESC, flags.id DESC) FILTER (WHERE flags.id IS NOT NULL), '[]'::jsonb) AS flags
-      FROM question_context
-      LEFT JOIN flags ON flags.question_id = question_context.question_id
-      GROUP BY
-        question_context.question_id,
-        question_context.bank_id,
-        question_context.bank_name,
-        question_context.question_type,
-        question_context.content_preview,
-        question_context.option_count,
-        question_context.answer_preview
+        questions.id AS question_id,
+        COALESCE(bank_for_question.bank_id, fallback_classification.id) AS bank_id,
+        COALESCE(bank_for_question.bank_name, fallback_classification.name, '未映射题库') AS bank_name,
+        questions.normalized_type AS question_type,
+        COALESCE(option_counts.option_count, 0) AS option_count,
+        COALESCE(question_overrides.content_override, questions.content) AS effective_content,
+        COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS effective_answer_raw,
+        COALESCE(question_overrides.analyze_raw_override, questions.analyze_raw) AS effective_analyze_raw,
+        question_overrides.version AS override_version,
+        question_overrides.content_override,
+        question_overrides.answer_raw_override,
+        question_overrides.analyze_raw_override,
+        question_overrides.note AS override_note,
+        question_overrides.updated_at AS override_updated_at,
+        question_overrides.updated_by_admin_id AS override_updated_by_admin_id,
+        admin_users.display_name AS override_updated_by_display_name,
+        COALESCE((
+          SELECT bool_or(question_quality_flags.excluded_from_practice)
+          FROM question_quality_flags
+          WHERE question_quality_flags.question_id = questions.id
+            AND question_quality_flags.status = 'open'
+        ), false) AS excluded_from_practice
+      FROM questions
+      LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
+      LEFT JOIN admin_users ON admin_users.id = question_overrides.updated_by_admin_id
+      LEFT JOIN bank_for_question ON true
+      LEFT JOIN fallback_classification ON true
+      LEFT JOIN option_counts ON option_counts.question_id = questions.id
+      WHERE questions.id = $1
+      LIMIT 1
     `,
     [questionId],
-  )) as QueryRows<QuestionReviewRow>;
-  const row = result.rows[0];
+  )) as QueryRows<QuestionCoreRow>;
 
-  return row ? mapQuestionReviewRow(row) : null;
+  return result.rows[0] ?? null;
+}
+
+async function loadQuestionFlags(client: QueryClient, questionId: string): Promise<AdminQuestionReviewFlagV1[]> {
+  const result = (await client.query(
+    `
+      SELECT
+        question_quality_flags.id,
+        question_quality_flags.flag_type,
+        question_quality_flags.severity,
+        question_quality_flags.status,
+        question_quality_flags.note,
+        question_quality_flags.created_at,
+        question_quality_flags.created_by_admin_id,
+        created_by.display_name AS created_by_display_name,
+        question_quality_flags.resolved_at,
+        question_quality_flags.resolved_by_admin_id,
+        resolved_by.display_name AS resolved_by_display_name
+      FROM question_quality_flags
+      LEFT JOIN admin_users created_by ON created_by.id = question_quality_flags.created_by_admin_id
+      LEFT JOIN admin_users resolved_by ON resolved_by.id = question_quality_flags.resolved_by_admin_id
+      WHERE question_quality_flags.question_id = $1
+      ORDER BY question_quality_flags.created_at DESC, question_quality_flags.id DESC
+    `,
+    [questionId],
+  )) as QueryRows<FlagRow>;
+
+  return result.rows.map(mapFlagRow);
+}
+
+async function loadQuestionOptions(client: QueryClient, questionId: string): Promise<QuestionOptionRow[]> {
+  const result = (await client.query(
+    `
+      SELECT
+        question_options.id,
+        question_options.question_id,
+        question_options.sort,
+        question_options.content,
+        question_option_overrides.content_override AS override_content
+      FROM question_options
+      LEFT JOIN question_option_overrides ON question_option_overrides.option_id = question_options.id
+      WHERE question_options.question_id = $1
+      ORDER BY question_options.sort, question_options.id
+    `,
+    [questionId],
+  )) as QueryRows<QuestionOptionRow>;
+
+  return result.rows;
 }
 
 async function insertFlag(
@@ -764,6 +1004,98 @@ async function countOpenFlags(client: QueryClient, questionId: string): Promise<
   return Number(result.rows[0]?.count ?? 0);
 }
 
+async function allOptionsBelongToQuestion(
+  client: QueryClient,
+  questionId: string,
+  optionIds: readonly string[],
+): Promise<boolean> {
+  if (optionIds.length === 0) return true;
+  const result = (await client.query(
+    `
+      SELECT id
+      FROM question_options
+      WHERE question_id = $1
+        AND id = ANY($2::uuid[])
+    `,
+    [questionId, optionIds],
+  )) as QueryRows<{ id: string }>;
+  const found = new Set(result.rows.map((row) => row.id));
+  return optionIds.every((optionId) => found.has(optionId));
+}
+
+async function upsertQuestionOverride(
+  client: QueryClient,
+  input: UpdateAdminQuestionOverrideInput,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO question_overrides (
+        question_id,
+        content_override,
+        answer_raw_override,
+        analyze_raw_override,
+        note,
+        version,
+        updated_by_admin_id
+      )
+      VALUES (
+        $1,
+        CASE WHEN $3::boolean THEN $2::text ELSE NULL END,
+        CASE WHEN $5::boolean THEN $4::text ELSE NULL END,
+        CASE WHEN $7::boolean THEN $6::text ELSE NULL END,
+        $8,
+        1,
+        $9
+      )
+      ON CONFLICT (question_id) DO UPDATE SET
+        content_override = CASE WHEN $3::boolean THEN $2::text ELSE question_overrides.content_override END,
+        answer_raw_override = CASE WHEN $5::boolean THEN $4::text ELSE question_overrides.answer_raw_override END,
+        analyze_raw_override = CASE WHEN $7::boolean THEN $6::text ELSE question_overrides.analyze_raw_override END,
+        note = $8,
+        version = question_overrides.version + 1,
+        updated_by_admin_id = $9,
+        updated_at = now()
+    `,
+    [
+      input.questionId,
+      input.changes.content ?? null,
+      input.changes.content !== undefined,
+      input.changes.answerRaw ?? null,
+      input.changes.answerRaw !== undefined,
+      input.changes.analyzeRaw ?? null,
+      input.changes.analyzeRaw !== undefined,
+      input.changes.note,
+      input.actor.id,
+    ],
+  );
+}
+
+async function upsertQuestionOptionOverride(
+  client: QueryClient,
+  questionId: string,
+  optionId: string,
+  content: string,
+  actorId: string,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO question_option_overrides (
+        option_id,
+        question_id,
+        content_override,
+        updated_by_admin_id
+      )
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (option_id) DO UPDATE SET
+        question_id = EXCLUDED.question_id,
+        content_override = EXCLUDED.content_override,
+        updated_by_admin_id = EXCLUDED.updated_by_admin_id,
+        updated_at = now()
+    `,
+    [optionId, questionId, content, actorId],
+  );
+}
+
 function questionFromContext(
   context: QuestionContextRow,
   flags: AdminQuestionReviewFlagV1[],
@@ -778,6 +1110,56 @@ function questionFromContext(
     answerPreview: preview(context.answer_preview, 120),
     flags: flags.map(cloneFlag),
     excludedFromPractice: false,
+  };
+}
+
+function mapQuestionDetail(
+  row: QuestionCoreRow,
+  flags: AdminQuestionReviewFlagV1[],
+  options: QuestionOptionRow[],
+): AdminQuestionReviewDetailV1 {
+  const item = questionFromContext({
+    question_id: row.question_id,
+    bank_id: row.bank_id,
+    bank_name: row.bank_name,
+    question_type: row.question_type,
+    content_preview: row.effective_content,
+    option_count: row.option_count,
+    answer_preview: row.effective_answer_raw,
+  }, flags);
+  const overrideVersion = Number(row.override_version ?? 0);
+
+  return {
+    ...item,
+    excludedFromPractice: Boolean(row.excluded_from_practice),
+    content: row.effective_content,
+    answerRaw: row.effective_answer_raw,
+    analyzeRaw: row.effective_analyze_raw,
+    options: options.map(mapQuestionOptionRow),
+    override: overrideVersion > 0 && row.override_updated_at
+      ? {
+        version: overrideVersion,
+        contentOverride: row.content_override,
+        answerRawOverride: row.answer_raw_override,
+        analyzeRawOverride: row.analyze_raw_override,
+        note: row.override_note ?? '',
+        updatedBy: row.override_updated_by_admin_id && row.override_updated_by_display_name
+          ? { id: row.override_updated_by_admin_id, displayName: row.override_updated_by_display_name }
+          : null,
+        updatedAt: toIsoTimestamp(row.override_updated_at),
+      }
+      : null,
+    overrideVersion,
+  };
+}
+
+function mapQuestionOptionRow(row: QuestionOptionRow): AdminQuestionReviewOptionV1 {
+  return {
+    id: row.id,
+    sort: Number(row.sort),
+    content: row.content,
+    overrideContent: row.override_content,
+    effectiveContent: row.override_content ?? row.content,
   };
 }
 

@@ -9,6 +9,7 @@ import {
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminMeResponseV1Schema,
+  AdminQuestionOverrideResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
   AdminQuestionReviewListResponseV1Schema,
   AdminStudentDetailResponseV1Schema,
@@ -29,6 +30,7 @@ import {
   ResetAdminStudentPasswordResponseV1Schema,
   RevokeAdminStudentSessionsResponseV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
+  UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminUserRequestV1Schema,
   UpdateAdminStudentRequestV1Schema,
@@ -44,6 +46,7 @@ import {
   type AdminQuestionFlagSeverityV1,
   type AdminQuestionFlagStatusV1,
   type AdminQuestionFlagTypeV1,
+  type AdminQuestionReviewDetailV1,
   type AdminQuestionReviewFlagV1,
   type AdminQuestionReviewItemV1,
   type AdminManagedUserStatusV1,
@@ -1728,7 +1731,7 @@ function QuestionReviewPage({
   const [filters, setFilters] = useState<QuestionReviewFilters>(defaultQuestionReviewFilters);
   const [offset, setOffset] = useState(0);
   const [questions, setQuestions] = useState<AdminQuestionReviewItemV1[]>([]);
-  const [detailOverride, setDetailOverride] = useState<AdminQuestionReviewItemV1 | null>(null);
+  const [detailOverride, setDetailOverride] = useState<AdminQuestionReviewDetailV1 | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1770,8 +1773,23 @@ function QuestionReviewPage({
     setDetailOverride(null);
   }
 
-  function refreshAfterMutation(question: AdminQuestionReviewItemV1) {
+  function refreshAfterMutation(question: AdminQuestionReviewDetailV1) {
     setDetailOverride(question);
+    setQuestions((current) => current.map((item) => (
+      item.questionId === question.questionId
+        ? {
+          questionId: question.questionId,
+          bankId: question.bankId,
+          bankName: question.bankName,
+          questionType: question.questionType,
+          contentPreview: question.contentPreview,
+          optionCount: question.optionCount,
+          answerPreview: question.answerPreview,
+          flags: question.flags,
+          excludedFromPractice: question.excludedFromPractice,
+        }
+        : item
+    )));
     void loadQuestions();
     navigate(`/admin/question-review/${question.questionId}`);
   }
@@ -1781,7 +1799,7 @@ function QuestionReviewPage({
       <PageHeader
         eyebrow="Quality operations"
         title="Question Review"
-        description="B9.23 只做 preview-level 质检 UI：open flags 队列、flag add、resolve/ignore 和 excludedFromPractice；完整题目编辑器与 override 层后置。"
+        description="B9.26 增加题目 override 编辑闭环：列表仍用于 flag 队列，详情页通过独立覆盖层维护题干、答案、解析和选项文案，不直接改导入原表。"
         action={<button className="ghost" type="button" onClick={() => void loadQuestions()} disabled={loading}>刷新列表</button>}
       />
 
@@ -1849,17 +1867,13 @@ function QuestionReviewPage({
         </section>
 
         <aside className="admin-card student-side-panel">
-          {route.questionId && selectedQuestion ? (
+          {route.questionId ? (
             <QuestionReviewDetailPanel
-              question={selectedQuestion}
+              questionId={route.questionId}
+              initialQuestion={selectedQuestion}
               canWrite={canWrite}
               onChanged={refreshAfterMutation}
               onSessionExpired={onSessionExpired}
-            />
-          ) : route.questionId ? (
-            <InfoPanel
-              title="当前列表中没有该题目"
-              detail="Question Review 暂无单独 GET detail endpoint；请调整过滤条件或从左侧队列重新选择。"
             />
           ) : (
             <InfoPanel title="选择一个质检题目" detail="从左侧列表查看题干/答案预览、open flags，并进行 add/resolve/ignore 或练习排除操作。" />
@@ -1919,30 +1933,103 @@ function QuestionReviewTable({
   );
 }
 
+function isQuestionReviewDetail(
+  question: AdminQuestionReviewItemV1 | AdminQuestionReviewDetailV1 | null,
+): question is AdminQuestionReviewDetailV1 {
+  return Boolean(question && 'overrideVersion' in question && Array.isArray(question.options));
+}
+
 function QuestionReviewDetailPanel({
-  question,
+  questionId,
+  initialQuestion,
   canWrite,
   onChanged,
   onSessionExpired,
 }: {
-  question: AdminQuestionReviewItemV1;
+  questionId: string;
+  initialQuestion: AdminQuestionReviewItemV1 | AdminQuestionReviewDetailV1 | null;
   canWrite: boolean;
-  onChanged: (question: AdminQuestionReviewItemV1) => void;
+  onChanged: (question: AdminQuestionReviewDetailV1) => void;
   onSessionExpired: () => void;
 }) {
+  const [question, setQuestion] = useState<AdminQuestionReviewDetailV1 | null>(
+    () => (isQuestionReviewDetail(initialQuestion) ? initialQuestion : null),
+  );
+  const [loadingDetail, setLoadingDetail] = useState(true);
   const [flagType, setFlagType] = useState<AdminQuestionFlagTypeV1>('needs_manual_review');
   const [severity, setSeverity] = useState<AdminQuestionFlagSeverityV1>('medium');
   const [note, setNote] = useState('');
   const [excludeOnAdd, setExcludeOnAdd] = useState(false);
+  const [overrideContent, setOverrideContent] = useState('');
+  const [overrideAnswerRaw, setOverrideAnswerRaw] = useState('');
+  const [overrideAnalyzeRaw, setOverrideAnalyzeRaw] = useState('');
+  const [overrideNote, setOverrideNote] = useState('');
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
+  const syncOverrideDraft = useCallback((next: AdminQuestionReviewDetailV1) => {
+    setOverrideContent(next.content);
+    setOverrideAnswerRaw(next.answerRaw);
+    setOverrideAnalyzeRaw(next.analyzeRaw ?? '');
+    setOverrideNote(next.override?.note ?? '');
+    setOptionDrafts(Object.fromEntries(next.options.map((option) => [option.id, option.effectiveContent])));
+  }, []);
+
+  const loadDetail = useCallback(async () => {
+    setLoadingDetail(true);
+    setError('');
+    try {
+      const response = await requestJson(
+        `/api/admin/question-review/${encodeURIComponent(questionId)}`,
+        AdminQuestionReviewDetailResponseV1Schema,
+      );
+      setQuestion(response.question);
+      syncOverrideDraft(response.question);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapQuestionReviewError(caught));
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [questionId, onSessionExpired, syncOverrideDraft]);
+
+  useEffect(() => {
+    if (isQuestionReviewDetail(initialQuestion) && initialQuestion.questionId === questionId) {
+      setQuestion(initialQuestion);
+      syncOverrideDraft(initialQuestion);
+    }
+  }, [initialQuestion, questionId, syncOverrideDraft]);
 
   useEffect(() => {
     setMessage('');
     setError('');
     setExcludeOnAdd(false);
-  }, [question.questionId]);
+    setNote('');
+    void loadDetail();
+  }, [questionId, loadDetail]);
+
+  if (!question && loadingDetail) {
+    return (
+      <section className="student-detail">
+        <p className="eyebrow">Question Review Detail</p>
+        <h2>加载题目详情…</h2>
+      </section>
+    );
+  }
+
+  if (!question) {
+    return (
+      <section className="student-detail">
+        <p className="eyebrow">Question Review Detail</p>
+        <h2>题目详情不可用</h2>
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        <button className="ghost" type="button" onClick={() => void loadDetail()} disabled={loadingDetail}>重试加载详情</button>
+      </section>
+    );
+  }
+  const currentQuestion = question;
 
   async function patchQuestionReview(changes: {
     addFlags?: Array<{ type: AdminQuestionFlagTypeV1; severity: AdminQuestionFlagSeverityV1; note: string }>;
@@ -1961,13 +2048,15 @@ function QuestionReviewDetailPanel({
         ignoredFlagIds: changes.ignoredFlagIds ?? [],
         excludedFromPractice: changes.excludedFromPractice,
       });
-      const response = await requestJson(`/api/admin/question-review/${encodeURIComponent(question.questionId)}`, AdminQuestionReviewDetailResponseV1Schema, {
+      const response = await requestJson(`/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}`, AdminQuestionReviewDetailResponseV1Schema, {
         method: 'PATCH',
         body: JSON.stringify(request),
       });
       setMessage(successMessage);
       setNote('');
       setExcludeOnAdd(false);
+      setQuestion(response.question);
+      syncOverrideDraft(response.question);
       onChanged(response.question);
     } catch (caught: unknown) {
       if (isUnauthorized(caught)) onSessionExpired();
@@ -1982,45 +2071,130 @@ function QuestionReviewDetailPanel({
     const changes: Parameters<typeof patchQuestionReview>[0] = {
       addFlags: [{ type: flagType, severity, note }],
     };
-    if (excludeOnAdd && !question.excludedFromPractice) changes.excludedFromPractice = true;
+    if (excludeOnAdd && !currentQuestion.excludedFromPractice) changes.excludedFromPractice = true;
     await patchQuestionReview(changes, '质检 flag 已添加。');
   }
 
-  const openFlags = question.flags.filter((flag) => flag.status === 'open');
+  async function saveOverride(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite) return;
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const optionContentOverrides = currentQuestion.options
+        .map((option) => ({
+          optionId: option.id,
+          content: optionDrafts[option.id] ?? option.effectiveContent,
+          previous: option.effectiveContent,
+        }))
+        .filter((option) => option.content !== option.previous)
+        .map(({ optionId, content }) => ({ optionId, content }));
+      const contentChanged = overrideContent !== currentQuestion.content;
+      const answerChanged = overrideAnswerRaw !== currentQuestion.answerRaw;
+      const analyzeChanged = overrideAnalyzeRaw !== (currentQuestion.analyzeRaw ?? '');
+      const noteChanged = overrideNote !== (currentQuestion.override?.note ?? '');
+      const hasOverrideChange = contentChanged || answerChanged || analyzeChanged || optionContentOverrides.length > 0;
+      const request = UpdateAdminQuestionOverrideRequestV1Schema.parse({
+        expectedVersion: currentQuestion.overrideVersion,
+        content: contentChanged ? overrideContent : undefined,
+        answerRaw: answerChanged ? overrideAnswerRaw : undefined,
+        analyzeRaw: analyzeChanged ? overrideAnalyzeRaw : undefined,
+        optionContentOverrides,
+        note: hasOverrideChange || noteChanged ? overrideNote : '',
+      });
+      const response = await requestJson(
+        `/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}/override`,
+        AdminQuestionOverrideResponseV1Schema,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(request),
+        },
+      );
+      setQuestion(response.question);
+      syncOverrideDraft(response.question);
+      setMessage(`题目 override 已保存；version = ${response.question.overrideVersion}。`);
+      onChanged(response.question);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapQuestionReviewError(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const openFlags = currentQuestion.flags.filter((flag) => flag.status === 'open');
 
   return (
     <section className="student-detail">
       <p className="eyebrow">Question Review Detail</p>
-      <h2>{question.questionType}</h2>
+      <h2>{currentQuestion.questionType}</h2>
       <div className="badge-row">
-        {buildQuestionReviewBadges(question).map((badge) => <Badge key={badge} tone={questionReviewBadgeTone(badge)}>{badge}</Badge>)}
+        {buildQuestionReviewBadges(currentQuestion).map((badge) => <Badge key={badge} tone={questionReviewBadgeTone(badge)}>{badge}</Badge>)}
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {message ? <p className="form-success" role="status">{message}</p> : null}
+      {loadingDetail ? <p className="muted">正在刷新题目详情…</p> : null}
       {!canWrite ? <ForbiddenInline /> : null}
 
       <section className="detail-section">
-        <h3>Preview</h3>
+        <h3>Effective detail</h3>
         <dl className="key-values single">
-          <div><dt>questionId</dt><dd>{question.questionId}</dd></div>
-          <div><dt>bank</dt><dd>{question.bankName} / {question.bankId}</dd></div>
-          <div><dt>contentPreview</dt><dd>{question.contentPreview || '-'}</dd></div>
-          <div><dt>answerPreview</dt><dd>{question.answerPreview || '-'}</dd></div>
-          <div><dt>optionCount</dt><dd>{question.optionCount}</dd></div>
-          <div><dt>excludedFromPractice</dt><dd>{String(question.excludedFromPractice)}</dd></div>
+          <div><dt>questionId</dt><dd>{currentQuestion.questionId}</dd></div>
+          <div><dt>bank</dt><dd>{currentQuestion.bankName} / {currentQuestion.bankId}</dd></div>
+          <div><dt>content</dt><dd>{currentQuestion.content || '-'}</dd></div>
+          <div><dt>answerRaw</dt><dd>{currentQuestion.answerRaw || '-'}</dd></div>
+          <div><dt>analyzeRaw</dt><dd>{currentQuestion.analyzeRaw || '-'}</dd></div>
+          <div><dt>optionCount</dt><dd>{currentQuestion.optionCount}</dd></div>
+          <div><dt>excludedFromPractice</dt><dd>{String(currentQuestion.excludedFromPractice)}</dd></div>
+          <div><dt>overrideVersion</dt><dd>{currentQuestion.overrideVersion}</dd></div>
+          <div><dt>overrideUpdatedBy</dt><dd>{currentQuestion.override?.updatedBy?.displayName ?? '-'}</dd></div>
         </dl>
       </section>
 
+      <form className="stack-form detail-section" onSubmit={saveOverride}>
+        <h3>Override editor</h3>
+        <p className="muted">保存到 question_overrides / question_option_overrides；导入原始题库时不会覆盖这些人工修订。</p>
+        <label>题干 content override
+          <textarea value={overrideContent} onChange={(event) => setOverrideContent(event.target.value)} rows={5} disabled={!canWrite || submitting} />
+        </label>
+        <label>answerRaw override
+          <input value={overrideAnswerRaw} onChange={(event) => setOverrideAnswerRaw(event.target.value)} disabled={!canWrite || submitting} />
+        </label>
+        <label>analyzeRaw override
+          <textarea value={overrideAnalyzeRaw} onChange={(event) => setOverrideAnalyzeRaw(event.target.value)} rows={3} disabled={!canWrite || submitting} />
+        </label>
+        {currentQuestion.options.length > 0 ? (
+          <div className="option-editor-list">
+            <strong>Option content overrides</strong>
+            {currentQuestion.options.map((option) => (
+              <label key={option.id}>option {option.sort}
+                <input
+                  value={optionDrafts[option.id] ?? option.effectiveContent}
+                  onChange={(event) => setOptionDrafts({ ...optionDrafts, [option.id]: event.target.value })}
+                  disabled={!canWrite || submitting}
+                />
+                <span className="muted">{option.id}{option.overrideContent ? ' · overridden' : ''}</span>
+              </label>
+            ))}
+          </div>
+        ) : <p className="muted">该题没有选项记录。</p>}
+        <label>override note
+          <textarea value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} rows={2} disabled={!canWrite || submitting} placeholder="说明为什么覆盖题干/答案/选项。" />
+        </label>
+        <button type="submit" disabled={!canWrite || submitting}>{submitting ? '保存中…' : '保存题目 override'}</button>
+      </form>
+
       <section className="detail-section">
         <h3>Practice exclusion</h3>
-        <p className="muted">只切换 `excludedFromPractice`，不编辑原始题目内容；打开后新建普通练习会排除该题。</p>
+        <p className="muted">只切换 `excludedFromPractice`；打开后新建普通练习会排除该题。</p>
         <button
           type="button"
-          className={question.excludedFromPractice ? 'ghost' : 'danger'}
+          className={currentQuestion.excludedFromPractice ? 'ghost' : 'danger'}
           disabled={!canWrite || submitting}
-          onClick={() => void patchQuestionReview({ excludedFromPractice: !question.excludedFromPractice }, question.excludedFromPractice ? '该题已恢复进入练习选题。' : '该题已排除出练习选题。')}
+          onClick={() => void patchQuestionReview({ excludedFromPractice: !currentQuestion.excludedFromPractice }, currentQuestion.excludedFromPractice ? '该题已恢复进入练习选题。' : '该题已排除出练习选题。')}
         >
-          {question.excludedFromPractice ? '恢复练习选题' : '排除出练习'}
+          {currentQuestion.excludedFromPractice ? '恢复练习选题' : '排除出练习'}
         </button>
       </section>
 
@@ -2049,7 +2223,7 @@ function QuestionReviewDetailPanel({
           <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} disabled={!canWrite || submitting} placeholder="记录质检原因，不写入原题。" />
         </label>
         <label className="checkbox-label">
-          <input type="checkbox" checked={excludeOnAdd} onChange={(event) => setExcludeOnAdd(event.target.checked)} disabled={!canWrite || submitting || question.excludedFromPractice} />
+          <input type="checkbox" checked={excludeOnAdd} onChange={(event) => setExcludeOnAdd(event.target.checked)} disabled={!canWrite || submitting || currentQuestion.excludedFromPractice} />
           添加 flag 时同时排除练习
         </label>
         <button type="submit" disabled={!canWrite || submitting}>{submitting ? '提交中…' : '添加质检 flag'}</button>
@@ -2057,9 +2231,9 @@ function QuestionReviewDetailPanel({
 
       <section className="detail-section">
         <h3>Flags</h3>
-        {question.flags.length === 0 ? <InfoPanel title="暂无 flag" detail="可以先添加 needs_manual_review flag。" /> : (
+        {currentQuestion.flags.length === 0 ? <InfoPanel title="暂无 flag" detail="可以先添加 needs_manual_review flag。" /> : (
           <ul className="flag-list">
-            {question.flags.map((flag) => (
+            {currentQuestion.flags.map((flag) => (
               <QuestionReviewFlagItem
                 key={flag.id}
                 flag={flag}
@@ -3648,6 +3822,7 @@ function mapQuestionReviewError(error: unknown): string {
   if (error instanceof AdminApiError) {
     if (error.status === 403) return '质检操作失败：当前账号缺少题目质检写入权限。';
     if (error.status === 404) return `质检操作失败：${error.message}`;
+    if (error.status === 409) return `质检操作失败：${error.message}，请刷新详情后重试。`;
     if (error.status === 400) return `质检请求无效：${error.message}`;
   }
   return getErrorMessage(error);

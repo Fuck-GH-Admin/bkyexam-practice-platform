@@ -207,6 +207,49 @@ export const questionQualityFlags = pgTable(
   ],
 );
 
+export const questionOverrides = pgTable(
+  'question_overrides',
+  {
+    questionId: uuid('question_id')
+      .primaryKey()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    contentOverride: text('content_override'),
+    answerRawOverride: text('answer_raw_override'),
+    analyzeRawOverride: text('analyze_raw_override'),
+    note: text('note').notNull().default(''),
+    version: integer('version').notNull().default(1),
+    updatedByAdminId: uuid('updated_by_admin_id').references(() => adminUsers.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('question_overrides_updated_by_admin_id_idx').on(table.updatedByAdminId),
+    index('question_overrides_updated_at_idx').on(table.updatedAt.desc()),
+    check('question_overrides_content_override_check', sql`${table.contentOverride} IS NULL OR length(${table.contentOverride}) > 0`),
+    check('question_overrides_version_check', sql`${table.version} >= 1`),
+  ],
+);
+
+export const questionOptionOverrides = pgTable(
+  'question_option_overrides',
+  {
+    optionId: uuid('option_id')
+      .primaryKey()
+      .references(() => questionOptions.id, { onDelete: 'cascade' }),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    contentOverride: text('content_override').notNull(),
+    updatedByAdminId: uuid('updated_by_admin_id').references(() => adminUsers.id),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('question_option_overrides_question_id_idx').on(table.questionId),
+    index('question_option_overrides_updated_by_admin_id_idx').on(table.updatedByAdminId),
+    check('question_option_overrides_content_override_check', sql`length(${table.contentOverride}) > 0`),
+  ],
+);
+
 export const bankMappings = pgTable(
   'bank_mappings',
   {

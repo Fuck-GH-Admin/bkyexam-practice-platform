@@ -143,4 +143,19 @@ describe('initial database migration', () => {
     expect(sql).toContain('CHECK (failed_login_count >= 0)');
     expect(sql).toContain('admin_users_locked_until_idx');
   });
+
+  it('creates question review override tables separate from imported raw question tables', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0012_question_review_overrides.sql'), 'utf8');
+
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS question_overrides');
+    expect(sql).toContain('question_id uuid PRIMARY KEY REFERENCES questions(id) ON DELETE CASCADE');
+    expect(sql).toContain('content_override text');
+    expect(sql).toContain('answer_raw_override text');
+    expect(sql).toContain('analyze_raw_override text');
+    expect(sql).toContain('version integer NOT NULL DEFAULT 1 CHECK (version >= 1)');
+    expect(sql).toContain('CREATE TABLE IF NOT EXISTS question_option_overrides');
+    expect(sql).toContain('option_id uuid PRIMARY KEY REFERENCES question_options(id) ON DELETE CASCADE');
+    expect(sql).toContain('content_override text NOT NULL CHECK (length(content_override) > 0)');
+    expect(sql).toContain('question_option_overrides_question_id_idx');
+  });
 });

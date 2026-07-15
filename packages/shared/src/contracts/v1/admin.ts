@@ -644,6 +644,36 @@ export const AdminQuestionReviewItemV1Schema = z.object({
 }).strict();
 export type AdminQuestionReviewItemV1 = z.infer<typeof AdminQuestionReviewItemV1Schema>;
 
+export const AdminQuestionReviewOptionV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  sort: z.number().int(),
+  content: z.string(),
+  overrideContent: z.string().nullable(),
+  effectiveContent: z.string(),
+}).strict();
+export type AdminQuestionReviewOptionV1 = z.infer<typeof AdminQuestionReviewOptionV1Schema>;
+
+export const AdminQuestionReviewOverrideV1Schema = z.object({
+  version: z.number().int().positive(),
+  contentOverride: z.string().nullable(),
+  answerRawOverride: z.string().nullable(),
+  analyzeRawOverride: z.string().nullable(),
+  note: z.string(),
+  updatedBy: AdminQuestionReviewActorV1Schema.nullable(),
+  updatedAt: z.string().datetime(),
+}).strict();
+export type AdminQuestionReviewOverrideV1 = z.infer<typeof AdminQuestionReviewOverrideV1Schema>;
+
+export const AdminQuestionReviewDetailV1Schema = AdminQuestionReviewItemV1Schema.extend({
+  content: z.string(),
+  answerRaw: z.string(),
+  analyzeRaw: z.string().nullable(),
+  options: z.array(AdminQuestionReviewOptionV1Schema),
+  override: AdminQuestionReviewOverrideV1Schema.nullable(),
+  overrideVersion: z.number().int().nonnegative(),
+}).strict();
+export type AdminQuestionReviewDetailV1 = z.infer<typeof AdminQuestionReviewDetailV1Schema>;
+
 export const ListAdminQuestionReviewsRequestV1Schema = z.object({
   bankId: CaseInsensitiveUuidV1Schema.optional(),
   questionType: z.string().min(1).optional(),
@@ -699,6 +729,52 @@ export type UpdateAdminQuestionReviewRequestV1 = z.infer<
   typeof UpdateAdminQuestionReviewRequestV1Schema
 >;
 
+export const UpdateAdminQuestionOverrideOptionV1Schema = z.object({
+  optionId: CaseInsensitiveUuidV1Schema,
+  content: z.string().min(1),
+}).strict();
+export type UpdateAdminQuestionOverrideOptionV1 = z.infer<
+  typeof UpdateAdminQuestionOverrideOptionV1Schema
+>;
+
+export const UpdateAdminQuestionOverrideRequestV1Schema = z.object({
+  expectedVersion: z.number().int().nonnegative(),
+  content: z.string().min(1).optional(),
+  answerRaw: z.string().optional(),
+  analyzeRaw: z.string().nullable().optional(),
+  optionContentOverrides: z.array(UpdateAdminQuestionOverrideOptionV1Schema).max(100).default([]),
+  note: z.string().default(''),
+}).strict().superRefine((request, context) => {
+  const hasQuestionFieldChange = request.content !== undefined
+    || request.answerRaw !== undefined
+    || request.analyzeRaw !== undefined;
+  const hasOptionChange = request.optionContentOverrides.length > 0;
+  const hasNoteChange = request.note.trim().length > 0;
+
+  if (!hasQuestionFieldChange && !hasOptionChange && !hasNoteChange) {
+    context.addIssue({
+      code: 'custom',
+      message: 'At least one question override change is required',
+    });
+  }
+
+  const optionIds = new Set<string>();
+  for (const [index, option] of request.optionContentOverrides.entries()) {
+    if (optionIds.has(option.optionId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Duplicate option override ids are not allowed',
+        path: ['optionContentOverrides', index, 'optionId'],
+      });
+      break;
+    }
+    optionIds.add(option.optionId);
+  }
+});
+export type UpdateAdminQuestionOverrideRequestV1 = z.infer<
+  typeof UpdateAdminQuestionOverrideRequestV1Schema
+>;
+
 export const AdminQuestionReviewListResponseV1Schema = z.object({
   questions: z.array(AdminQuestionReviewItemV1Schema),
   page: z.object({
@@ -712,8 +788,15 @@ export type AdminQuestionReviewListResponseV1 = z.infer<
 >;
 
 export const AdminQuestionReviewDetailResponseV1Schema = z.object({
-  question: AdminQuestionReviewItemV1Schema,
+  question: AdminQuestionReviewDetailV1Schema,
 }).strict();
 export type AdminQuestionReviewDetailResponseV1 = z.infer<
   typeof AdminQuestionReviewDetailResponseV1Schema
+>;
+
+export const AdminQuestionOverrideResponseV1Schema = z.object({
+  question: AdminQuestionReviewDetailV1Schema,
+}).strict();
+export type AdminQuestionOverrideResponseV1 = z.infer<
+  typeof AdminQuestionOverrideResponseV1Schema
 >;

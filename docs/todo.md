@@ -5,6 +5,20 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed B9.26 Question Review override layer — 2026-07-15
+
+- [x] 新增 `docs/question-review-override-layer.md`。
+- [x] 新增 migration `0012_question_review_overrides.sql`。
+- [x] 新增 `question_overrides` / `question_option_overrides`，避免直接改导入原表。
+- [x] shared Admin v1 contract 新增 full detail、option detail、override request/response。
+- [x] 实现 `GET /api/admin/question-review/:questionId`。
+- [x] 实现 `PATCH /api/admin/question-review/:questionId/override`，使用 `expectedVersion` optimistic concurrency。
+- [x] 写入 `question_review.override_update` audit log。
+- [x] Practice/Wrongbook/Learning 读取 effective 题干、答案、解析或选项文案。
+- [x] Admin Question Review detail panel 支持编辑题干、answerRaw、analyzeRaw、选项文案和 note。
+- [x] 扩展 shared/API/PostgreSQL integration/Admin Playwright smoke。
+- [x] 不做富文本/图片题编辑器、不做批量 override、不做 diff/审批/回滚 UI、不做最终视觉。
+
 ## Completed Frontend B9.25 Admin Users management UI — 2026-07-15
 
 - [x] 新增 `docs/admin-users-management-ui.md`。
@@ -604,6 +618,7 @@
 - [x] mapping 写入版本/并发控制与 audit log。
 - [x] import job table、dry-run 触发、进度、结果和错误摘要。
 - [x] 题目质检标记与学生端排除策略。
+- [x] 题目质检 full detail 与 override 层。
 - [x] 初始 `super_admin` bootstrap。
 - [x] Audit Log read API。
 - [x] Admin User 管理。
@@ -617,6 +632,7 @@
 - [x] 实现题库整理表格/详情。
 - [x] 实现导入任务状态。
 - [x] 实现只读题目质检与异常标记。
+- [x] 实现题目质检 override 最小编辑器。
 - [x] 实现审计日志只读列表。
 
 完成标准：
@@ -682,5 +698,5 @@
 - 复杂消息队列。
 - AI 错因分析。
 - 在线多人监考。
-- 在 override/ownership 设计完成前直接编辑原始题目。
+- 直接编辑导入原始题目表；人工修订应继续走 override 层。
 - 在两个前端出现真实复用前创建共享 UI package。

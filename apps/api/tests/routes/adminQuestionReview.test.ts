@@ -5,11 +5,12 @@ import { createAuditService, createMemoryAuditLogRepository } from '../../src/ad
 import { createMemoryAdminAuthRepository } from '../../src/admin/auth';
 import { hashPassword } from '../../src/auth/password';
 import { buildApp } from '../../src/app';
-import type { AdminQuestionReviewItemV1 } from '@bkyexam-practice/shared';
+import type { AdminQuestionReviewDetailV1, AdminQuestionReviewItemV1 } from '@bkyexam-practice/shared';
 
 const adminId = '50000000-0000-4000-8000-000000000001';
 const bankId = '10000000-0000-4000-8000-000000000001';
 const questionId = '20000000-0000-4000-8000-000000000001';
+const optionId = '30000000-0000-4000-8000-000000000001';
 const flagId = '70000000-0000-4000-8000-000000000001';
 
 const questionReview: AdminQuestionReviewItemV1 = {
@@ -32,6 +33,22 @@ const questionReview: AdminQuestionReviewItemV1 = {
     resolvedBy: null,
   }],
   excludedFromPractice: false,
+};
+
+const questionReviewDetail: AdminQuestionReviewDetailV1 = {
+  ...questionReview,
+  content: 'PostgreSQL 中哪个命令用于提交当前事务？',
+  answerRaw: 'COMMIT',
+  analyzeRaw: 'COMMIT 会提交当前事务。',
+  options: [{
+    id: optionId,
+    sort: 1,
+    content: 'COMMIT',
+    overrideContent: null,
+    effectiveContent: 'COMMIT',
+  }],
+  override: null,
+  overrideVersion: 0,
 };
 
 async function adminAuthRepository(roles: Array<'content_editor' | 'operator' | 'super_admin'> = ['content_editor']) {
@@ -85,6 +102,68 @@ describe('admin question review routes', () => {
       questions: [questionReview],
       page: { limit: 10, offset: 0, hasMore: false },
     });
+  });
+
+  it('loads question detail and saves override edits with audit logs', async () => {
+    const auditLogRepository = createMemoryAuditLogRepository();
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminQuestionReviewRepository: createMemoryAdminQuestionReviewRepository([questionReviewDetail]),
+      auditService: createAuditService(auditLogRepository),
+    });
+    const cookie = await loginAdmin(app);
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/admin/question-review/${questionId}`,
+      headers: { cookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({
+      question: {
+        questionId,
+        content: 'PostgreSQL 中哪个命令用于提交当前事务？',
+        answerRaw: 'COMMIT',
+        options: [{ id: optionId, effectiveContent: 'COMMIT' }],
+        overrideVersion: 0,
+      },
+    });
+
+    const override = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${questionId}/override`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 0,
+        content: 'PostgreSQL 中 COMMIT 用于提交当前事务。',
+        answerRaw: 'COMMIT',
+        optionContentOverrides: [{ optionId, content: 'COMMIT 命令' }],
+        note: 'Integration override',
+      },
+    });
+    expect(override.statusCode).toBe(200);
+    expect(override.json()).toMatchObject({
+      question: {
+        questionId,
+        content: 'PostgreSQL 中 COMMIT 用于提交当前事务。',
+        answerRaw: 'COMMIT',
+        options: [{ id: optionId, overrideContent: 'COMMIT 命令', effectiveContent: 'COMMIT 命令' }],
+        overrideVersion: 1,
+        override: { version: 1, note: 'Integration override' },
+      },
+    });
+    expect(auditLogRepository.entries.filter((entry) => entry.action === 'question_review.override_update')).toHaveLength(1);
+
+    const conflict = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${questionId}/override`,
+      headers: { cookie },
+      payload: {
+        expectedVersion: 0,
+        content: 'stale edit',
+      },
+    });
+    expect(conflict.statusCode).toBe(409);
   });
 
   it('adds flags, resolves flags, updates exclusion, and writes audit logs', async () => {
@@ -172,6 +251,12 @@ describe('admin question review routes', () => {
         };
       },
       async updateQuestionReview() {
+        return { status: 'question_not_found' };
+      },
+      async getQuestionReview() {
+        return null;
+      },
+      async updateQuestionOverride() {
         return { status: 'question_not_found' };
       },
     };

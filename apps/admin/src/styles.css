@@ -483,6 +483,20 @@ label {
   margin: 8px 0 0;
 }
 
+.option-editor-list {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e0e8f2;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.option-editor-list label {
+  display: grid;
+  gap: 6px;
+}
+
 .json-preview {
   display: grid;
   gap: 8px;

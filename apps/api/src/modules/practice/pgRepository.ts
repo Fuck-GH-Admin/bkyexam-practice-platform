@@ -142,9 +142,13 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
               FROM classifications
               JOIN bank_classifications ON classifications.parent_id = bank_classifications.id
             )
-            SELECT questions.id, questions.normalized_type, questions.content
+            SELECT
+              questions.id,
+              questions.normalized_type,
+              COALESCE(question_overrides.content_override, questions.content) AS content
             FROM questions
             JOIN bank_classifications ON bank_classifications.id = questions.classification_id
+            LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
             WHERE questions.normalized_type = ANY($2::text[])
               AND NOT EXISTS (
                 SELECT 1
@@ -163,10 +167,15 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
 
         const optionsResult = (await transactionClient.query(
           `
-            SELECT id, question_id, sort, content
+            SELECT
+              question_options.id,
+              question_options.question_id,
+              question_options.sort,
+              COALESCE(question_option_overrides.content_override, question_options.content) AS content
             FROM question_options
-            WHERE question_id = ANY($1::uuid[])
-            ORDER BY question_id, sort, id
+            LEFT JOIN question_option_overrides ON question_option_overrides.option_id = question_options.id
+            WHERE question_options.question_id = ANY($1::uuid[])
+            ORDER BY question_options.question_id, question_options.sort, question_options.id
           `,
           [questionIds],
         )) as QueryRows<OptionRow>;
@@ -251,14 +260,15 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
             practice_session_questions.sort,
             practice_session_questions.is_correct,
             questions.normalized_type,
-            questions.answer_raw,
-            questions.content,
+            COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_raw,
+            COALESCE(question_overrides.content_override, questions.content) AS content,
             (practice_session_questions.answered_at IS NOT NULL) AS answered,
             practice_session_drafts.draft_answer,
             COALESCE(practice_session_drafts.marked_for_review, false) AS marked_for_review
           FROM practice_session_questions
           JOIN practice_sessions ON practice_sessions.id = practice_session_questions.session_id
           JOIN questions ON questions.id = practice_session_questions.question_id
+          LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
           LEFT JOIN practice_session_drafts
             ON practice_session_drafts.session_id = practice_session_questions.session_id
             AND practice_session_drafts.question_id = practice_session_questions.question_id
@@ -272,10 +282,15 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
       const questionIds = questionsResult.rows.map((question) => question.question_id);
       const optionsResult = (await client.query(
         `
-          SELECT id, question_id, sort, content
+          SELECT
+            question_options.id,
+            question_options.question_id,
+            question_options.sort,
+            COALESCE(question_option_overrides.content_override, question_options.content) AS content
           FROM question_options
-          WHERE question_id = ANY($1::uuid[])
-          ORDER BY question_id, sort, id
+          LEFT JOIN question_option_overrides ON question_option_overrides.option_id = question_options.id
+          WHERE question_options.question_id = ANY($1::uuid[])
+          ORDER BY question_options.question_id, question_options.sort, question_options.id
         `,
         [questionIds],
       )) as QueryRows<OptionRow>;
@@ -557,10 +572,11 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
               practice_session_questions.id AS session_question_id,
               questions.id AS question_id,
               questions.normalized_type,
-              questions.answer_raw
+              COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_raw
             FROM practice_sessions
             JOIN practice_session_questions ON practice_session_questions.session_id = practice_sessions.id
             JOIN questions ON questions.id = practice_session_questions.question_id
+            LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
             WHERE practice_sessions.id = $1
               AND practice_sessions.student_id = $2
               AND practice_session_questions.question_id = $3
@@ -693,11 +709,12 @@ export function createPgPracticeRepository(client: QueryClient): PracticeReposit
               practice_session_questions.answered_at,
               practice_session_questions.is_correct,
               questions.normalized_type,
-              questions.answer_raw,
+              COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_raw,
               practice_session_drafts.draft_answer
             FROM practice_sessions
             JOIN practice_session_questions ON practice_session_questions.session_id = practice_sessions.id
             JOIN questions ON questions.id = practice_session_questions.question_id
+            LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
             LEFT JOIN practice_session_drafts
               ON practice_session_drafts.session_id = practice_sessions.id
               AND practice_session_drafts.question_id = practice_session_questions.question_id
@@ -904,14 +921,15 @@ async function loadPracticeQuestion(
         practice_session_questions.sort,
         practice_session_questions.is_correct,
         questions.normalized_type,
-        questions.answer_raw,
-        questions.content,
+        COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS answer_raw,
+        COALESCE(question_overrides.content_override, questions.content) AS content,
         (practice_session_questions.answered_at IS NOT NULL) AS answered,
         practice_session_drafts.draft_answer,
         COALESCE(practice_session_drafts.marked_for_review, false) AS marked_for_review
       FROM practice_session_questions
       JOIN practice_sessions ON practice_sessions.id = practice_session_questions.session_id
       JOIN questions ON questions.id = practice_session_questions.question_id
+      LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
       LEFT JOIN practice_session_drafts
         ON practice_session_drafts.session_id = practice_session_questions.session_id
         AND practice_session_drafts.question_id = practice_session_questions.question_id
@@ -930,10 +948,15 @@ async function loadPracticeQuestion(
 
   const optionsResult = (await client.query(
     `
-      SELECT id, question_id, sort, content
+      SELECT
+        question_options.id,
+        question_options.question_id,
+        question_options.sort,
+        COALESCE(question_option_overrides.content_override, question_options.content) AS content
       FROM question_options
-      WHERE question_id = $1
-      ORDER BY sort, id
+      LEFT JOIN question_option_overrides ON question_option_overrides.option_id = question_options.id
+      WHERE question_options.question_id = $1
+      ORDER BY question_options.sort, question_options.id
     `,
     [questionId],
   )) as QueryRows<OptionRow>;

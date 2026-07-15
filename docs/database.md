@@ -359,6 +359,8 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 
 `apps/api/src/db/migrations/0011_admin_identity_security.sql` extends `admin_users` for administrator login security. It adds `password_changed_at`, `failed_login_count`, `failed_login_window_started_at`, and `locked_until`, backfills `password_changed_at` from `created_at`, adds a nonnegative failed-count check, and indexes non-null admin locks.
 
+`apps/api/src/db/migrations/0012_question_review_overrides.sql` adds the question-review override layer. It creates `question_overrides` and `question_option_overrides` so content editors can revise effective content without mutating imported raw question rows. These tables stay separate from the import upsert path and are read by Practice/Wrongbook/Learning as effective overrides.
+
 B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
 B9.7 Password Login Enforcement now updates `failed_login_count`, `failed_login_window_started_at`, `locked_until`, and `last_login_at` during student login, and clears `password_reset_required` plus failure/lockout state on successful `POST /api/auth/password/change`.

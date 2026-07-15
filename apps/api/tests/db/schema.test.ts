@@ -13,8 +13,10 @@ import {
   practiceSessionDrafts,
   practiceSessionQuestions,
   practiceSessions,
+  questionOptionOverrides,
   questionQualityFlags,
   questionOptions,
+  questionOverrides,
   questions,
   studentSessions,
   students,
@@ -32,6 +34,8 @@ describe('database schema', () => {
     expect(getTableName(auditLogs)).toBe('audit_logs');
     expect(getTableName(importJobs)).toBe('import_jobs');
     expect(getTableName(questionQualityFlags)).toBe('question_quality_flags');
+    expect(getTableName(questionOverrides)).toBe('question_overrides');
+    expect(getTableName(questionOptionOverrides)).toBe('question_option_overrides');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -201,6 +205,38 @@ describe('database schema', () => {
       'question_quality_flags_type_check',
       'question_quality_flags_severity_check',
       'question_quality_flags_status_check',
+    ]));
+  });
+
+  it('defines question override tables outside imported raw question tables', () => {
+    const questionOverrideConfig = getTableConfig(questionOverrides);
+    const optionOverrideConfig = getTableConfig(questionOptionOverrides);
+
+    expect(questionOverrideConfig.columns.map((column) => column.name)).toEqual([
+      'question_id',
+      'content_override',
+      'answer_raw_override',
+      'analyze_raw_override',
+      'note',
+      'version',
+      'updated_by_admin_id',
+      'created_at',
+      'updated_at',
+    ]);
+    expect(questionOverrideConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_overrides_updated_by_admin_id_idx',
+      'question_overrides_updated_at_idx',
+    ]));
+    expect(optionOverrideConfig.columns.map((column) => column.name)).toEqual([
+      'option_id',
+      'question_id',
+      'content_override',
+      'updated_by_admin_id',
+      'updated_at',
+    ]);
+    expect(optionOverrideConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_option_overrides_question_id_idx',
+      'question_option_overrides_updated_by_admin_id_idx',
     ]));
   });
 

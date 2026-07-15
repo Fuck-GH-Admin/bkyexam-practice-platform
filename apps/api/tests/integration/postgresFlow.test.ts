@@ -189,7 +189,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 11, currentMigration: '0011_admin_identity_security.sql' },
+      database: { ok: true, migrationCount: 12, currentMigration: '0012_question_review_overrides.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -837,6 +837,59 @@ describe('PostgreSQL-backed API integration', () => {
       }],
     });
 
+    const unansweredReviewDetail = await app.inject({
+      method: 'GET',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}`,
+      headers: { cookie: editorCookie },
+    });
+    expect(unansweredReviewDetail.statusCode).toBe(200);
+    expect(unansweredReviewDetail.json()).toMatchObject({
+      question: {
+        questionId: fixtureIds.questions.unanswered,
+        content: '哪一个是 PostgreSQL 的默认端口？',
+        answerRaw: fixtureIds.options.unansweredCorrect,
+        options: [
+          { id: fixtureIds.options.unansweredCorrect, effectiveContent: '5432' },
+          { id: fixtureIds.options.unansweredWrong, effectiveContent: '3306' },
+        ],
+        overrideVersion: 0,
+      },
+    });
+
+    const unansweredOverride = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override`,
+      headers: { cookie: editorCookie },
+      payload: {
+        expectedVersion: 0,
+        content: '哪一个端口是 PostgreSQL 的默认监听端口？',
+        optionContentOverrides: [{ optionId: fixtureIds.options.unansweredCorrect, content: '5432（默认端口）' }],
+        note: 'Integration override should affect student-facing practice without editing raw imports.',
+      },
+    });
+    expect(unansweredOverride.statusCode).toBe(200);
+    expect(unansweredOverride.json()).toMatchObject({
+      question: {
+        questionId: fixtureIds.questions.unanswered,
+        content: '哪一个端口是 PostgreSQL 的默认监听端口？',
+        options: [
+          { id: fixtureIds.options.unansweredCorrect, overrideContent: '5432（默认端口）', effectiveContent: '5432（默认端口）' },
+          { id: fixtureIds.options.unansweredWrong, effectiveContent: '3306' },
+        ],
+        overrideVersion: 1,
+      },
+    });
+    const staleUnansweredOverride = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override`,
+      headers: { cookie: editorCookie },
+      payload: {
+        expectedVersion: 0,
+        content: 'stale override',
+      },
+    });
+    expect(staleUnansweredOverride.statusCode).toBe(409);
+
     const created = await app.inject({
       method: 'POST',
       url: '/api/practice/sessions',
@@ -865,6 +918,13 @@ describe('PostgreSQL-backed API integration', () => {
       fixtureIds.questions.falseCorrect,
       fixtureIds.questions.unanswered,
     ]);
+    expect(findQuestion(createdBody, fixtureIds.questions.unanswered)).toMatchObject({
+      content: '哪一个端口是 PostgreSQL 的默认监听端口？',
+      options: [
+        { id: fixtureIds.options.unansweredCorrect, content: '5432（默认端口）' },
+        { id: fixtureIds.options.unansweredWrong, content: '3306' },
+      ],
+    });
     expect(JSON.stringify(createdBody)).not.toContain('answerRaw');
 
     const secondaryCreated = await app.inject({

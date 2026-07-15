@@ -98,11 +98,17 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await expect(page.getByRole('heading', { name: 'single_choice' })).toBeVisible();
   await expect(page.getByText('答案疑似错误')).toBeVisible();
   const questionDetail = page.locator('.student-side-panel');
+  await questionDetail.getByLabel('题干 content override').fill('1 + 1 的正确答案是什么？（已复核）');
+  await questionDetail.getByLabel('answerRaw override').fill('B');
+  await questionDetail.getByLabel('option 2').fill('2（正确）');
+  await questionDetail.getByLabel('override note').fill('人工复核：修订题干和正确选项文案');
+  await page.getByRole('button', { name: '保存题目 override' }).click();
+  await expect(page.getByText(/题目 override 已保存；version = 1/)).toBeVisible();
   await page.getByRole('button', { name: '排除出练习' }).click();
   await expect(page.getByText('该题已排除出练习选题。')).toBeVisible();
   await questionDetail.getByLabel('Flag type').selectOption('needs_manual_review');
   await questionDetail.getByLabel('Severity').selectOption('high');
-  await questionDetail.getByLabel('Note').fill('需要人工复核题干和答案');
+  await questionDetail.getByLabel('Note', { exact: true }).fill('需要人工复核题干和答案');
   await page.getByRole('button', { name: '添加质检 flag' }).click();
   await expect(page.getByText('质检 flag 已添加。')).toBeVisible();
   await page.getByRole('button', { name: 'resolve' }).first().click();
@@ -146,6 +152,8 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   expect(state.calls).toContain('POST /api/admin/import-jobs');
   expect(state.calls.some((call) => call.endsWith('/errors'))).toBe(true);
   expect(state.calls).toContain('GET /api/admin/question-review');
+  expect(state.calls).toContain('GET /api/admin/question-review/77777777-7777-4777-8777-777777777777');
+  expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777/override');
   expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777');
   expect(state.calls).toContain('GET /api/admin/audit-logs');
   expect(state.calls).toContain('GET /api/admin/users');

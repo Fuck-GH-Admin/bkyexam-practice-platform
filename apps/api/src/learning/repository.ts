@@ -844,7 +844,7 @@ async function loadReviewMarks(
         COALESCE(bank_mappings.subject_category, 'Unknown') AS subject_category,
         COALESCE(bank_mappings.subject_name, 'Unknown') AS subject_name,
         questions.normalized_type,
-        LEFT(regexp_replace(COALESCE(questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
+        LEFT(regexp_replace(COALESCE(question_overrides.content_override, questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
         question_bookmarks.favorite,
         question_bookmarks.long_term_review,
         question_bookmarks.note,
@@ -853,6 +853,7 @@ async function loadReviewMarks(
         question_bookmarks.updated_at
       FROM question_bookmarks
       JOIN questions ON questions.id = question_bookmarks.question_id
+      LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
       LEFT JOIN bank_mappings ON bank_mappings.bank_id = question_bookmarks.bank_id
       WHERE ${filters.join(' AND ')}
       ORDER BY question_bookmarks.updated_at DESC, question_bookmarks.id DESC
@@ -946,7 +947,7 @@ async function upsertReviewMark(
         COALESCE(bank_mappings.subject_category, 'Unknown') AS subject_category,
         COALESCE(bank_mappings.subject_name, 'Unknown') AS subject_name,
         questions.normalized_type,
-        LEFT(regexp_replace(COALESCE(questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
+        LEFT(regexp_replace(COALESCE(question_overrides.content_override, questions.content, ''), '\\s+', ' ', 'g'), 120) AS content_preview,
         upserted.favorite,
         upserted.long_term_review,
         upserted.note,
@@ -955,6 +956,7 @@ async function upsertReviewMark(
         upserted.updated_at
       FROM upserted
       JOIN questions ON questions.id = upserted.question_id
+      LEFT JOIN question_overrides ON question_overrides.question_id = questions.id
       LEFT JOIN bank_mappings ON bank_mappings.bank_id = upserted.bank_id
     `,
     [

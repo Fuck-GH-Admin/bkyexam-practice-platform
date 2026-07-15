@@ -2,7 +2,7 @@
 
 状态日期：**2026-07-15**
 
-目标：把已存在的 Admin Question Review 后端能力暴露为可运行的最小质检工作台，但仍不做完整题目编辑器、override 层、批量处理或最终视觉系统。
+目标：把已存在的 Admin Question Review 后端能力暴露为可运行的最小质检工作台。B9.26 之后，preview 阶段已被完整 detail/override 层补齐，但保留本页作为 preview 阶段的设计与验收记录。
 
 ## 1. 本阶段结论
 
@@ -13,7 +13,7 @@ detail preview = implemented
 add flag = implemented
 resolve / ignore flag = implemented
 excludedFromPractice toggle = implemented
-full question editor / override = deferred
+full question editor / override = superseded by B9.26
 visual polish = deferred
 ```
 
@@ -26,7 +26,7 @@ B9.23 将 `Question Review` 从 placeholder 升级为功能性 preview UI。该�
 - Sidebar 中 `Question Review` 已按 `question_review:read` 权限显示为功能页。
 - 新增 `/admin/question-review` 队列页。
 - 新增 `/admin/question-review/:questionId` 选中题目预览面板。
-- 直接访问 detail URL 时，如果当前列表过滤条件无法返回该题，会提示当前后端没有单独 GET detail endpoint，需要从列表重新选择或调整过滤条件。
+- 该阶段完成时，直接访问 detail URL 时如果列表过滤条件无法返回该题，会提示当前后端没有单独 GET detail endpoint；B9.26 已补齐独立 GET detail 与 override 保存。
 
 ### List / filters / pagination
 
@@ -93,7 +93,7 @@ npm run test:e2e  PASS, 5 passed
 npm run verify:docker  PASS
 ```
 
-完整质量门已通过：63 个 Vitest 文件 / 499 tests、5 条 Playwright smoke、1 条 PostgreSQL integration。
+完整质量门已通过：63 个 Vitest 文件 / 504 tests、5 条 Playwright smoke、1 条 PostgreSQL integration。
 
 ## 4. 明确未完成
 
@@ -114,4 +114,4 @@ B9.23 不声明完成以下内容：
 
 B9.23 后，B9.24 已完成 Audit Logs read-only UI，文档见 [`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md)。
 
-B9.25 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only 和 Admin Users management UI。下一步建议进入完整 Question Review editor / override。
+B9.26 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI。下一步建议进入 import reset/cancel/retry 或 override diff/审批/回滚。

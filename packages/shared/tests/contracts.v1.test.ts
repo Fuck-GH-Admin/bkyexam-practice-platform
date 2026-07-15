@@ -14,6 +14,7 @@ import {
   AdminStudentListResponseV1Schema,
   AdminUserDetailResponseV1Schema,
   AdminUserListResponseV1Schema,
+  AdminQuestionOverrideResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
   AdminQuestionReviewListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
@@ -32,6 +33,7 @@ import {
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
+  UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
   ResetAdminStudentPasswordRequestV1Schema,
   ResetAdminStudentPasswordResponseV1Schema,
@@ -580,6 +582,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
 
   it('parses admin question review contracts and update actions', () => {
     const flagId = '70000000-0000-4000-8000-000000000001';
+    const optionId = '71000000-0000-4000-8000-000000000001';
     expect(ListAdminQuestionReviewsRequestV1Schema.parse({
       bankId: bankId.toUpperCase(),
       flagType: 'bad_answer',
@@ -610,6 +613,28 @@ describe('v1 auth/catalog/error/health contracts', () => {
       resolveFlagIds: [flagId],
       ignoredFlagIds: [flagId],
     })).toThrow();
+    expect(UpdateAdminQuestionOverrideRequestV1Schema.parse({
+      expectedVersion: 0,
+      content: 'PostgreSQL 中哪个命令用于提交当前事务？（已复核）',
+      answerRaw: 'COMMIT',
+      optionContentOverrides: [{ optionId: optionId.toUpperCase(), content: 'COMMIT 命令' }],
+      note: '人工复核修订',
+    })).toMatchObject({
+      expectedVersion: 0,
+      content: 'PostgreSQL 中哪个命令用于提交当前事务？（已复核）',
+      optionContentOverrides: [{ optionId, content: 'COMMIT 命令' }],
+      note: '人工复核修订',
+    });
+    expect(() => UpdateAdminQuestionOverrideRequestV1Schema.parse({
+      expectedVersion: 1,
+      optionContentOverrides: [
+        { optionId, content: 'A' },
+        { optionId, content: 'B' },
+      ],
+    })).toThrow();
+    expect(() => UpdateAdminQuestionOverrideRequestV1Schema.parse({
+      expectedVersion: 1,
+    })).toThrow();
 
     const question = {
       questionId,
@@ -637,9 +662,34 @@ describe('v1 auth/catalog/error/health contracts', () => {
       questions: [question],
       page: { limit: 20, offset: 0, hasMore: false },
     }).questions[0]?.excludedFromPractice).toBe(true);
-    expect(AdminQuestionReviewDetailResponseV1Schema.parse({ question }).question.flags[0]?.type).toBe('bad_answer');
+    const detailQuestion = {
+      ...question,
+      content: 'PostgreSQL 中哪个命令用于提交当前事务？',
+      answerRaw: 'COMMIT',
+      analyzeRaw: 'COMMIT 会提交当前事务。',
+      options: [{
+        id: optionId,
+        sort: 1,
+        content: 'COMMIT',
+        overrideContent: 'COMMIT 命令',
+        effectiveContent: 'COMMIT 命令',
+      }],
+      override: {
+        version: 1,
+        contentOverride: null,
+        answerRawOverride: 'COMMIT',
+        analyzeRawOverride: null,
+        note: '人工复核修订',
+        updatedBy: { id: '50000000-0000-4000-8000-000000000001', displayName: 'Operator' },
+        updatedAt: '2026-07-13T10:10:00.000Z',
+      },
+      overrideVersion: 1,
+    };
+
+    expect(AdminQuestionReviewDetailResponseV1Schema.parse({ question: detailQuestion }).question.flags[0]?.type).toBe('bad_answer');
+    expect(AdminQuestionOverrideResponseV1Schema.parse({ question: detailQuestion }).question.options[0]?.effectiveContent).toBe('COMMIT 命令');
     expect(() => AdminQuestionReviewDetailResponseV1Schema.parse({
-      question: { ...question, flags: [{ ...question.flags[0], severity: 'fatal' }] },
+      question: { ...detailQuestion, flags: [{ ...question.flags[0], severity: 'fatal' }] },
     })).toThrow();
   });
 

@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  AdminQuestionOverrideResponseV1Schema,
   AdminQuestionReviewDetailResponseV1Schema,
   AdminQuestionReviewListResponseV1Schema,
   ApiErrorResponseV1Schema,
   CaseInsensitiveUuidV1Schema,
   ListAdminQuestionReviewsRequestV1Schema,
+  UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   type AdminPermissionV1,
 } from '@bkyexam-practice/shared';
@@ -73,6 +75,92 @@ export function createAdminQuestionReviewRoutes(options: AdminQuestionReviewRout
 
       const page = await repository.listQuestionReviews(parsedQuery.data);
       return AdminQuestionReviewListResponseV1Schema.parse(page);
+    });
+
+    app.get('/api/admin/question-review/:questionId', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:read');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { questionId?: unknown };
+      const parsedQuestionId = CaseInsensitiveUuidV1Schema.safeParse(params.questionId);
+      if (!parsedQuestionId.success) {
+        return reply.status(400).send(errorResponse('Invalid question id'));
+      }
+
+      const question = await repository.getQuestionReview(parsedQuestionId.data.toLocaleLowerCase());
+      if (!question) {
+        return reply.status(404).send(errorResponse('Question not found'));
+      }
+
+      return AdminQuestionReviewDetailResponseV1Schema.parse({ question });
+    });
+
+    app.patch('/api/admin/question-review/:questionId/override', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:write');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { questionId?: unknown };
+      const parsedQuestionId = CaseInsensitiveUuidV1Schema.safeParse(params.questionId);
+      if (!parsedQuestionId.success) {
+        return reply.status(400).send(errorResponse('Invalid question id'));
+      }
+
+      const parsedBody = UpdateAdminQuestionOverrideRequestV1Schema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(errorResponse('Invalid question override update request'));
+      }
+
+      const result = await repository.updateQuestionOverride({
+        questionId: parsedQuestionId.data.toLocaleLowerCase(),
+        changes: parsedBody.data,
+        actor: {
+          id: required.session.admin.id,
+          displayName: required.session.admin.displayName,
+        },
+      });
+
+      if (result.status === 'question_not_found') {
+        return reply.status(404).send(errorResponse('Question not found'));
+      }
+      if (result.status === 'option_not_found') {
+        return reply.status(404).send(errorResponse('Question option not found'));
+      }
+      if (result.status === 'version_conflict') {
+        return reply.status(409).send(errorResponse('Question override version conflict'));
+      }
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'question_review.override_update',
+        resourceType: 'question',
+        resourceId: result.after.questionId,
+        before: {
+          overrideVersion: result.before.overrideVersion,
+          contentPreview: result.before.contentPreview,
+          answerPreview: result.before.answerPreview,
+          optionOverrideCount: result.before.options.filter((option) => option.overrideContent !== null).length,
+        },
+        after: {
+          overrideVersion: result.after.overrideVersion,
+          contentPreview: result.after.contentPreview,
+          answerPreview: result.after.answerPreview,
+          optionOverrideCount: result.after.options.filter((option) => option.overrideContent !== null).length,
+        },
+        metadata: {
+          bankId: result.after.bankId,
+          changedOptionCount: parsedBody.data.optionContentOverrides.length,
+          note: parsedBody.data.note,
+        },
+        result: 'success',
+      });
+
+      return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
     });
 
     app.patch('/api/admin/question-review/:questionId', async (request, reply) => {
