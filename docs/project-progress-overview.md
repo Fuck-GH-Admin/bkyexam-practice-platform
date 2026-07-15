@@ -284,7 +284,7 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 4. **等 Learning 前端范围明确后，再集中设计学生端学习中心。**
 5. **最终视觉系统放最后统一打磨。**
 
-换句话说：  
+换句话说：
 **前端不是不做，而是不要现在做最终视觉；现在适合做功能闭环和 IA 验证。**
 
 ## 7. 推荐下一阶段路线
@@ -336,14 +336,14 @@ apps/api/src/admin/question-review/mappers.ts
 
 我们现在需要决定下一步走哪条：
 
-1. **稳健路线：继续 Admin 后端模块化。**  
+1. **稳健路线：继续 Admin 后端模块化。**
    推荐，风险最低，有利于后续长期维护。
 
-2. **体验路线：补 Import Jobs realtime progress。**  
+2. **体验路线：补 Import Jobs realtime progress。**
    对管理端体验提升明显，但会引入新行为和新测试面。
 
-3. **产品路线：开始 Learning 前端 IA / wireframe。**  
+3. **产品路线：开始 Learning 前端 IA / wireframe。**
    可以做，但不要做最终视觉。
 
-我的建议是：  
+我的建议是：
 **先做 B9.31 Admin Question Review 后端模块化，然后再考虑 Import realtime progress 或 Question Review 完整运营流。**
