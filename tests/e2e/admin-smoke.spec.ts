@@ -4,7 +4,7 @@ import { createMockAdminState, installMockAdminApi } from './mockAdminApi.js';
 
 const adminBaseUrl = 'http://127.0.0.1:5174';
 
-test('admin operational MVP covers login, system status, student accounts, bank mappings, import jobs, and question review', {
+test('admin operational MVP covers login, system status, student accounts, bank mappings, import jobs, question review, and audit logs', {
   tag: '@desktop',
 }, async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
@@ -108,6 +108,14 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await page.getByRole('button', { name: 'resolve' }).first().click();
   await expect(page.getByText('质检 flag 已 resolve。')).toBeVisible();
 
+  await page.getByRole('button', { name: 'Audit Logs' }).click();
+  await expect(page.getByRole('heading', { name: 'Audit Logs' })).toBeVisible();
+  await expect(page.getByText('bank_mapping.update')).toBeVisible();
+  await page.getByRole('button', { name: '查看审计日志' }).first().click();
+  await expect(page.getByRole('heading', { name: 'bank_mapping.update' })).toBeVisible();
+  await expect(page.getByText('高等数学（校内版）')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Metadata' })).toBeVisible();
+
   expect(state.calls).toContain('POST /api/admin/auth/login');
   expect(state.calls).toContain('GET /api/admin/system/status');
   expect(state.calls).toContain('POST /api/admin/students');
@@ -120,6 +128,7 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   expect(state.calls.some((call) => call.endsWith('/errors'))).toBe(true);
   expect(state.calls).toContain('GET /api/admin/question-review');
   expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777');
+  expect(state.calls).toContain('GET /api/admin/audit-logs');
   expect(runtimeErrors).toEqual([]);
 });
 

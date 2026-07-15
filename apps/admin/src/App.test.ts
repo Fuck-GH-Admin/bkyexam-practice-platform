@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type {
+  AdminAuditLogEntryV1,
   AdminBankMappingListItemV1,
   AdminImportJobV1,
   AdminPermissionV1,
@@ -9,6 +10,8 @@ import type {
 
 import {
   buildAdminPath,
+  buildAuditLogBadges,
+  buildAuditLogListQuery,
   buildBankMappingListQuery,
   buildBankMappingStatusBadges,
   buildImportJobListQuery,
@@ -41,6 +44,10 @@ describe('admin route helpers', () => {
       kind: 'question-review',
       questionId: '77777777-7777-4777-8777-777777777777',
     });
+    expect(parseAdminRoute('/admin/audit-logs/99999999-9999-4999-8999-999999999999')).toEqual({
+      kind: 'audit-logs',
+      auditLogId: '99999999-9999-4999-8999-999999999999',
+    });
     expect(buildAdminPath({ kind: 'students', studentId: 'student-1' })).toBe('/admin/students/student-1');
     expect(buildAdminPath({ kind: 'bank-mappings', bankId: '11111111-1111-4111-8111-111111111111' })).toBe(
       '/admin/bank-mappings/11111111-1111-4111-8111-111111111111',
@@ -50,6 +57,9 @@ describe('admin route helpers', () => {
     );
     expect(buildAdminPath({ kind: 'question-review', questionId: '77777777-7777-4777-8777-777777777777' })).toBe(
       '/admin/question-review/77777777-7777-4777-8777-777777777777',
+    );
+    expect(buildAdminPath({ kind: 'audit-logs', auditLogId: '99999999-9999-4999-8999-999999999999' })).toBe(
+      '/admin/audit-logs/99999999-9999-4999-8999-999999999999',
     );
   });
 
@@ -198,6 +208,41 @@ describe('question review helpers', () => {
       'excluded-from-practice',
       'blocking',
       '1 open flag',
+    ]);
+  });
+});
+
+describe('audit log helpers', () => {
+  test('builds audit log query and badges', () => {
+    expect(buildAuditLogListQuery({
+      actorAdminId: '99999999-9999-4999-8999-999999999999',
+      action: 'bank_mapping.update',
+      resourceType: 'bank_mapping',
+      resourceId: '',
+      result: 'success',
+      createdFrom: '2026-07-15T10:00:00.000Z',
+      createdTo: '',
+    }, 20, 40)).toBe(
+      'limit=20&offset=40&actorAdminId=99999999-9999-4999-8999-999999999999&action=bank_mapping.update&resourceType=bank_mapping&result=success&createdFrom=2026-07-15T10%3A00%3A00.000Z',
+    );
+
+    const entry: AdminAuditLogEntryV1 = {
+      id: '99999999-9999-4999-8999-999999999999',
+      actor: null,
+      action: 'admin_user.bootstrap',
+      resourceType: 'admin_user',
+      resourceId: 'admin',
+      before: null,
+      after: { loginName: 'admin' },
+      metadata: { source: 'bootstrap' },
+      result: 'success',
+      createdAt: '2026-07-15T10:00:00.000Z',
+    };
+
+    expect(buildAuditLogBadges(entry)).toEqual([
+      'success',
+      'admin_user',
+      'system-actor',
     ]);
   });
 });

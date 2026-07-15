@@ -476,6 +476,20 @@ label {
   margin: 8px 0 0;
 }
 
+.json-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.json-preview pre {
+  overflow: auto;
+  max-height: 280px;
+  border: 1px solid #dce6f2;
+  border-radius: 12px;
+  background: #f4f7fb;
+  padding: 10px;
+}
+
 .error-panel {
   border-color: rgba(190, 71, 71, 0.26);
 }

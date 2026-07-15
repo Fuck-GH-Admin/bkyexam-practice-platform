@@ -110,15 +110,8 @@ B9.23 不声明完成以下内容：
 - Admin Users UI。
 - 最终视觉设计系统。
 
-## 5. 下一步建议
+## 5. 后续记录
 
-B9.23 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history 和 Question Review preview。
+B9.23 后，B9.24 已完成 Audit Logs read-only UI，文档见 [`admin-audit-logs-readonly-ui.md`](admin-audit-logs-readonly-ui.md)。
 
-下一步建议做 **B9.24 Admin Audit Logs read-only UI**：
-
-- 只读审计日志 list/filter/page。
-- 展示 actor/action/resource/result/createdAt。
-- 简单 before/after/metadata JSON preview。
-- 不做复杂 diff viewer，不做导出，不做最终视觉。
-
-这样可以先把已有审计能力暴露出来，帮助后续核查 Bank Mapping、Import Jobs、Question Review、Student Accounts 和 Admin Users 的管理操作。
+B9.24 后，Admin P1 工作流中已经可运行的部分包括：Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview 和 Audit Logs read-only。下一步建议进入 Admin Users management UI。

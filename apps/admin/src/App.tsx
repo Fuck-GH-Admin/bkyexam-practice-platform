@@ -1,5 +1,6 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import {
+  AdminAuditLogListResponseV1Schema,
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
   AdminImportJobDetailResponseV1Schema,
@@ -27,6 +28,8 @@ import {
   UpdateAdminBankMappingRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminStudentRequestV1Schema,
+  type AdminAuditLogEntryV1,
+  type AdminAuditLogResultV1,
   type AdminBankMappingDetailV1,
   type AdminBankMappingListItemV1,
   type AdminBankMappingStatusV1,
@@ -51,7 +54,7 @@ import {
 type Parser<T> = { parse: (payload: unknown) => T };
 
 type AdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
-type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review';
+type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs';
 type PlaceholderAdminNavKey = Exclude<AdminNavKey, ImplementedAdminNavKey>;
 
 type AdminRoute =
@@ -61,6 +64,7 @@ type AdminRoute =
   | { kind: 'bank-mappings'; bankId?: string }
   | { kind: 'import-jobs'; jobId?: string; panel?: 'create' }
   | { kind: 'question-review'; questionId?: string }
+  | { kind: 'audit-logs'; auditLogId?: string }
   | { kind: 'placeholder'; key: PlaceholderAdminNavKey }
   | { kind: 'unknown'; path: string };
 
@@ -108,6 +112,16 @@ type QuestionReviewFilters = {
   status: AdminQuestionFlagStatusV1;
 };
 
+type AuditLogFilters = {
+  actorAdminId: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  result: '' | AdminAuditLogResultV1;
+  createdFrom: string;
+  createdTo: string;
+};
+
 const defaultStudentFilters: StudentFilters = {
   keyword: '',
   className: '',
@@ -138,6 +152,16 @@ const defaultQuestionReviewFilters: QuestionReviewFilters = {
   flagType: '',
   severity: '',
   status: 'open',
+};
+
+const defaultAuditLogFilters: AuditLogFilters = {
+  actorAdminId: '',
+  action: '',
+  resourceType: '',
+  resourceId: '',
+  result: '',
+  createdFrom: '',
+  createdTo: '',
 };
 
 const defaultImportSourceDir = 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank';
@@ -199,8 +223,8 @@ const adminNavigation: Array<{
     label: 'Audit Logs',
     path: '/admin/audit-logs',
     permissions: ['audit_log:read'],
-    implemented: false,
-    description: '审计日志读取 UI 后续阶段开放。',
+    implemented: true,
+    description: '审计日志只读查询：actor、action、resource、result 与 before/after/metadata preview。',
   },
   {
     key: 'admin-users',
@@ -249,6 +273,11 @@ export function parseAdminRoute(pathname: string): AdminRoute {
     const questionId = decodeURIComponent(path.slice('/admin/question-review/'.length));
     return { kind: 'question-review', questionId };
   }
+  if (path === '/admin/audit-logs') return { kind: 'audit-logs' };
+  if (path.startsWith('/admin/audit-logs/')) {
+    const auditLogId = decodeURIComponent(path.slice('/admin/audit-logs/'.length));
+    return { kind: 'audit-logs', auditLogId };
+  }
   const placeholder = adminNavigation.find((item) => item.path === path && !item.implemented);
   if (placeholder) return { kind: 'placeholder', key: placeholder.key as PlaceholderAdminNavKey };
   return { kind: 'unknown', path };
@@ -275,6 +304,10 @@ export function buildAdminPath(route: AdminRoute): string {
   if (route.kind === 'question-review') {
     if (route.questionId) return `/admin/question-review/${encodeURIComponent(route.questionId)}`;
     return '/admin/question-review';
+  }
+  if (route.kind === 'audit-logs') {
+    if (route.auditLogId) return `/admin/audit-logs/${encodeURIComponent(route.auditLogId)}`;
+    return '/admin/audit-logs';
   }
   if (route.kind === 'placeholder') {
     return adminNavigation.find((item) => item.key === route.key)?.path ?? '/admin/system';
@@ -341,6 +374,20 @@ export function buildQuestionReviewListQuery(filters: QuestionReviewFilters, lim
   return params.toString();
 }
 
+export function buildAuditLogListQuery(filters: AuditLogFilters, limit: number, offset: number): string {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  addOptionalParam(params, 'actorAdminId', filters.actorAdminId);
+  addOptionalParam(params, 'action', filters.action);
+  addOptionalParam(params, 'resourceType', filters.resourceType);
+  addOptionalParam(params, 'resourceId', filters.resourceId);
+  addOptionalParam(params, 'result', filters.result);
+  addOptionalDateParam(params, 'createdFrom', filters.createdFrom);
+  addOptionalDateParam(params, 'createdTo', filters.createdTo);
+  return params.toString();
+}
+
 export function parseBulkStudentInput(input: string): BulkStudentDraft[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
@@ -393,6 +440,14 @@ export function buildQuestionReviewBadges(question: AdminQuestionReviewItemV1): 
   const openFlags = question.flags.filter((flag) => flag.status === 'open');
   if (openFlags.some((flag) => flag.severity === 'blocking')) badges.push('blocking');
   if (openFlags.length > 0) badges.push(`${openFlags.length} open flag${openFlags.length > 1 ? 's' : ''}`);
+  return badges;
+}
+
+export function buildAuditLogBadges(entry: AdminAuditLogEntryV1): string[] {
+  const badges = [entry.result, entry.resourceType];
+  badges.push(entry.actor ? 'admin-actor' : 'system-actor');
+  const actionGroup = entry.action.includes('.') ? entry.action.split('.')[0] : '';
+  if (actionGroup && !badges.includes(actionGroup)) badges.push(actionGroup);
   return badges;
 }
 
@@ -531,6 +586,12 @@ export function App() {
       ) : route.kind === 'question-review' ? (
         <QuestionReviewPage
           admin={admin}
+          route={route}
+          navigate={navigate}
+          onSessionExpired={expireSession}
+        />
+      ) : route.kind === 'audit-logs' ? (
+        <AuditLogsPage
           route={route}
           navigate={navigate}
           onSessionExpired={expireSession}
@@ -1999,6 +2060,220 @@ function QuestionReviewFlagItem({
   );
 }
 
+function AuditLogsPage({
+  route,
+  navigate,
+  onSessionExpired,
+}: {
+  route: Extract<AdminRoute, { kind: 'audit-logs' }>;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+  onSessionExpired: () => void;
+}) {
+  const [draftFilters, setDraftFilters] = useState<AuditLogFilters>(defaultAuditLogFilters);
+  const [filters, setFilters] = useState<AuditLogFilters>(defaultAuditLogFilters);
+  const [offset, setOffset] = useState(0);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogEntryV1[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const limit = 20;
+
+  const selectedLog = route.auditLogId
+    ? auditLogs.find((entry) => entry.id === route.auditLogId) ?? null
+    : null;
+
+  const loadAuditLogs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildAuditLogListQuery(filters, limit, offset);
+      const response = await requestJson(`/api/admin/audit-logs?${query}`, AdminAuditLogListResponseV1Schema);
+      setAuditLogs(response.auditLogs);
+      setHasMore(response.page.hasMore);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, offset, onSessionExpired]);
+
+  useEffect(() => {
+    void loadAuditLogs();
+  }, [loadAuditLogs]);
+
+  function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOffset(0);
+    setFilters(draftFilters);
+  }
+
+  return (
+    <section className="admin-page">
+      <PageHeader
+        eyebrow="Audit"
+        title="Audit Logs"
+        description="B9.24 只做只读审计日志 UI：list/filter/page 与 before/after/metadata JSON preview；复杂 diff viewer、导出和视觉精修后置。"
+        action={<button className="ghost" type="button" onClick={() => void loadAuditLogs()} disabled={loading}>刷新列表</button>}
+      />
+
+      <section className="admin-card">
+        <form className="student-filters" onSubmit={submitFilters}>
+          <label>actorAdminId
+            <input value={draftFilters.actorAdminId} onChange={(event) => setDraftFilters({ ...draftFilters, actorAdminId: event.target.value })} placeholder="uuid" />
+          </label>
+          <label>action
+            <input value={draftFilters.action} onChange={(event) => setDraftFilters({ ...draftFilters, action: event.target.value })} placeholder="bank_mapping.update" />
+          </label>
+          <label>resourceType
+            <input value={draftFilters.resourceType} onChange={(event) => setDraftFilters({ ...draftFilters, resourceType: event.target.value })} placeholder="student / question" />
+          </label>
+          <label>resourceId
+            <input value={draftFilters.resourceId} onChange={(event) => setDraftFilters({ ...draftFilters, resourceId: event.target.value })} />
+          </label>
+          <label>result
+            <select value={draftFilters.result} onChange={(event) => setDraftFilters({ ...draftFilters, result: event.target.value as AuditLogFilters['result'] })}>
+              <option value="">全部</option>
+              <option value="success">success</option>
+              <option value="failure">failure</option>
+            </select>
+          </label>
+          <label>createdFrom
+            <input type="datetime-local" value={draftFilters.createdFrom} onChange={(event) => setDraftFilters({ ...draftFilters, createdFrom: event.target.value })} />
+          </label>
+          <label>createdTo
+            <input type="datetime-local" value={draftFilters.createdTo} onChange={(event) => setDraftFilters({ ...draftFilters, createdTo: event.target.value })} />
+          </label>
+          <button type="submit">应用过滤</button>
+        </form>
+      </section>
+
+      <div className="student-layout">
+        <section className="admin-card student-list-card">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Audit events</p>
+              <h2>审计日志列表</h2>
+            </div>
+            <span className="muted">offset {offset}</span>
+          </div>
+          {error ? <ErrorPanel message={error} onRetry={() => void loadAuditLogs()} /> : null}
+          {loading ? <p className="muted">正在加载审计日志…</p> : null}
+          {!loading && !error && auditLogs.length === 0 ? <InfoPanel title="没有匹配审计日志" detail="审计日志为只读列表；可以调整 actor/action/resource/result/time 过滤。" /> : null}
+          {auditLogs.length > 0 ? <AuditLogTable auditLogs={auditLogs} navigate={navigate} /> : null}
+          <div className="pager">
+            <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
+            <span>offset {offset}</span>
+            <button className="ghost" type="button" disabled={!hasMore || loading} onClick={() => setOffset(offset + limit)}>下一页</button>
+          </div>
+        </section>
+
+        <aside className="admin-card student-side-panel">
+          {route.auditLogId && selectedLog ? (
+            <AuditLogDetailPanel entry={selectedLog} />
+          ) : route.auditLogId ? (
+            <InfoPanel title="当前列表中没有该日志" detail="Audit Logs 暂无单独 GET detail endpoint；请调整过滤条件或从左侧列表重新选择。" />
+          ) : (
+            <InfoPanel title="选择一条审计日志" detail="从左侧列表点击查看，右侧展示 actor、action、resource、before/after 和 metadata JSON preview。" />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function AuditLogTable({
+  auditLogs,
+  navigate,
+}: {
+  auditLogs: AdminAuditLogEntryV1[];
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Resource</th>
+            <th>Result</th>
+            <th>Metadata</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {auditLogs.map((entry) => (
+            <tr key={entry.id}>
+              <td>
+                <strong>{entry.actor?.displayName ?? 'system'}</strong>
+                <br />
+                <span className="muted">{entry.actor?.loginName ?? '-'}</span>
+              </td>
+              <td>{entry.action}</td>
+              <td>{entry.resourceType}<br /><span className="muted">{entry.resourceId}</span></td>
+              <td>
+                <div className="badge-row">
+                  {buildAuditLogBadges(entry).map((badge) => (
+                    <Badge key={badge} tone={auditLogBadgeTone(badge)}>{badge}</Badge>
+                  ))}
+                </div>
+              </td>
+              <td>{Object.keys(entry.metadata).join(', ') || '-'}</td>
+              <td>{formatAdminDate(entry.createdAt)}</td>
+              <td><button className="ghost" type="button" onClick={() => navigate(`/admin/audit-logs/${entry.id}`)}>查看审计日志</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AuditLogDetailPanel({ entry }: { entry: AdminAuditLogEntryV1 }) {
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Audit Log Detail</p>
+      <h2>{entry.action}</h2>
+      <div className="badge-row">
+        {buildAuditLogBadges(entry).map((badge) => <Badge key={badge} tone={auditLogBadgeTone(badge)}>{badge}</Badge>)}
+      </div>
+
+      <section className="detail-section">
+        <h3>Identity</h3>
+        <dl className="key-values single">
+          <div><dt>id</dt><dd>{entry.id}</dd></div>
+          <div><dt>actor</dt><dd>{entry.actor ? `${entry.actor.displayName} / ${entry.actor.loginName} / ${entry.actor.id}` : 'system / bootstrap / unknown'}</dd></div>
+          <div><dt>resource</dt><dd>{entry.resourceType} / {entry.resourceId}</dd></div>
+          <div><dt>result</dt><dd>{entry.result}</dd></div>
+          <div><dt>createdAt</dt><dd>{formatAdminDate(entry.createdAt)}</dd></div>
+        </dl>
+      </section>
+
+      <section className="detail-section">
+        <h3>Before / after</h3>
+        <JsonPreview title="before" value={entry.before} />
+        <JsonPreview title="after" value={entry.after} />
+      </section>
+
+      <section className="detail-section">
+        <h3>Metadata</h3>
+        <JsonPreview title="metadata" value={entry.metadata} />
+      </section>
+    </section>
+  );
+}
+
+function JsonPreview({ title, value }: { title: string; value: unknown }) {
+  return (
+    <div className="json-preview">
+      <strong>{title}</strong>
+      <pre>{formatJsonBlock(value)}</pre>
+    </div>
+  );
+}
+
 function StudentAccountsPage({
   admin,
   route,
@@ -2571,7 +2846,7 @@ function PlaceholderPage({ routeKey }: { routeKey: PlaceholderAdminNavKey }) {
       />
       <InfoPanel
         title="此功能后续阶段开放"
-        detail="B9.19 只交付 Admin Login、System Status 与 Student Accounts。此入口用于确认导航边界，不开放半成品写操作。"
+        detail="当前仅剩 Admin Users 仍为占位；此入口用于确认导航边界，不开放半成品写操作。"
       />
     </section>
   );
@@ -2725,6 +3000,7 @@ function getActiveNavKey(route: AdminRoute): AdminNavKey | null {
   if (route.kind === 'bank-mappings') return 'bank-mappings';
   if (route.kind === 'import-jobs') return 'import-jobs';
   if (route.kind === 'question-review') return 'question-review';
+  if (route.kind === 'audit-logs') return 'audit-logs';
   if (route.kind === 'placeholder') return route.key;
   return null;
 }
@@ -2736,6 +3012,13 @@ function normalizeAdminPath(pathname: string): string {
 function addOptionalParam(params: URLSearchParams, key: string, value: string) {
   const normalized = value.trim();
   if (normalized) params.set(key, normalized);
+}
+
+function addOptionalDateParam(params: URLSearchParams, key: string, value: string) {
+  const normalized = value.trim();
+  if (!normalized) return;
+  const parsed = new Date(normalized);
+  params.set(key, Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString());
 }
 
 function optionalString(value: string): string | undefined {
@@ -2778,6 +3061,13 @@ function questionReviewBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 
   return 'neutral';
 }
 
+function auditLogBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'danger' {
+  if (badge === 'success') return 'ok';
+  if (badge === 'failure') return 'danger';
+  if (badge === 'system-actor') return 'warning';
+  return 'neutral';
+}
+
 function formatImportJobProgress(job: AdminImportJobV1): string {
   return `${job.progress.phase} ${job.progress.current}/${job.progress.total}`;
 }
@@ -2793,6 +3083,15 @@ function formatImportJobSummary(job: AdminImportJobV1): string {
     .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
     .map(([label, value]) => `${label}: ${value}`);
   return parts.length > 0 ? parts.join(' · ') : '-';
+}
+
+function formatJsonBlock(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  try {
+    return JSON.stringify(value, null, 2) ?? String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function readNextPathFromLocation(): string | null {

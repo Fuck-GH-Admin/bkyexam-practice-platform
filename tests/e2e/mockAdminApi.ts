@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 
 import type {
+  AdminAuditLogEntryV1,
   AdminBankMappingDetailV1,
   AdminImportJobV1,
   AdminPermissionV1,
@@ -17,6 +18,7 @@ export type MockAdminState = {
   bankMappings: AdminBankMappingDetailV1[];
   importJobs: AdminImportJobV1[];
   questionReviews: AdminQuestionReviewItemV1[];
+  auditLogs: AdminAuditLogEntryV1[];
 };
 
 const adminId = '99999999-9999-4999-8999-999999999999';
@@ -106,6 +108,27 @@ export function createMockAdminState(): MockAdminState {
             note: '答案疑似错误',
           }),
         ],
+      }),
+    ],
+    auditLogs: [
+      buildAuditLog({
+        id: '99999999-9999-4999-8999-000000000001',
+        action: 'bank_mapping.update',
+        resourceType: 'bank_mapping',
+        resourceId: '44444444-4444-4444-8444-444444444444',
+        before: { bankName: '高等数学' },
+        after: { bankName: '高等数学（校内版）' },
+        metadata: { bankId: '44444444-4444-4444-8444-444444444444' },
+      }),
+      buildAuditLog({
+        id: '99999999-9999-4999-8999-000000000002',
+        actor: null,
+        action: 'admin_user.bootstrap',
+        resourceType: 'admin_user',
+        resourceId: 'admin',
+        before: null,
+        after: { loginName: 'admin' },
+        metadata: { source: 'bootstrap' },
       }),
     ],
   };
@@ -234,6 +257,29 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         question.excludedFromPractice = body.excludedFromPractice;
       }
       return fulfillJson(route, { question });
+    }
+
+    if (method === 'GET' && pathname === '/api/admin/audit-logs') {
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const result = url.searchParams.get('result');
+      const action = url.searchParams.get('action')?.toLowerCase() ?? '';
+      const resourceType = url.searchParams.get('resourceType')?.toLowerCase() ?? '';
+      const resourceId = url.searchParams.get('resourceId')?.toLowerCase() ?? '';
+      const actorAdminId = url.searchParams.get('actorAdminId');
+      const filtered = state.auditLogs.filter((entry) => {
+        if (result && entry.result !== result) return false;
+        if (action && !entry.action.toLowerCase().includes(action)) return false;
+        if (resourceType && entry.resourceType.toLowerCase() !== resourceType) return false;
+        if (resourceId && !entry.resourceId.toLowerCase().includes(resourceId)) return false;
+        if (actorAdminId && entry.actor?.id !== actorAdminId) return false;
+        return true;
+      });
+      const pageItems = filtered.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        auditLogs: pageItems.slice(0, limit),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
     }
 
     if (method === 'GET' && pathname === '/api/admin/students') {
@@ -661,6 +707,33 @@ function buildQuestionReviewFlag(input: {
     createdBy: { id: adminId, displayName: '平台管理员' },
     resolvedAt: null,
     resolvedBy: null,
+  };
+}
+
+function buildAuditLog(input: {
+  id: string;
+  actor?: AdminAuditLogEntryV1['actor'];
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  before: unknown;
+  after: unknown;
+  metadata: Record<string, unknown>;
+  result?: AdminAuditLogEntryV1['result'];
+}): AdminAuditLogEntryV1 {
+  return {
+    id: input.id,
+    actor: input.actor === undefined
+      ? { id: adminId, loginName: 'admin', displayName: '平台管理员' }
+      : input.actor,
+    action: input.action,
+    resourceType: input.resourceType,
+    resourceId: input.resourceId,
+    before: input.before,
+    after: input.after,
+    metadata: input.metadata,
+    result: input.result ?? 'success',
+    createdAt: now,
   };
 }
 
