@@ -9,5 +9,6 @@ export type {
   BulkUpdateAdminBankMappingStatusResult,
   UpdateAdminBankMappingInput,
   UpdateAdminBankMappingResult,
-} from './bank-mappings/index.js';
-export { createMemoryAdminBankMappingRepository, createPgAdminBankMappingRepository } from './bank-mappings/index.js';
+} from './types.js';
+export { createMemoryAdminBankMappingRepository } from './memoryRepository.js';
+export { createPgAdminBankMappingRepository } from './pgRepository.js';

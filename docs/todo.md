@@ -1,5 +1,14 @@
 # Roadmap
 
+## Completed B9.33 Admin Bank Mappings backend modularization — 2026-07-16
+
+- [x] 新增 `docs/backend-modularization-b9.33-bank-mappings.md`。
+- [x] 将 `apps/api/src/admin/bankMappings.ts` 收敛为兼容 facade。
+- [x] 拆出 `admin/bank-mappings/{index,types,memoryRepository,pgRepository,mappers,rules}.ts`。
+- [x] 保持 Bank Mappings list/detail/update/bulk-status public API 与 SQL 行为不变。
+- [x] 通过 API typecheck、Bank Mappings repository/routes 局部测试与最终 `npm run verify:docker`。
+- [x] 不做 route validation/error helper 抽取、不做 Import realtime progress、不做最终前端视觉。
+
 ## Completed B9.32 Admin Students backend modularization — 2026-07-16
 
 - [x] 新增 `docs/backend-modularization-b9.32-admin-students.md`。
