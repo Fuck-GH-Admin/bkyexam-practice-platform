@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.23 Admin Question Review preview UI — 2026-07-15
+
+- [x] 新增 `docs/admin-question-review-preview-ui.md`。
+- [x] `/admin/question-review` 从 placeholder 升级为功能性 preview 页面。
+- [x] 实现 Question Review list/filter/page，覆盖 status、severity、flagType、questionType、bankId、keyword。
+- [x] 实现 `/admin/question-review/:questionId` preview panel，展示 contentPreview、answerPreview、optionCount、flags 和 excludedFromPractice。
+- [x] 实现 add flag、resolve flag、ignore flag 和 toggle excludedFromPractice。
+- [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
+- [x] 不做完整题目编辑器、不做 override 层、不做批量操作、不做最终视觉。
+
 ## Completed Frontend B9.22 Admin Import Jobs dry-run/history UI — 2026-07-15
 
 - [x] 新增 `docs/admin-import-jobs-dry-run-ui.md`。
@@ -587,7 +597,7 @@
 - [x] 实现管理 shell、导航和权限守卫（B9.19 最小 Admin runtime slice）。
 - [ ] 实现题库整理表格/详情。
 - [ ] 实现导入任务状态。
-- [ ] 实现只读题目质检与异常标记。
+- [x] 实现只读题目质检与异常标记。
 
 完成标准：
 

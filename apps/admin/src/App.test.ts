@@ -3,6 +3,7 @@ import type {
   AdminBankMappingListItemV1,
   AdminImportJobV1,
   AdminPermissionV1,
+  AdminQuestionReviewItemV1,
   AdminStudentV1,
 } from '@bkyexam-practice/shared';
 
@@ -12,6 +13,8 @@ import {
   buildBankMappingStatusBadges,
   buildImportJobListQuery,
   buildImportJobStatusBadges,
+  buildQuestionReviewBadges,
+  buildQuestionReviewListQuery,
   buildStudentListQuery,
   buildStudentStatusBadges,
   buildVisibleAdminNavigation,
@@ -34,12 +37,19 @@ describe('admin route helpers', () => {
       kind: 'import-jobs',
       jobId: '33333333-3333-4333-8333-333333333333',
     });
+    expect(parseAdminRoute('/admin/question-review/77777777-7777-4777-8777-777777777777')).toEqual({
+      kind: 'question-review',
+      questionId: '77777777-7777-4777-8777-777777777777',
+    });
     expect(buildAdminPath({ kind: 'students', studentId: 'student-1' })).toBe('/admin/students/student-1');
     expect(buildAdminPath({ kind: 'bank-mappings', bankId: '11111111-1111-4111-8111-111111111111' })).toBe(
       '/admin/bank-mappings/11111111-1111-4111-8111-111111111111',
     );
     expect(buildAdminPath({ kind: 'import-jobs', jobId: '33333333-3333-4333-8333-333333333333' })).toBe(
       '/admin/import-jobs/33333333-3333-4333-8333-333333333333',
+    );
+    expect(buildAdminPath({ kind: 'question-review', questionId: '77777777-7777-4777-8777-777777777777' })).toBe(
+      '/admin/question-review/77777777-7777-4777-8777-777777777777',
     );
   });
 
@@ -142,6 +152,52 @@ describe('import job helpers', () => {
       'dry_run',
       'reset-requested',
       'has-errors',
+    ]);
+  });
+});
+
+describe('question review helpers', () => {
+  test('builds question review query and badges', () => {
+    expect(buildQuestionReviewListQuery({
+      keyword: '答案',
+      bankId: '',
+      questionType: 'single_choice',
+      flagType: 'bad_answer',
+      severity: 'blocking',
+      status: 'open',
+    }, 20, 0)).toBe(
+      'limit=20&offset=0&status=open&keyword=%E7%AD%94%E6%A1%88&questionType=single_choice&flagType=bad_answer&severity=blocking',
+    );
+
+    const question: AdminQuestionReviewItemV1 = {
+      questionId: '77777777-7777-4777-8777-777777777777',
+      bankId: '44444444-4444-4444-8444-444444444444',
+      bankName: '高等数学',
+      questionType: 'single_choice',
+      contentPreview: '1+1=?',
+      optionCount: 4,
+      answerPreview: 'B',
+      excludedFromPractice: true,
+      flags: [
+        {
+          id: '88888888-8888-4888-8888-888888888888',
+          type: 'bad_answer',
+          severity: 'blocking',
+          status: 'open',
+          note: '答案疑似错误',
+          createdAt: '2026-07-15T10:00:00.000Z',
+          createdBy: null,
+          resolvedAt: null,
+          resolvedBy: null,
+        },
+      ],
+    };
+
+    expect(buildQuestionReviewBadges(question)).toEqual([
+      'single_choice',
+      'excluded-from-practice',
+      'blocking',
+      '1 open flag',
     ]);
   });
 });

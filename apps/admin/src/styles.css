@@ -455,6 +455,27 @@ label {
   padding: 10px;
 }
 
+.flag-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flag-list li {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e0e8f2;
+  border-radius: 16px;
+  background: #f8fbff;
+  padding: 12px;
+}
+
+.flag-list p {
+  margin: 8px 0 0;
+}
+
 .error-panel {
   border-color: rgba(190, 71, 71, 0.26);
 }

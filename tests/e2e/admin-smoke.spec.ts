@@ -4,7 +4,7 @@ import { createMockAdminState, installMockAdminApi } from './mockAdminApi.js';
 
 const adminBaseUrl = 'http://127.0.0.1:5174';
 
-test('admin operational MVP covers login, system status, student accounts, bank mappings, and import jobs', {
+test('admin operational MVP covers login, system status, student accounts, bank mappings, import jobs, and question review', {
   tag: '@desktop',
 }, async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
@@ -91,6 +91,23 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await page.getByRole('button', { name: '查看 error report' }).click();
   await expect(page.getByRole('heading', { name: '没有错误摘要' })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Question Review' }).click();
+  await expect(page.getByRole('heading', { name: 'Question Review' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看题目质检' })).toBeVisible();
+  await page.getByRole('button', { name: '查看题目质检' }).click();
+  await expect(page.getByRole('heading', { name: 'single_choice' })).toBeVisible();
+  await expect(page.getByText('答案疑似错误')).toBeVisible();
+  const questionDetail = page.locator('.student-side-panel');
+  await page.getByRole('button', { name: '排除出练习' }).click();
+  await expect(page.getByText('该题已排除出练习选题。')).toBeVisible();
+  await questionDetail.getByLabel('Flag type').selectOption('needs_manual_review');
+  await questionDetail.getByLabel('Severity').selectOption('high');
+  await questionDetail.getByLabel('Note').fill('需要人工复核题干和答案');
+  await page.getByRole('button', { name: '添加质检 flag' }).click();
+  await expect(page.getByText('质检 flag 已添加。')).toBeVisible();
+  await page.getByRole('button', { name: 'resolve' }).first().click();
+  await expect(page.getByText('质检 flag 已 resolve。')).toBeVisible();
+
   expect(state.calls).toContain('POST /api/admin/auth/login');
   expect(state.calls).toContain('GET /api/admin/system/status');
   expect(state.calls).toContain('POST /api/admin/students');
@@ -101,6 +118,8 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   expect(state.calls).toContain('GET /api/admin/import-jobs');
   expect(state.calls).toContain('POST /api/admin/import-jobs');
   expect(state.calls.some((call) => call.endsWith('/errors'))).toBe(true);
+  expect(state.calls).toContain('GET /api/admin/question-review');
+  expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777');
   expect(runtimeErrors).toEqual([]);
 });
 

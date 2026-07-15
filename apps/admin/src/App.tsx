@@ -8,6 +8,8 @@ import {
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminMeResponseV1Schema,
+  AdminQuestionReviewDetailResponseV1Schema,
+  AdminQuestionReviewListResponseV1Schema,
   AdminStudentDetailResponseV1Schema,
   AdminStudentListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
@@ -23,6 +25,7 @@ import {
   ResetAdminStudentPasswordResponseV1Schema,
   RevokeAdminStudentSessionsResponseV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
+  UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminStudentRequestV1Schema,
   type AdminBankMappingDetailV1,
   type AdminBankMappingListItemV1,
@@ -31,6 +34,11 @@ import {
   type AdminImportJobStatusV1,
   type AdminImportJobV1,
   type AdminPermissionV1,
+  type AdminQuestionFlagSeverityV1,
+  type AdminQuestionFlagStatusV1,
+  type AdminQuestionFlagTypeV1,
+  type AdminQuestionReviewFlagV1,
+  type AdminQuestionReviewItemV1,
   type AdminStudentStatusV1,
   type AdminStudentV1,
   type AdminSystemStatusResponseV1,
@@ -43,7 +51,7 @@ import {
 type Parser<T> = { parse: (payload: unknown) => T };
 
 type AdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
-type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs';
+type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review';
 type PlaceholderAdminNavKey = Exclude<AdminNavKey, ImplementedAdminNavKey>;
 
 type AdminRoute =
@@ -52,6 +60,7 @@ type AdminRoute =
   | { kind: 'students'; studentId?: string; panel?: 'create' | 'bulk-create' }
   | { kind: 'bank-mappings'; bankId?: string }
   | { kind: 'import-jobs'; jobId?: string; panel?: 'create' }
+  | { kind: 'question-review'; questionId?: string }
   | { kind: 'placeholder'; key: PlaceholderAdminNavKey }
   | { kind: 'unknown'; path: string };
 
@@ -90,6 +99,15 @@ type ImportJobFilters = {
   status: '' | AdminImportJobStatusV1;
 };
 
+type QuestionReviewFilters = {
+  keyword: string;
+  bankId: string;
+  questionType: string;
+  flagType: '' | AdminQuestionFlagTypeV1;
+  severity: '' | AdminQuestionFlagSeverityV1;
+  status: AdminQuestionFlagStatusV1;
+};
+
 const defaultStudentFilters: StudentFilters = {
   keyword: '',
   className: '',
@@ -111,6 +129,15 @@ const defaultBankMappingFilters: BankMappingFilters = {
 
 const defaultImportJobFilters: ImportJobFilters = {
   status: '',
+};
+
+const defaultQuestionReviewFilters: QuestionReviewFilters = {
+  keyword: '',
+  bankId: '',
+  questionType: '',
+  flagType: '',
+  severity: '',
+  status: 'open',
 };
 
 const defaultImportSourceDir = 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank';
@@ -164,8 +191,8 @@ const adminNavigation: Array<{
     label: 'Question Review',
     path: '/admin/question-review',
     permissions: ['question_review:read'],
-    implemented: false,
-    description: '题目质检工作台后续阶段开放；当前只保留入口占位。',
+    implemented: true,
+    description: '题目质检：open flags 队列、预览、标记、resolve/ignore 与练习排除。',
   },
   {
     key: 'audit-logs',
@@ -217,6 +244,11 @@ export function parseAdminRoute(pathname: string): AdminRoute {
     const jobId = decodeURIComponent(path.slice('/admin/import-jobs/'.length));
     return { kind: 'import-jobs', jobId };
   }
+  if (path === '/admin/question-review') return { kind: 'question-review' };
+  if (path.startsWith('/admin/question-review/')) {
+    const questionId = decodeURIComponent(path.slice('/admin/question-review/'.length));
+    return { kind: 'question-review', questionId };
+  }
   const placeholder = adminNavigation.find((item) => item.path === path && !item.implemented);
   if (placeholder) return { kind: 'placeholder', key: placeholder.key as PlaceholderAdminNavKey };
   return { kind: 'unknown', path };
@@ -239,6 +271,10 @@ export function buildAdminPath(route: AdminRoute): string {
     if (route.panel === 'create') return '/admin/import-jobs/create';
     if (route.jobId) return `/admin/import-jobs/${encodeURIComponent(route.jobId)}`;
     return '/admin/import-jobs';
+  }
+  if (route.kind === 'question-review') {
+    if (route.questionId) return `/admin/question-review/${encodeURIComponent(route.questionId)}`;
+    return '/admin/question-review';
   }
   if (route.kind === 'placeholder') {
     return adminNavigation.find((item) => item.key === route.key)?.path ?? '/admin/system';
@@ -292,6 +328,19 @@ export function buildImportJobListQuery(filters: ImportJobFilters, limit: number
   return params.toString();
 }
 
+export function buildQuestionReviewListQuery(filters: QuestionReviewFilters, limit: number, offset: number): string {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  params.set('status', filters.status);
+  addOptionalParam(params, 'keyword', filters.keyword);
+  addOptionalParam(params, 'bankId', filters.bankId);
+  addOptionalParam(params, 'questionType', filters.questionType);
+  addOptionalParam(params, 'flagType', filters.flagType);
+  addOptionalParam(params, 'severity', filters.severity);
+  return params.toString();
+}
+
 export function parseBulkStudentInput(input: string): BulkStudentDraft[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
@@ -336,6 +385,14 @@ export function buildImportJobStatusBadges(job: AdminImportJobV1): string[] {
   const badges: string[] = [job.status, job.mode];
   if (job.options.resetBeforeImport) badges.push('reset-requested');
   if (job.errorSummary.length > 0) badges.push('has-errors');
+  return badges;
+}
+
+export function buildQuestionReviewBadges(question: AdminQuestionReviewItemV1): string[] {
+  const badges = [question.questionType, question.excludedFromPractice ? 'excluded-from-practice' : 'practice-enabled'];
+  const openFlags = question.flags.filter((flag) => flag.status === 'open');
+  if (openFlags.some((flag) => flag.severity === 'blocking')) badges.push('blocking');
+  if (openFlags.length > 0) badges.push(`${openFlags.length} open flag${openFlags.length > 1 ? 's' : ''}`);
   return badges;
 }
 
@@ -466,6 +523,13 @@ export function App() {
         />
       ) : route.kind === 'import-jobs' ? (
         <ImportJobsPage
+          admin={admin}
+          route={route}
+          navigate={navigate}
+          onSessionExpired={expireSession}
+        />
+      ) : route.kind === 'question-review' ? (
+        <QuestionReviewPage
           admin={admin}
           route={route}
           navigate={navigate}
@@ -1534,6 +1598,407 @@ function ImportJobErrorReport({ errors }: { errors: AdminImportJobErrorSummaryV1
   );
 }
 
+function QuestionReviewPage({
+  admin,
+  route,
+  navigate,
+  onSessionExpired,
+}: {
+  admin: AdminUserV1;
+  route: Extract<AdminRoute, { kind: 'question-review' }>;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+  onSessionExpired: () => void;
+}) {
+  const [draftFilters, setDraftFilters] = useState<QuestionReviewFilters>(defaultQuestionReviewFilters);
+  const [filters, setFilters] = useState<QuestionReviewFilters>(defaultQuestionReviewFilters);
+  const [offset, setOffset] = useState(0);
+  const [questions, setQuestions] = useState<AdminQuestionReviewItemV1[]>([]);
+  const [detailOverride, setDetailOverride] = useState<AdminQuestionReviewItemV1 | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const limit = 20;
+
+  const canWrite = admin.permissions.includes('question_review:write');
+  const selectedQuestion = route.questionId
+    ? (detailOverride?.questionId === route.questionId ? detailOverride : questions.find((question) => question.questionId === route.questionId) ?? null)
+    : null;
+
+  const loadQuestions = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildQuestionReviewListQuery(filters, limit, offset);
+      const response = await requestJson(`/api/admin/question-review?${query}`, AdminQuestionReviewListResponseV1Schema);
+      setQuestions(response.questions);
+      setHasMore(response.page.hasMore);
+      setDetailOverride((current) => {
+        if (!current) return null;
+        return response.questions.some((question) => question.questionId === current.questionId) ? null : current;
+      });
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, offset, onSessionExpired]);
+
+  useEffect(() => {
+    void loadQuestions();
+  }, [loadQuestions]);
+
+  function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOffset(0);
+    setFilters(draftFilters);
+    setDetailOverride(null);
+  }
+
+  function refreshAfterMutation(question: AdminQuestionReviewItemV1) {
+    setDetailOverride(question);
+    void loadQuestions();
+    navigate(`/admin/question-review/${question.questionId}`);
+  }
+
+  return (
+    <section className="admin-page">
+      <PageHeader
+        eyebrow="Quality operations"
+        title="Question Review"
+        description="B9.23 只做 preview-level 质检 UI：open flags 队列、flag add、resolve/ignore 和 excludedFromPractice；完整题目编辑器与 override 层后置。"
+        action={<button className="ghost" type="button" onClick={() => void loadQuestions()} disabled={loading}>刷新列表</button>}
+      />
+
+      <section className="admin-card">
+        <form className="student-filters" onSubmit={submitFilters}>
+          <label>关键字
+            <input value={draftFilters.keyword} onChange={(event) => setDraftFilters({ ...draftFilters, keyword: event.target.value })} placeholder="题干 / 答案 / searchable text" />
+          </label>
+          <label>状态
+            <select value={draftFilters.status} onChange={(event) => setDraftFilters({ ...draftFilters, status: event.target.value as AdminQuestionFlagStatusV1 })}>
+              <option value="open">open</option>
+              <option value="resolved">resolved</option>
+              <option value="ignored">ignored</option>
+            </select>
+          </label>
+          <label>严重度
+            <select value={draftFilters.severity} onChange={(event) => setDraftFilters({ ...draftFilters, severity: event.target.value as QuestionReviewFilters['severity'] })}>
+              <option value="">全部</option>
+              <option value="low">low</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+              <option value="blocking">blocking</option>
+            </select>
+          </label>
+          <label>Flag type
+            <select value={draftFilters.flagType} onChange={(event) => setDraftFilters({ ...draftFilters, flagType: event.target.value as QuestionReviewFilters['flagType'] })}>
+              <option value="">全部</option>
+              <option value="bad_answer">bad_answer</option>
+              <option value="missing_option">missing_option</option>
+              <option value="bad_option">bad_option</option>
+              <option value="garbled_content">garbled_content</option>
+              <option value="duplicate_question">duplicate_question</option>
+              <option value="wrong_type">wrong_type</option>
+              <option value="needs_manual_review">needs_manual_review</option>
+            </select>
+          </label>
+          <label>questionType
+            <input value={draftFilters.questionType} onChange={(event) => setDraftFilters({ ...draftFilters, questionType: event.target.value })} placeholder="single_choice" />
+          </label>
+          <label>bankId
+            <input value={draftFilters.bankId} onChange={(event) => setDraftFilters({ ...draftFilters, bankId: event.target.value })} placeholder="uuid" />
+          </label>
+          <button type="submit">应用过滤</button>
+        </form>
+      </section>
+
+      <div className="student-layout">
+        <section className="admin-card student-list-card">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Review queue</p>
+              <h2>题目质检队列</h2>
+            </div>
+            <span className="muted">offset {offset}</span>
+          </div>
+          {error ? <ErrorPanel message={error} onRetry={() => void loadQuestions()} /> : null}
+          {loading ? <p className="muted">正在加载题目质检队列…</p> : null}
+          {!loading && !error && questions.length === 0 ? <InfoPanel title="没有匹配质检题目" detail="后端当前按 flag status 返回队列；默认只看 open。" /> : null}
+          {questions.length > 0 ? <QuestionReviewTable questions={questions} navigate={navigate} /> : null}
+          <div className="pager">
+            <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
+            <span>offset {offset}</span>
+            <button className="ghost" type="button" disabled={!hasMore || loading} onClick={() => setOffset(offset + limit)}>下一页</button>
+          </div>
+        </section>
+
+        <aside className="admin-card student-side-panel">
+          {route.questionId && selectedQuestion ? (
+            <QuestionReviewDetailPanel
+              question={selectedQuestion}
+              canWrite={canWrite}
+              onChanged={refreshAfterMutation}
+              onSessionExpired={onSessionExpired}
+            />
+          ) : route.questionId ? (
+            <InfoPanel
+              title="当前列表中没有该题目"
+              detail="Question Review 暂无单独 GET detail endpoint；请调整过滤条件或从左侧队列重新选择。"
+            />
+          ) : (
+            <InfoPanel title="选择一个质检题目" detail="从左侧列表查看题干/答案预览、open flags，并进行 add/resolve/ignore 或练习排除操作。" />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function QuestionReviewTable({
+  questions,
+  navigate,
+}: {
+  questions: AdminQuestionReviewItemV1[];
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Bank</th>
+            <th>Flags</th>
+            <th>Preview</th>
+            <th>Answer</th>
+            <th>Options</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {questions.map((question) => (
+            <tr key={question.questionId}>
+              <td>
+                <strong>{question.questionType}</strong>
+                <br />
+                <span className="muted">{question.questionId}</span>
+              </td>
+              <td>{question.bankName}<br /><span className="muted">{question.bankId}</span></td>
+              <td>
+                <div className="badge-row">
+                  {buildQuestionReviewBadges(question).map((badge) => (
+                    <Badge key={badge} tone={questionReviewBadgeTone(badge)}>{badge}</Badge>
+                  ))}
+                </div>
+              </td>
+              <td>{question.contentPreview || '-'}</td>
+              <td>{question.answerPreview || '-'}</td>
+              <td>{question.optionCount}</td>
+              <td><button className="ghost" type="button" onClick={() => navigate(`/admin/question-review/${question.questionId}`)}>查看题目质检</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function QuestionReviewDetailPanel({
+  question,
+  canWrite,
+  onChanged,
+  onSessionExpired,
+}: {
+  question: AdminQuestionReviewItemV1;
+  canWrite: boolean;
+  onChanged: (question: AdminQuestionReviewItemV1) => void;
+  onSessionExpired: () => void;
+}) {
+  const [flagType, setFlagType] = useState<AdminQuestionFlagTypeV1>('needs_manual_review');
+  const [severity, setSeverity] = useState<AdminQuestionFlagSeverityV1>('medium');
+  const [note, setNote] = useState('');
+  const [excludeOnAdd, setExcludeOnAdd] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    setMessage('');
+    setError('');
+    setExcludeOnAdd(false);
+  }, [question.questionId]);
+
+  async function patchQuestionReview(changes: {
+    addFlags?: Array<{ type: AdminQuestionFlagTypeV1; severity: AdminQuestionFlagSeverityV1; note: string }>;
+    resolveFlagIds?: string[];
+    ignoredFlagIds?: string[];
+    excludedFromPractice?: boolean;
+  }, successMessage: string) {
+    if (!canWrite) return;
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const request = UpdateAdminQuestionReviewRequestV1Schema.parse({
+        addFlags: changes.addFlags ?? [],
+        resolveFlagIds: changes.resolveFlagIds ?? [],
+        ignoredFlagIds: changes.ignoredFlagIds ?? [],
+        excludedFromPractice: changes.excludedFromPractice,
+      });
+      const response = await requestJson(`/api/admin/question-review/${encodeURIComponent(question.questionId)}`, AdminQuestionReviewDetailResponseV1Schema, {
+        method: 'PATCH',
+        body: JSON.stringify(request),
+      });
+      setMessage(successMessage);
+      setNote('');
+      setExcludeOnAdd(false);
+      onChanged(response.question);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapQuestionReviewError(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function addFlag(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const changes: Parameters<typeof patchQuestionReview>[0] = {
+      addFlags: [{ type: flagType, severity, note }],
+    };
+    if (excludeOnAdd && !question.excludedFromPractice) changes.excludedFromPractice = true;
+    await patchQuestionReview(changes, '质检 flag 已添加。');
+  }
+
+  const openFlags = question.flags.filter((flag) => flag.status === 'open');
+
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Question Review Detail</p>
+      <h2>{question.questionType}</h2>
+      <div className="badge-row">
+        {buildQuestionReviewBadges(question).map((badge) => <Badge key={badge} tone={questionReviewBadgeTone(badge)}>{badge}</Badge>)}
+      </div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {message ? <p className="form-success" role="status">{message}</p> : null}
+      {!canWrite ? <ForbiddenInline /> : null}
+
+      <section className="detail-section">
+        <h3>Preview</h3>
+        <dl className="key-values single">
+          <div><dt>questionId</dt><dd>{question.questionId}</dd></div>
+          <div><dt>bank</dt><dd>{question.bankName} / {question.bankId}</dd></div>
+          <div><dt>contentPreview</dt><dd>{question.contentPreview || '-'}</dd></div>
+          <div><dt>answerPreview</dt><dd>{question.answerPreview || '-'}</dd></div>
+          <div><dt>optionCount</dt><dd>{question.optionCount}</dd></div>
+          <div><dt>excludedFromPractice</dt><dd>{String(question.excludedFromPractice)}</dd></div>
+        </dl>
+      </section>
+
+      <section className="detail-section">
+        <h3>Practice exclusion</h3>
+        <p className="muted">只切换 `excludedFromPractice`，不编辑原始题目内容；打开后新建普通练习会排除该题。</p>
+        <button
+          type="button"
+          className={question.excludedFromPractice ? 'ghost' : 'danger'}
+          disabled={!canWrite || submitting}
+          onClick={() => void patchQuestionReview({ excludedFromPractice: !question.excludedFromPractice }, question.excludedFromPractice ? '该题已恢复进入练习选题。' : '该题已排除出练习选题。')}
+        >
+          {question.excludedFromPractice ? '恢复练习选题' : '排除出练习'}
+        </button>
+      </section>
+
+      <form className="stack-form detail-section" onSubmit={addFlag}>
+        <h3>Add flag</h3>
+        <label>Flag type
+          <select value={flagType} onChange={(event) => setFlagType(event.target.value as AdminQuestionFlagTypeV1)} disabled={!canWrite || submitting}>
+            <option value="needs_manual_review">needs_manual_review</option>
+            <option value="bad_answer">bad_answer</option>
+            <option value="missing_option">missing_option</option>
+            <option value="bad_option">bad_option</option>
+            <option value="garbled_content">garbled_content</option>
+            <option value="duplicate_question">duplicate_question</option>
+            <option value="wrong_type">wrong_type</option>
+          </select>
+        </label>
+        <label>Severity
+          <select value={severity} onChange={(event) => setSeverity(event.target.value as AdminQuestionFlagSeverityV1)} disabled={!canWrite || submitting}>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="blocking">blocking</option>
+          </select>
+        </label>
+        <label>Note
+          <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} disabled={!canWrite || submitting} placeholder="记录质检原因，不写入原题。" />
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={excludeOnAdd} onChange={(event) => setExcludeOnAdd(event.target.checked)} disabled={!canWrite || submitting || question.excludedFromPractice} />
+          添加 flag 时同时排除练习
+        </label>
+        <button type="submit" disabled={!canWrite || submitting}>{submitting ? '提交中…' : '添加质检 flag'}</button>
+      </form>
+
+      <section className="detail-section">
+        <h3>Flags</h3>
+        {question.flags.length === 0 ? <InfoPanel title="暂无 flag" detail="可以先添加 needs_manual_review flag。" /> : (
+          <ul className="flag-list">
+            {question.flags.map((flag) => (
+              <QuestionReviewFlagItem
+                key={flag.id}
+                flag={flag}
+                canWrite={canWrite}
+                submitting={submitting}
+                onResolve={() => void patchQuestionReview({ resolveFlagIds: [flag.id] }, '质检 flag 已 resolve。')}
+                onIgnore={() => void patchQuestionReview({ ignoredFlagIds: [flag.id] }, '质检 flag 已 ignore。')}
+              />
+            ))}
+          </ul>
+        )}
+        {openFlags.length === 0 ? <p className="muted">当前没有 open flags；默认列表刷新后可能不再显示该题。</p> : null}
+      </section>
+    </section>
+  );
+}
+
+function QuestionReviewFlagItem({
+  flag,
+  canWrite,
+  submitting,
+  onResolve,
+  onIgnore,
+}: {
+  flag: AdminQuestionReviewFlagV1;
+  canWrite: boolean;
+  submitting: boolean;
+  onResolve: () => void;
+  onIgnore: () => void;
+}) {
+  return (
+    <li>
+      <div>
+        <div className="badge-row">
+          <Badge tone={questionReviewBadgeTone(flag.status)}>{flag.status}</Badge>
+          <Badge tone={questionReviewBadgeTone(flag.severity)}>{flag.severity}</Badge>
+          <Badge>{flag.type}</Badge>
+        </div>
+        <p>{flag.note || '-'}</p>
+        <p className="muted">
+          created {formatAdminDate(flag.createdAt)} by {flag.createdBy?.displayName ?? '-'}
+          {flag.resolvedAt ? ` · resolved ${formatAdminDate(flag.resolvedAt)} by ${flag.resolvedBy?.displayName ?? '-'}` : ''}
+        </p>
+      </div>
+      {flag.status === 'open' ? (
+        <div className="button-row">
+          <button className="ghost" type="button" disabled={!canWrite || submitting} onClick={onResolve}>resolve</button>
+          <button className="ghost" type="button" disabled={!canWrite || submitting} onClick={onIgnore}>ignore</button>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 function StudentAccountsPage({
   admin,
   route,
@@ -2259,6 +2724,7 @@ function getActiveNavKey(route: AdminRoute): AdminNavKey | null {
   if (route.kind === 'students') return 'students';
   if (route.kind === 'bank-mappings') return 'bank-mappings';
   if (route.kind === 'import-jobs') return 'import-jobs';
+  if (route.kind === 'question-review') return 'question-review';
   if (route.kind === 'placeholder') return route.key;
   return null;
 }
@@ -2300,6 +2766,15 @@ function importJobBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'dang
   if (badge === 'succeeded') return 'ok';
   if (badge === 'failed' || badge === 'has-errors') return 'danger';
   if (badge === 'queued' || badge === 'running' || badge === 'reset-requested') return 'warning';
+  return 'neutral';
+}
+
+function questionReviewBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'danger' {
+  if (badge === 'resolved' || badge === 'practice-enabled') return 'ok';
+  if (badge === 'ignored' || badge === 'low') return 'neutral';
+  if (badge === 'medium' || badge === 'high' || badge === 'open') return 'warning';
+  if (badge === 'blocking' || badge === 'excluded-from-practice') return 'danger';
+  if (badge.endsWith('open flag') || badge.endsWith('open flags')) return 'warning';
   return 'neutral';
 }
 
@@ -2355,6 +2830,15 @@ function mapImportJobError(error: unknown): string {
     if (error.status === 403) return `导入任务被拒绝：${error.message}`;
     if (error.status === 409) return '已有导入任务正在运行，请稍后刷新列表。';
     if (error.status === 422) return `导入任务未开放：${error.message}`;
+  }
+  return getErrorMessage(error);
+}
+
+function mapQuestionReviewError(error: unknown): string {
+  if (error instanceof AdminApiError) {
+    if (error.status === 403) return '质检操作失败：当前账号缺少题目质检写入权限。';
+    if (error.status === 404) return `质检操作失败：${error.message}`;
+    if (error.status === 400) return `质检请求无效：${error.message}`;
   }
   return getErrorMessage(error);
 }

@@ -4,6 +4,8 @@ import type {
   AdminBankMappingDetailV1,
   AdminImportJobV1,
   AdminPermissionV1,
+  AdminQuestionReviewFlagV1,
+  AdminQuestionReviewItemV1,
   AdminStudentV1,
   BulkCreateAdminStudentItemV1,
 } from '@bkyexam-practice/shared';
@@ -14,6 +16,7 @@ export type MockAdminState = {
   students: AdminStudentV1[];
   bankMappings: AdminBankMappingDetailV1[];
   importJobs: AdminImportJobV1[];
+  questionReviews: AdminQuestionReviewItemV1[];
 };
 
 const adminId = '99999999-9999-4999-8999-999999999999';
@@ -88,6 +91,23 @@ export function createMockAdminState(): MockAdminState {
         errorSummary: [{ message: 'source file is missing', file: 'questions.json' }],
       }),
     ],
+    questionReviews: [
+      buildQuestionReview({
+        questionId: '77777777-7777-4777-8777-777777777777',
+        bankId: '44444444-4444-4444-8444-444444444444',
+        bankName: '高等数学（校内版）',
+        questionType: 'single_choice',
+        excludedFromPractice: false,
+        flags: [
+          buildQuestionReviewFlag({
+            id: '88888888-8888-4888-8888-888888888888',
+            type: 'bad_answer',
+            severity: 'blocking',
+            note: '答案疑似错误',
+          }),
+        ],
+      }),
+    ],
   };
 }
 
@@ -144,6 +164,76 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
           excludedQuestions: 1,
         },
       });
+    }
+
+    if (method === 'GET' && pathname === '/api/admin/question-review') {
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const status = url.searchParams.get('status') ?? 'open';
+      const severity = url.searchParams.get('severity');
+      const flagType = url.searchParams.get('flagType');
+      const questionType = url.searchParams.get('questionType');
+      const keyword = url.searchParams.get('keyword')?.toLowerCase() ?? '';
+      const filtered = state.questionReviews
+        .map((question) => ({
+          ...question,
+          flags: question.flags.filter((flag) => {
+            if (status && flag.status !== status) return false;
+            if (severity && flag.severity !== severity) return false;
+            if (flagType && flag.type !== flagType) return false;
+            return true;
+          }),
+        }))
+        .filter((question) => {
+          if (question.flags.length === 0) return false;
+          if (questionType && question.questionType !== questionType) return false;
+          if (keyword && !`${question.bankName} ${question.contentPreview} ${question.answerPreview}`.toLowerCase().includes(keyword)) return false;
+          return true;
+        });
+      const pageItems = filtered.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        questions: pageItems.slice(0, limit),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
+    }
+
+    const questionReviewMatch = pathname.match(/^\/api\/admin\/question-review\/([^/]+)$/);
+    if (method === 'PATCH' && questionReviewMatch) {
+      const questionId = questionReviewMatch[1];
+      const question = state.questionReviews.find((item) => item.questionId === questionId);
+      if (!question) return fulfillJson(route, { error: 'Question not found' }, 404);
+      const body = readBody<{
+        addFlags?: Array<Pick<AdminQuestionReviewFlagV1, 'type' | 'severity' | 'note'>>;
+        resolveFlagIds?: string[];
+        ignoredFlagIds?: string[];
+        excludedFromPractice?: boolean;
+      }>(route);
+      for (const flagId of body.resolveFlagIds ?? []) {
+        const flag = question.flags.find((item) => item.id === flagId);
+        if (!flag) return fulfillJson(route, { error: 'Question review flag not found' }, 404);
+        flag.status = 'resolved';
+        flag.resolvedAt = '2026-07-15T10:55:00.000Z';
+        flag.resolvedBy = { id: adminId, displayName: '平台管理员' };
+      }
+      for (const flagId of body.ignoredFlagIds ?? []) {
+        const flag = question.flags.find((item) => item.id === flagId);
+        if (!flag) return fulfillJson(route, { error: 'Question review flag not found' }, 404);
+        flag.status = 'ignored';
+        flag.resolvedAt = '2026-07-15T10:56:00.000Z';
+        flag.resolvedBy = { id: adminId, displayName: '平台管理员' };
+      }
+      for (const flag of body.addFlags ?? []) {
+        question.flags.unshift(buildQuestionReviewFlag({
+          id: nextQuestionFlagId(question.flags.length + 1),
+          type: flag.type,
+          severity: flag.severity,
+          note: flag.note,
+        }));
+      }
+      if (body.excludedFromPractice !== undefined) {
+        question.excludedFromPractice = body.excludedFromPractice;
+      }
+      return fulfillJson(route, { question });
     }
 
     if (method === 'GET' && pathname === '/api/admin/students') {
@@ -534,12 +624,56 @@ function buildImportJob(input: {
   };
 }
 
+function buildQuestionReview(input: {
+  questionId: string;
+  bankId: string;
+  bankName: string;
+  questionType: string;
+  excludedFromPractice: boolean;
+  flags: AdminQuestionReviewFlagV1[];
+}): AdminQuestionReviewItemV1 {
+  return {
+    questionId: input.questionId,
+    bankId: input.bankId,
+    bankName: input.bankName,
+    questionType: input.questionType,
+    contentPreview: '1 + 1 的正确答案是什么？',
+    optionCount: 4,
+    answerPreview: 'B',
+    flags: input.flags,
+    excludedFromPractice: input.excludedFromPractice,
+  };
+}
+
+function buildQuestionReviewFlag(input: {
+  id: string;
+  type: AdminQuestionReviewFlagV1['type'];
+  severity: AdminQuestionReviewFlagV1['severity'];
+  note: string;
+}): AdminQuestionReviewFlagV1 {
+  return {
+    id: input.id,
+    type: input.type,
+    severity: input.severity,
+    status: 'open',
+    note: input.note,
+    createdAt: now,
+    createdBy: { id: adminId, displayName: '平台管理员' },
+    resolvedAt: null,
+    resolvedBy: null,
+  };
+}
+
 function nextStudentId(index: number) {
   return `aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, '0')}`;
 }
 
 function nextImportJobId(index: number) {
   return `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`;
+}
+
+function nextQuestionFlagId(index: number) {
+  return `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, '0')}`;
 }
 
 function readBody<T>(route: Route): T {

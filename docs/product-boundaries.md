@@ -41,9 +41,9 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 - 抽查题干、选项、答案与解析的质量。
 - 处理异常数据和必要的学生支持。
 
-管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前只覆盖 Admin Login、System Status 与 Student Accounts。
+管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前已覆盖 Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs dry-run/history 与 Question Review preview。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，B9.21 Bank Mappings P1 UI 见 [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，B9.22 Import Jobs dry-run/history UI 见 [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts、System Status、Bank Mappings 和 Import Jobs dry-run/history 可运营；Import true write/reset/cancel/retry 和完整 Question Review editor 继续后置。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，B9.21 Bank Mappings P1 UI 见 [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，B9.22 Import Jobs dry-run/history UI 见 [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，B9.23 Question Review preview UI 见 [`admin-question-review-preview-ui.md`](./admin-question-review-preview-ui.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history 和 Question Review preview 可运营；Import true write/reset/cancel/retry、完整 Question Review editor、Audit Logs UI 和 Admin Users UI 继续后置。
 
 ### API / Data Platform
 
@@ -193,9 +193,11 @@ mastered -> active  # 再次答错时自动恢复
 
 第一版只做查看与隐藏/标记异常，不急于在平台内编辑所有原始题目：
 
-- 查看题干、选项、答案、解析、来源分类。
+- 查看题干、答案、选项数、来源题库和 preview 级字段。
 - 标记答案异常、选项缺失、内容乱码、重复题。
 - 必要时从学生题库中排除。
+
+当前 B9.23 已实现 preview UI、add flag、resolve/ignore 与 excludedFromPractice；直接编辑原始题目和 override 层仍后置。
 
 直接编辑原始题目会引入“下次导入是否覆盖”的数据所有权问题，必须先设计 override 层。
 
