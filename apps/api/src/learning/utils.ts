@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   LearningFeedbackSignalV1,
   LearningGoalSettingsV1,
   LearningGoalsResponseV1,
@@ -396,4 +396,3 @@ export function addUtcDays(date: string, offset: number): string {
   const [year, month, day] = date.split('-').map((part) => Number.parseInt(part, 10)) as [number, number, number];
   return new Date(Date.UTC(year, month - 1, day + offset)).toISOString().slice(0, 10);
 }
-
