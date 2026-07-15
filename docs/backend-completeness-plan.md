@@ -11,19 +11,30 @@
 
 ## 1. 总体判断
 
-后端已经完成的是：**学生客观题内部试用版的主闭环**。
+后端已经完成的是：**学生客观题内部试用版的主闭环**，并且 B9.14 已在真实服务器完成 staging production gate / deployment smoke / deployment evidence 验收。
 
 后端尚未完成的是：**完整平台化后端**，尤其是管理端前端、运营导入平台、非客观题流程、生产运维、推荐策略和模块化边界。
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 89%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate dry-run、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI 与 `main` required checks 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、性能压测和目标环境 gate。 |
+| 后端工程可验证性 | **约 92%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI、`main` required checks 与 B9.14 真实服务器 staging evidence 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、外部监控告警和系统性性能压测。 |
 | 后端模块化程度 | **约 35–45%** | 业务上下文已清楚，但物理目录和大文件仍混杂。 |
-| 完整平台后端 | **约 81–84%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定和生产 gate runbook 已落地，但全题型、管理前端、推荐策略和生产能力仍未完成。 |
-| 公开生产后端就绪 | **约 84%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI 与 `main` branch protection/required checks；仍缺 PR review、外部监控告警、性能压测、正式旧账号迁移执行证据和正式部署验收。 |
+| 完整平台后端 | **约 84–86%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run 导入任务、import error report、true import gate、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage 与 Admin Student Manage；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
+| 公开生产后端就绪 | **约 88%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence；仍缺 PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
+
+B9.14 staging 实机验收摘要：
+
+```text
+target = https://exam.acgbot.cc.cd
+commit = 1686c6e27a23029c6cc53c8a22ddb843c3d332d7
+production gate = ok=true
+legacyPasswordlessStudents = 0
+HTTP smoke = PASS
+deployment evidence = ready=true, 14 pass / 0 warn / 0 fail
+```
 
 ## 2. 已完成且被验证的后端能力
 
@@ -225,13 +236,13 @@
 - B9.7 已把学生登录推进到正式密码模式：默认要求 `password`，不再公开自助创建学生；仅显式 legacy env 可以临时允许无密码旧账号。
 - 已启用学生登录失败计数、临时锁定、成功清空失败状态和 `last_login_at` 更新；学生改密 API 已落地。
 - 不做学校账号/邀请码/SSO 作为当前阶段；邀请码/SSO 留作远期。
-- 仍没有学生自助找回账号、账号合并和正式前端改密入口；旧账号批量临时密码迁移 CLI 已落地，但目标环境还没实际执行。
+- 仍没有学生自助找回账号、账号合并和正式前端改密入口；旧账号批量临时密码迁移 CLI 已落地，且 B9.14 已在 staging 目标环境实际迁移 13 个旧账号并保留历史数据。
 - Admin identity/RBAC/audit foundation、初始 `super_admin` bootstrap、Admin User manage 和管理员登录失败锁定已落地；生产参数和更完整账号安全策略仍需上线验收。
 
 影响：
 
 - 后端身份主链路已具备公开生产雏形，但仍不能直接发布为完整生产系统。
-- 不能安全开放管理端给真实运营团队，直到远端 CI、监控告警、部署参数和管理 UI 验收完成。
+- 不能安全开放管理端给真实运营团队，直到 PR review/merge、监控告警、凭据交付流程、系统性压测和管理 UI 验收完成。
 - 旧学生数据会保留，但历史旧账号需要管理员重置/迁移临时密码后再进入正式模式。
 
 ### 3.2 管理端后端未完整实现
@@ -1467,28 +1478,56 @@ review_items
 - 不合并 PR。
 - 不替代 owner/reviewer 完成 review。
 - 不部署到真实目标环境。
-- 不声明公开生产可发布；当前 blocker 已从“branch protection/required checks 缺失”变为“PR review、目标环境 production gate、legacy migration closure、deployment smoke、rollback plan、外部监控和性能证据缺失”。
+- 不声明公开生产可发布；B9.14 已完成目标环境 gate/smoke/evidence，当前 blocker 变为 PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。
+
+### Phase B9.14 — Staging Production Gate / Deployment Smoke / Performance Evidence
+
+状态：**已完成真实服务器 staging 验收，2026-07-15。**
+
+实际落地：
+
+- 目标环境：`https://exam.acgbot.cc.cd` / `root@47.88.33.54`。
+- 部署目录：`/srv/bkyexam-practice-platform`。
+- 备份/证据目录：`/srv/bkyexam-backups/b9.14-20260715080815`。
+- 部署 commit：`1686c6e27a23029c6cc53c8a22ddb843c3d332d7`。
+- 首次部署中断后已恢复：`npm ci` 未完成导致 service 缺少 `fastify`，重启后续跑安装/构建/迁移/导入。
+- `npm ci`、`npm run build`、`db:migrate`、`import:db`、`db:smoke` 全部通过。
+- 真实题库导入：2941 classifications / 89922 questions / 154899 options / 2662 mappings。
+- 已更新 production env：secure cookie、rate limit、CSRF origin check、legacy passwordless disabled、true import write disabled。
+- 旧 13 个无密码学生账号已保留并迁移到临时密码，`legacyPasswordlessStudents=0`。
+- 已创建/刷新 `admin` super_admin 和 `202502040201`–`202502040230` 的 `2班` 学生账号。
+- 目标数据库 production gate：`ok=true`。
+- HTTPS smoke：health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me 全部 PASS。
+- Deployment evidence CLI：`ready=true`，`14 pass / 0 warn / 0 fail`。
+- 凭据只存在服务器受限目录 `/root/bkyexam-credentials/LATEST`，未写入 Git，未在日志/对话中输出明文密码。
+
+仍保留不做：
+
+- 不合并 PR，不替代 owner/reviewer 完成 review。
+- 不声明外部监控告警已接入。
+- 不声明已完成系统性压测。
+- 不提前开始正式前端视觉实现。
 
 ## 6. 推荐下一步具体执行
 
 如果继续本规划，下一步建议执行：
 
-> **B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence**，在用户确认目标环境后，对 staging/prod-like 数据库跑完整 production gate、legacy migration closure、deployment smoke 与最低限度性能证据。
+> **B9.15 Staging Operations Hardening / Monitoring / Load Baseline**，在 B9.14 已完成的目标环境基础上，补外部监控告警最小闭环、systemd/nginx runbook 复核、低成本压测脚本、实机 backup/restore 复核和发布回滚演练记录。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-chore: record staging deployment gate evidence
+chore: record staging ops hardening baseline
 ```
 
 范围建议只包含：
 
-- 对 staging/prod-like `DATABASE_URL` 运行 `npm run ops:production-gate`，保存 report。
-- 若存在 legacy passwordless students，执行旧账号迁移 CLI 后重新跑 gate。
-- 对目标环境运行 health/readiness/metrics/admin login/student login/create practice session smoke。
-- 补一轮最小性能证据：关键 API 响应基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
-- 把结果填入 `ops:deployment-evidence` evidence JSON。
-- 本阶段仍不做正式前端。
+- 复核 systemd/nginx/env/backup runbook，确保恢复步骤不是只存在本次对话。
+- 补一个可重复的轻量 API load baseline：health/readiness/banks/login/practice create。
+- 记录 PostgreSQL 热点查询与当前索引观察，不急着重构。
+- 接入或至少设计外部 uptime/alerting 最小方案。
+- 复核凭据交付流程：谁拿 admin/student 初始密码、如何要求首次改密、旧账号密码如何处理。
+- 本阶段仍不做正式前端视觉。
 
 不做：
 
@@ -1502,7 +1541,7 @@ chore: record staging deployment gate evidence
 - 不引入微服务
 - 不引入复杂消息队列
 
-这样可以把“PR/branch protection 真实闭环”推进到“目标环境可发布证据闭环”，再考虑正式前端信息架构。
+这样可以把“目标环境可发布证据闭环”推进到“可运维、可观察、可回滚”的发布基线，再考虑正式前端信息架构。
 
 ## 7. 阶段提交规则
 
@@ -1519,6 +1558,6 @@ chore: record staging deployment gate evidence
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review、外部监控告警、性能压测和目标环境旧账号迁移执行证据。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是继续后端生产闭环：在用户确认目标环境后做 B9.14 staging production gate / deployment smoke / performance evidence；正式前端仍应等目标环境 gate、身份迁移证据、性能边界和管理端信息架构稳定后再进入设计实现。
+最合理的下一步是继续后端运维闭环：做 B9.15 staging operations hardening / monitoring / load baseline；正式前端仍应等目标环境运维基线、凭据交付流程、性能边界和管理端信息架构稳定后再进入设计实现。

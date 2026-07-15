@@ -5,6 +5,25 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.14 Staging Deployment Evidence — 2026-07-15
+
+- [x] 真实服务器目标：`https://exam.acgbot.cc.cd` / `root@47.88.33.54`。
+- [x] 部署 commit：`1686c6e27a23029c6cc53c8a22ddb843c3d332d7`。
+- [x] 恢复首次部署中断：重启后确认 `npm ci` 未完成导致 service 缺依赖，续跑安装/构建/迁移/导入。
+- [x] `npm ci`、`npm run build`、`db:migrate`、`import:db`、`db:smoke` 通过。
+- [x] 全量题库导入结果：2941 classifications / 89922 questions / 154899 options / 2662 mappings。
+- [x] `/etc/bkyexam-practice-api.env` 已启用 production、secure cookie、rate limit、CSRF origin check，true import write 保持关闭。
+- [x] 旧 13 个无密码学生账号已保留并迁移到临时密码；`legacyPasswordlessStudents=0`。
+- [x] 已创建/刷新 `admin` super_admin。
+- [x] 已创建/刷新 `202502040201`–`202502040230`，`className=2班`，`passwordResetRequired=true`。
+- [x] 凭据只保存在服务器受限目录 `/root/bkyexam-credentials/LATEST`，未写入 Git，未在对话中输出明文密码。
+- [x] 目标数据库 production gate：`ok=true`，仅剩预期的 password reset queue warning。
+- [x] HTTPS smoke 覆盖 health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me，全部 PASS。
+- [x] deployment evidence CLI：`ready=true`，`14 pass / 0 warn / 0 fail`。
+- [x] API、nginx、PostgreSQL 最终均 active，近 10 分钟 API journal 未见 error/warn/fail。
+- [x] 证据记录在 `docs/b9.14-staging-deployment-log.md` 与服务器 `/srv/bkyexam-backups/b9.14-20260715080815/`。
+- [x] 未声明 PR 已 review/merge；未声明已接入外部监控告警或完成系统性压测。
+
 ## Completed Backend B9.13 PR / Branch Protection / Required Checks — 2026-07-15
 
 - [x] 创建 PR `#2`：`https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/pull/2`。
@@ -21,7 +40,10 @@
 
 后续代码阶段：
 
-- [ ] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（需要提供/确定 staging/prod-like 目标环境）。
+- [x] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（`exam.acgbot.cc.cd`）已完成：production gate `ok=true`、legacy passwordless `0`、HTTPS smoke PASS、deployment evidence `ready=true`。
+- [ ] B9.15 Staging Operations Hardening：外部监控/告警最小闭环、systemd/nginx runbook 复核、低成本压测脚本、实机 backup/restore 复核。
+- [ ] PR #2 review / merge 决策。
+- [ ] 前端正式设计仍暂缓；先完成管理平台信息架构、账号运营流程和学生端必要功能审查。
 
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 

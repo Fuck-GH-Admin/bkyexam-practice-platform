@@ -13,16 +13,16 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API 与 super_admin bootstrap CLI 已实现，尚未开始前端。**
-- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、Admin Student Manage API、学生密码登录 enforcement、生产 gate CLI、旧账号迁移写入 CLI 与 runbook、生产部署证据校验 CLI；B9.13 已完成 PR、PR CI、`main` branch protection / required checks；完整监控告警、目标环境迁移执行证据、性能压测和正式部署验收仍未完成。**
+- **生产就绪前置：已新增公开 readiness、request id、结构化未捕获错误、基础安全 headers、可配置 rate limit / CSRF origin check、隔离 PostgreSQL backup/restore 演练、结构化 HTTP request log hook、`/api/health/metrics` smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、Admin Student Manage API、学生密码登录 enforcement、生产 gate CLI、旧账号迁移写入 CLI 与 runbook、生产部署证据校验 CLI；B9.13 已完成 PR、PR CI、`main` branch protection / required checks；B9.14 已完成真实服务器 staging 部署、目标数据库 production gate、旧账号迁移、正式 2班学生账号初始化、HTTPS 功能 smoke、轻量性能证据和 deployment evidence ready；完整监控告警、系统性性能压测、PR review/merge 与正式生产发布验收仍未完成。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
 
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
-| 学生客观题核心闭环 | **约 93%** | 登录、首页、多会话、题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；账户、归档和部分 UX 未完成 |
-| 公开生产就绪度 | **约 84%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、管理员登录失败锁定、生产 gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、PR CI 和 `main` branch protection / required checks；仍缺 PR review、外部监控告警、目标环境迁移执行证据、性能压测和正式部署验收 |
-| 完整产品愿景 | **约 80%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook 与部署证据校验 CLI 已落地，但分母仍包含管理前端、全题型、运营与生产能力 |
+| 学生客观题核心闭环 | **约 94%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；B9.14 已在 staging 完成学生登录和创建练习 smoke；归档、部分 UX 和最终前端仍未完成 |
+| 公开生产就绪度 | **约 88%** | 已补第一个管理员 bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、管理员登录失败锁定、生产 gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、gated true import、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、结构化 request log hook、metrics smoke endpoint、正式身份安全策略文档、学生身份安全数据模型、PR CI、`main` branch protection / required checks，以及 B9.14 真实服务器 staging 部署证据；仍缺 PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收 |
+| 完整产品愿景 | **约 82%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate、Question Review Flags API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI 和真实 staging 验收已落地，但分母仍包含管理前端、最终学生前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -92,6 +92,28 @@ npm run ops:deployment-evidence -- --template  PASS
 ```
 
 该命令可生成 deployment evidence JSON 模板；`--evidence=<file> --require-ready` 会在远端 CI、branch protection、production gate、旧账号迁移和 rollback/smoke 证据缺失时返回非 0。
+
+B9.14 真实服务器 staging deployment evidence：
+
+```text
+target = https://exam.acgbot.cc.cd
+commit = 1686c6e27a23029c6cc53c8a22ddb843c3d332d7
+production gate = ok=true
+legacyPasswordlessStudents = 0
+HTTP smoke = PASS
+deployment evidence = ready=true, 14 pass / 0 warn / 0 fail
+```
+
+目标环境证据文件保存在服务器：
+
+```text
+/srv/bkyexam-backups/b9.14-20260715080815/production-gate-clean.json
+/srv/bkyexam-backups/b9.14-20260715080815/http-functional-smoke.json
+/srv/bkyexam-backups/b9.14-20260715080815/perf-smoke.json
+/srv/bkyexam-backups/b9.14-20260715080815/deployment-evidence-report.json
+```
+
+B9.14 初始化了 `admin` super_admin 和 `202502040201`–`202502040230` 的 `2班` 学生账号；旧 13 个无密码账号已保留并迁移到临时密码，最终 `students=43`、`legacyPasswordlessStudents=0`、`passwordResetRequiredStudents=43`。凭据仅保存在服务器受限目录 `/root/bkyexam-credentials/LATEST`，未写入 Git。
 
 全量题库慢速 smoke：
 

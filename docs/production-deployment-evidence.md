@@ -1,6 +1,6 @@
 # Production Deployment Evidence Runbook
 
-状态：**B9.13 已记录 PR / branch protection / required checks，2026-07-15。**
+状态：**B9.14 已完成真实服务器 staging deployment evidence，PR #2 仍待 review/merge，2026-07-15。**
 
 本文把“能不能公开生产发布”的最后一层证据固定成可执行命令和可审计 JSON。它不代表当前已经可公开发布；它用于阻止缺少远端 CI、branch protection、目标环境 production gate、rollback、deployment smoke 或性能验证证据的发布。
 
@@ -101,13 +101,71 @@ remaining failing checks = production_gate_passed, legacy_student_migration_clos
 
 本阶段已完成“推送分支 + PR + branch protection + required checks + PR CI 跑绿”。仍未 review/merge，也未部署到真实目标环境。
 
-## 5. 进入正式前端前的建议
+
+## 5. B9.14 Staging Evidence Snapshot
+
+2026-07-15 在 `exam.acgbot.cc.cd` 完成真实服务器 staging 部署验证。
+
+```text
+target = https://exam.acgbot.cc.cd
+origin = root@47.88.33.54
+repo_dir = /srv/bkyexam-practice-platform
+backup_dir = /srv/bkyexam-backups/b9.14-20260715080815
+commit = 1686c6e27a23029c6cc53c8a22ddb843c3d332d7
+branch = codex/practice-platform-stabilization
+```
+
+部署结果：
+
+| Gate | Result |
+| --- | --- |
+| `npm ci` / build | PASS |
+| DB migrations `0001`–`0011` | PASS |
+| Full question bank import | PASS：2941 classifications / 89922 questions / 154899 options / 2662 mappings |
+| DB smoke | PASS |
+| Legacy student password migration | PASS：13 old passwordless accounts migrated and retained |
+| Formal accounts | PASS：`admin` super_admin + `202502040201`–`202502040230` `2班` students |
+| Production gate | PASS：`ok=true`, `legacyPasswordlessStudents=0` |
+| HTTPS functional smoke | PASS：health/readiness/metrics/banks/student login/practice create/admin login/admin me |
+| Deployment evidence CLI | PASS：`ready=true`, `14 pass / 0 warn / 0 fail` |
+
+目标环境证据：
+
+```text
+/srv/bkyexam-backups/b9.14-20260715080815/production-gate-clean.json
+/srv/bkyexam-backups/b9.14-20260715080815/http-functional-smoke.json
+/srv/bkyexam-backups/b9.14-20260715080815/perf-smoke.json
+/srv/bkyexam-backups/b9.14-20260715080815/deployment-evidence-input.json
+/srv/bkyexam-backups/b9.14-20260715080815/deployment-evidence-report.json
+```
+
+凭据只在服务器受限路径，不写入 Git、不在日志中输出明文：
+
+```text
+/root/bkyexam-credentials/LATEST
+/root/bkyexam-credentials/bkyexam-b9.14-credentials-20260715093217.csv
+/srv/bkyexam-backups/b9.14-20260715080815/legacy-student-password-migration-credentials.csv
+```
+
+远端 CI 使用 PR #2 最新已通过 run：
+
+```text
+run = 29380130674
+url = https://github.com/Fuck-GH-Admin/bkyexam-practice-platform/actions/runs/29380130674
+headSha = 1686c6e27a23029c6cc53c8a22ddb843c3d332d7
+quality = success
+postgres-integration = success
+```
+
+本节把 B9.14 判定为 **staging-ready**。正式公开 production 仍需 owner/reviewer 处理 PR #2、确认凭据交付流程，并补外部监控告警/系统性压测。
+
+## 6. 进入正式前端前的建议
 
 在正式前端设计前，建议先完成：
 
 1. 完成 PR review / merge 决策。
-2. 对 staging/prod-like 数据库跑完整 production gate。
-3. 若仍有旧无密码账号，执行 legacy student password migration 并重新跑 production gate。
-4. 跑目标环境 health/readiness/metrics/admin login/student login/create practice session smoke。
-5. 补一轮最低限度性能证据：关键 API 基准、真实题库导入耗时、数据库查询热点和 Web bundle/code-splitting 评估。
-6. 保存本 runbook 的 evidence JSON 和 report JSON。
+2. 做 B9.15 staging operations hardening：外部 uptime/alerting 最小闭环、systemd/nginx/env/backup runbook 复核。
+3. 补一轮可重复轻量压测：health/readiness/banks/login/practice create，并记录阈值。
+4. 复核凭据交付与首次改密流程，避免 admin/student 初始密码散落。
+5. 审核管理平台信息架构和账号运营流程，再决定是否进入管理前端设计。
+6. 学生正式前端视觉仍放最后，等后端运维基线、性能边界和管理端 IA 稳定后再做。
