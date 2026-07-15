@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 
 import type {
+  AdminBankMappingDetailV1,
   AdminPermissionV1,
   AdminStudentV1,
   BulkCreateAdminStudentItemV1,
@@ -10,6 +11,7 @@ export type MockAdminState = {
   authenticated: boolean;
   calls: string[];
   students: AdminStudentV1[];
+  bankMappings: AdminBankMappingDetailV1[];
 };
 
 const adminId = '99999999-9999-4999-8999-999999999999';
@@ -51,6 +53,24 @@ export function createMockAdminState(): MockAdminState {
         displayName: 'legacy001',
         className: null,
         lastLoginAt: '2026-07-15T08:00:00.000Z',
+      }),
+    ],
+    bankMappings: [
+      buildBankMapping({
+        bankId: '44444444-4444-4444-8444-444444444444',
+        rawName: '公共课/数学/高等数学',
+        bankName: '高等数学',
+        status: 'review',
+        visible: false,
+        objectiveQuestionCount: 30,
+      }),
+      buildBankMapping({
+        bankId: '55555555-5555-4555-8555-555555555555',
+        rawName: '公共课/英语/大学英语',
+        bankName: '大学英语',
+        status: 'active',
+        visible: true,
+        objectiveQuestionCount: 18,
       }),
     ],
   };
@@ -126,6 +146,84 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         students: pageItems.slice(0, limit),
         page: { limit, offset, hasMore: pageItems.length > limit },
       });
+    }
+
+    if (method === 'GET' && pathname === '/api/admin/bank-mappings') {
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const status = url.searchParams.get('status');
+      const visible = url.searchParams.get('visible');
+      const keyword = url.searchParams.get('keyword')?.toLowerCase() ?? '';
+      const filtered = state.bankMappings.filter((mapping) => {
+        if (status && mapping.status !== status) return false;
+        if (visible && mapping.visible !== (visible === 'true')) return false;
+        if (keyword && !`${mapping.rawName} ${mapping.bankName} ${mapping.keywords.join(' ')}`.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      const pageItems = filtered.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        bankMappings: pageItems.slice(0, limit).map(toBankMappingListItem),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
+    }
+
+    if (method === 'POST' && pathname === '/api/admin/bank-mappings/bulk-status') {
+      const body = readBody<{
+        items: Array<{ bankId: string; expectedVersion: number }>;
+        changes: { visible?: boolean; status?: AdminBankMappingDetailV1['status'] };
+      }>(route);
+      const updated: Array<{ bankId: string; version: number }> = [];
+      const failed: Array<{ bankId: string; error: string }> = [];
+      for (const item of body.items) {
+        const mapping = state.bankMappings.find((candidate) => candidate.bankId === item.bankId);
+        if (!mapping) {
+          failed.push({ bankId: item.bankId, error: 'not_found' });
+          continue;
+        }
+        if (mapping.version !== item.expectedVersion) {
+          failed.push({ bankId: item.bankId, error: 'version_conflict' });
+          continue;
+        }
+        if (body.changes.status) mapping.status = body.changes.status;
+        if (body.changes.visible !== undefined) mapping.visible = body.changes.visible;
+        mapping.version += 1;
+        mapping.updatedAt = '2026-07-15T10:50:00.000Z';
+        mapping.updatedBy = { id: adminId, displayName: '平台管理员' };
+        mapping.studentPreview = buildStudentPreview(mapping);
+        updated.push({ bankId: mapping.bankId, version: mapping.version });
+      }
+      return fulfillJson(route, { updated, failed });
+    }
+
+    const bankMappingMatch = pathname.match(/^\/api\/admin\/bank-mappings\/([^/]+)$/);
+    if (bankMappingMatch) {
+      const bankId = bankMappingMatch[1];
+      const mapping = state.bankMappings.find((item) => item.bankId === bankId);
+      if (!mapping) return fulfillJson(route, { error: 'Bank mapping not found' }, 404);
+
+      if (method === 'GET') {
+        return fulfillJson(route, { bankMapping: mapping });
+      }
+
+      if (method === 'PATCH') {
+        const body = readBody<{
+          expectedVersion: number;
+          changes: Partial<Pick<
+            AdminBankMappingDetailV1,
+            'bankName' | 'subjectCategory' | 'subjectName' | 'visible' | 'status' | 'difficulty' | 'examPurpose' | 'audience' | 'keywords' | 'description' | 'notes'
+          >>;
+        }>(route);
+        if (body.expectedVersion !== mapping.version) {
+          return fulfillJson(route, { error: 'Bank mapping version conflict' }, 409);
+        }
+        Object.assign(mapping, body.changes, {
+          version: mapping.version + 1,
+          updatedAt: '2026-07-15T10:45:00.000Z',
+          updatedBy: { id: adminId, displayName: '平台管理员' },
+        });
+        mapping.studentPreview = buildStudentPreview(mapping);
+        return fulfillJson(route, { bankMapping: mapping });
+      }
     }
 
     if (method === 'POST' && pathname === '/api/admin/students') {
@@ -253,6 +351,69 @@ function buildStudent(input: {
     createdBy: { id: adminId, displayName: '平台管理员' },
     createdAt: now,
     updatedAt: now,
+  };
+}
+
+function buildBankMapping(input: {
+  bankId: string;
+  rawName: string;
+  bankName: string;
+  status: AdminBankMappingDetailV1['status'];
+  visible: boolean;
+  objectiveQuestionCount: number;
+}): AdminBankMappingDetailV1 {
+  const mapping: AdminBankMappingDetailV1 = {
+    bankId: input.bankId,
+    rawName: input.rawName,
+    bankName: input.bankName,
+    subjectCategory: '公共课',
+    subjectName: input.bankName.includes('英语') ? '英语' : '数学',
+    parentId: null,
+    parentName: null,
+    qGroup: 2,
+    visible: input.visible,
+    status: input.status,
+    difficulty: 'normal',
+    examPurpose: 'practice',
+    questionTypes: ['single_choice', 'true_false'],
+    audience: 'student',
+    keywords: [input.bankName],
+    description: `${input.bankName} 练习题库`,
+    notes: '',
+    questionCount: input.objectiveQuestionCount,
+    descendantQuestionCount: input.objectiveQuestionCount,
+    objectiveQuestionCount: input.objectiveQuestionCount,
+    version: 1,
+    updatedAt: now,
+    updatedBy: { id: adminId, displayName: '平台管理员' },
+    questionTypeCounts: {
+      single_choice: Math.max(0, input.objectiveQuestionCount - 5),
+      true_false: Math.min(5, input.objectiveQuestionCount),
+    },
+    studentPreview: {
+      visibleInStudentCatalog: false,
+      reason: '',
+    },
+  };
+  mapping.studentPreview = buildStudentPreview(mapping);
+  return mapping;
+}
+
+function toBankMappingListItem(mapping: AdminBankMappingDetailV1) {
+  const {
+    parentName: _parentName,
+    questionTypeCounts: _questionTypeCounts,
+    studentPreview: _studentPreview,
+    ...listItem
+  } = mapping;
+  return listItem;
+}
+
+function buildStudentPreview(mapping: AdminBankMappingDetailV1) {
+  const visibleInStudentCatalog = mapping.visible && mapping.status === 'active' && mapping.objectiveQuestionCount > 0;
+  return {
+    visibleInStudentCatalog,
+    reason: visibleInStudentCatalog ? 'active and visible with objective questions' : 'not active/visible or no objective questions',
   };
 }
 

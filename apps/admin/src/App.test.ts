@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import type { AdminPermissionV1, AdminStudentV1 } from '@bkyexam-practice/shared';
+import type { AdminBankMappingListItemV1, AdminPermissionV1, AdminStudentV1 } from '@bkyexam-practice/shared';
 
 import {
   buildAdminPath,
+  buildBankMappingListQuery,
+  buildBankMappingStatusBadges,
   buildStudentListQuery,
   buildStudentStatusBadges,
   buildVisibleAdminNavigation,
@@ -16,7 +18,14 @@ describe('admin route helpers', () => {
     expect(parseAdminRoute('/admin/students/create')).toEqual({ kind: 'students', panel: 'create' });
     expect(parseAdminRoute('/admin/students/bulk-create')).toEqual({ kind: 'students', panel: 'bulk-create' });
     expect(parseAdminRoute('/admin/students/student-1')).toEqual({ kind: 'students', studentId: 'student-1' });
+    expect(parseAdminRoute('/admin/bank-mappings/11111111-1111-4111-8111-111111111111')).toEqual({
+      kind: 'bank-mappings',
+      bankId: '11111111-1111-4111-8111-111111111111',
+    });
     expect(buildAdminPath({ kind: 'students', studentId: 'student-1' })).toBe('/admin/students/student-1');
+    expect(buildAdminPath({ kind: 'bank-mappings', bankId: '11111111-1111-4111-8111-111111111111' })).toBe(
+      '/admin/bank-mappings/11111111-1111-4111-8111-111111111111',
+    );
   });
 
   test('filters navigation by actual RBAC permissions', () => {
@@ -33,6 +42,58 @@ describe('admin route helpers', () => {
       'system',
       'students',
       'import-jobs',
+    ]);
+  });
+});
+
+describe('bank mapping helpers', () => {
+  test('builds a compact bank mapping query string', () => {
+    const filters = {
+      keyword: '数学',
+      status: 'review',
+      visible: 'false',
+      subjectCategory: '公共课',
+      subjectName: '',
+      qGroup: '2',
+      hasObjectiveQuestions: 'true',
+    } satisfies Parameters<typeof buildBankMappingListQuery>[0];
+
+    expect(buildBankMappingListQuery(filters, 20, 0)).toBe(
+      'limit=20&offset=0&keyword=%E6%95%B0%E5%AD%A6&status=review&visible=false&subjectCategory=%E5%85%AC%E5%85%B1%E8%AF%BE&qGroup=2&hasObjectiveQuestions=true',
+    );
+  });
+
+  test('summarizes bank mapping publishing blockers', () => {
+    const mapping: AdminBankMappingListItemV1 = {
+      bankId: '11111111-1111-4111-8111-111111111111',
+      rawName: 'raw math',
+      bankName: '高等数学',
+      subjectCategory: '公共课',
+      subjectName: '数学',
+      parentId: '22222222-2222-4222-8222-222222222222',
+      qGroup: 2,
+      visible: false,
+      status: 'review',
+      difficulty: 'normal',
+      examPurpose: 'practice',
+      questionTypes: ['single_choice'],
+      audience: 'student',
+      keywords: ['数学'],
+      description: '',
+      notes: '',
+      questionCount: 0,
+      descendantQuestionCount: 0,
+      objectiveQuestionCount: 0,
+      version: 1,
+      updatedAt: '2026-07-15T10:00:00.000Z',
+      updatedBy: null,
+    };
+
+    expect(buildBankMappingStatusBadges(mapping)).toEqual([
+      'review',
+      'hidden-from-students',
+      'no-objective-questions',
+      'child-bank',
     ]);
   });
 });

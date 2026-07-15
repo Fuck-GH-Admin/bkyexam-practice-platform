@@ -1,5 +1,7 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import {
+  AdminBankMappingDetailResponseV1Schema,
+  AdminBankMappingListResponseV1Schema,
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminMeResponseV1Schema,
@@ -7,18 +9,25 @@ import {
   AdminStudentListResponseV1Schema,
   AdminSystemStatusResponseV1Schema,
   ApiErrorResponseV1Schema,
+  BulkUpdateAdminBankMappingStatusRequestV1Schema,
+  BulkUpdateAdminBankMappingStatusResponseV1Schema,
   BulkCreateAdminStudentsRequestV1Schema,
   BulkCreateAdminStudentsResponseV1Schema,
   CreateAdminStudentRequestV1Schema,
   ResetAdminStudentPasswordRequestV1Schema,
   ResetAdminStudentPasswordResponseV1Schema,
   RevokeAdminStudentSessionsResponseV1Schema,
+  UpdateAdminBankMappingRequestV1Schema,
   UpdateAdminStudentRequestV1Schema,
+  type AdminBankMappingDetailV1,
+  type AdminBankMappingListItemV1,
+  type AdminBankMappingStatusV1,
   type AdminPermissionV1,
   type AdminStudentStatusV1,
   type AdminStudentV1,
   type AdminSystemStatusResponseV1,
   type AdminUserV1,
+  type BulkUpdateAdminBankMappingStatusResponseV1,
   type BulkCreateAdminStudentItemV1,
   type BulkCreateAdminStudentsResponseV1,
 } from '@bkyexam-practice/shared';
@@ -26,13 +35,14 @@ import {
 type Parser<T> = { parse: (payload: unknown) => T };
 
 type AdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
-type ImplementedAdminNavKey = 'system' | 'students';
+type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings';
 type PlaceholderAdminNavKey = Exclude<AdminNavKey, ImplementedAdminNavKey>;
 
 type AdminRoute =
   | { kind: 'login' }
   | { kind: 'system' }
   | { kind: 'students'; studentId?: string; panel?: 'create' | 'bulk-create' }
+  | { kind: 'bank-mappings'; bankId?: string }
   | { kind: 'placeholder'; key: PlaceholderAdminNavKey }
   | { kind: 'unknown'; path: string };
 
@@ -57,6 +67,16 @@ type BulkOptionsDraft = {
   skipExisting: boolean;
 };
 
+type BankMappingFilters = {
+  keyword: string;
+  status: '' | AdminBankMappingStatusV1;
+  visible: '' | 'true' | 'false';
+  subjectCategory: string;
+  subjectName: string;
+  qGroup: string;
+  hasObjectiveQuestions: '' | 'true' | 'false';
+};
+
 const defaultStudentFilters: StudentFilters = {
   keyword: '',
   className: '',
@@ -64,6 +84,16 @@ const defaultStudentFilters: StudentFilters = {
   status: 'active',
   passwordResetRequired: '',
   lockedOnly: false,
+};
+
+const defaultBankMappingFilters: BankMappingFilters = {
+  keyword: '',
+  status: 'review',
+  visible: '',
+  subjectCategory: '',
+  subjectName: '',
+  qGroup: '',
+  hasObjectiveQuestions: '',
 };
 
 const defaultBulkText = `loginName,displayName,className,groupName
@@ -99,8 +129,8 @@ const adminNavigation: Array<{
     label: 'Bank Mappings',
     path: '/admin/bank-mappings',
     permissions: ['bank_mapping:read'],
-    implemented: false,
-    description: '题库整理 UI 后续阶段开放；当前后端 API 已存在。',
+    implemented: true,
+    description: '题库整理：列表、筛选、详情编辑、发布/隐藏和批量状态更新。',
   },
   {
     key: 'import-jobs',
@@ -157,6 +187,11 @@ export function parseAdminRoute(pathname: string): AdminRoute {
     const studentId = decodeURIComponent(path.slice('/admin/students/'.length));
     return { kind: 'students', studentId };
   }
+  if (path === '/admin/bank-mappings') return { kind: 'bank-mappings' };
+  if (path.startsWith('/admin/bank-mappings/')) {
+    const bankId = decodeURIComponent(path.slice('/admin/bank-mappings/'.length));
+    return { kind: 'bank-mappings', bankId };
+  }
   const placeholder = adminNavigation.find((item) => item.path === path && !item.implemented);
   if (placeholder) return { kind: 'placeholder', key: placeholder.key as PlaceholderAdminNavKey };
   return { kind: 'unknown', path };
@@ -170,6 +205,10 @@ export function buildAdminPath(route: AdminRoute): string {
     if (route.panel === 'bulk-create') return '/admin/students/bulk-create';
     if (route.studentId) return `/admin/students/${encodeURIComponent(route.studentId)}`;
     return '/admin/students';
+  }
+  if (route.kind === 'bank-mappings') {
+    if (route.bankId) return `/admin/bank-mappings/${encodeURIComponent(route.bankId)}`;
+    return '/admin/bank-mappings';
   }
   if (route.kind === 'placeholder') {
     return adminNavigation.find((item) => item.key === route.key)?.path ?? '/admin/system';
@@ -198,6 +237,20 @@ export function buildStudentListQuery(filters: StudentFilters, limit: number, of
   addOptionalParam(params, 'status', filters.status);
   addOptionalParam(params, 'passwordResetRequired', filters.passwordResetRequired);
   if (filters.lockedOnly) params.set('lockedOnly', 'true');
+  return params.toString();
+}
+
+export function buildBankMappingListQuery(filters: BankMappingFilters, limit: number, offset: number): string {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  addOptionalParam(params, 'keyword', filters.keyword);
+  addOptionalParam(params, 'status', filters.status);
+  addOptionalParam(params, 'visible', filters.visible);
+  addOptionalParam(params, 'subjectCategory', filters.subjectCategory);
+  addOptionalParam(params, 'subjectName', filters.subjectName);
+  addOptionalParam(params, 'qGroup', filters.qGroup);
+  addOptionalParam(params, 'hasObjectiveQuestions', filters.hasObjectiveQuestions);
   return params.toString();
 }
 
@@ -231,6 +284,13 @@ export function buildStudentStatusBadges(student: AdminStudentV1): string[] {
   const badges = [student.status === 'active' ? 'active' : 'disabled'];
   badges.push(student.passwordResetRequired ? '待改密' : '已启用');
   if (student.lockedUntil) badges.push(`锁定至 ${formatAdminDate(student.lockedUntil)}`);
+  return badges;
+}
+
+export function buildBankMappingStatusBadges(mapping: AdminBankMappingListItemV1): string[] {
+  const badges = [mapping.status, mapping.visible ? 'visible' : 'hidden-from-students'];
+  if (mapping.objectiveQuestionCount === 0) badges.push('no-objective-questions');
+  if (mapping.parentId) badges.push('child-bank');
   return badges;
 }
 
@@ -347,6 +407,13 @@ export function App() {
         <SystemStatusPage onSessionExpired={expireSession} />
       ) : route.kind === 'students' ? (
         <StudentAccountsPage
+          admin={admin}
+          route={route}
+          navigate={navigate}
+          onSessionExpired={expireSession}
+        />
+      ) : route.kind === 'bank-mappings' ? (
+        <BankMappingsPage
           admin={admin}
           route={route}
           navigate={navigate}
@@ -570,6 +637,495 @@ function SystemStatusContent({ status }: { status: AdminSystemStatusResponseV1 }
         </ul>
       </section>
     </>
+  );
+}
+
+function BankMappingsPage({
+  admin,
+  route,
+  navigate,
+  onSessionExpired,
+}: {
+  admin: AdminUserV1;
+  route: Extract<AdminRoute, { kind: 'bank-mappings' }>;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+  onSessionExpired: () => void;
+}) {
+  const [draftFilters, setDraftFilters] = useState<BankMappingFilters>(defaultBankMappingFilters);
+  const [filters, setFilters] = useState<BankMappingFilters>(defaultBankMappingFilters);
+  const [offset, setOffset] = useState(0);
+  const [mappings, setMappings] = useState<AdminBankMappingListItemV1[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedBankIds, setSelectedBankIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<'' | AdminBankMappingStatusV1>('');
+  const [bulkVisible, setBulkVisible] = useState<'' | 'true' | 'false'>('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<BulkUpdateAdminBankMappingStatusResponseV1 | null>(null);
+  const limit = 20;
+
+  const canWrite = admin.permissions.includes('bank_mapping:write');
+  const canPublish = admin.permissions.includes('bank_mapping:publish');
+
+  const loadMappings = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildBankMappingListQuery(filters, limit, offset);
+      const response = await requestJson(`/api/admin/bank-mappings?${query}`, AdminBankMappingListResponseV1Schema);
+      setMappings(response.bankMappings);
+      setHasMore(response.page.hasMore);
+      setSelectedBankIds((current) => current.filter((bankId) => response.bankMappings.some((mapping) => mapping.bankId === bankId)));
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, offset, onSessionExpired]);
+
+  useEffect(() => {
+    void loadMappings();
+  }, [loadMappings]);
+
+  function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOffset(0);
+    setFilters(draftFilters);
+    setBulkResult(null);
+  }
+
+  function toggleSelected(bankId: string, checked: boolean) {
+    setSelectedBankIds((current) => {
+      if (checked) return current.includes(bankId) ? current : [...current, bankId];
+      return current.filter((candidate) => candidate !== bankId);
+    });
+  }
+
+  async function submitBulkStatus(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const selectedMappings = mappings.filter((mapping) => selectedBankIds.includes(mapping.bankId));
+    if (!canPublish || selectedMappings.length === 0) return;
+
+    const changes: { visible?: boolean; status?: AdminBankMappingStatusV1 } = {};
+    if (bulkStatus) changes.status = bulkStatus;
+    if (bulkVisible) changes.visible = bulkVisible === 'true';
+
+    setBulkSubmitting(true);
+    setError('');
+    setBulkResult(null);
+    try {
+      const request = BulkUpdateAdminBankMappingStatusRequestV1Schema.parse({
+        items: selectedMappings.map((mapping) => ({
+          bankId: mapping.bankId,
+          expectedVersion: mapping.version,
+        })),
+        changes,
+      });
+      const response = await requestJson('/api/admin/bank-mappings/bulk-status', BulkUpdateAdminBankMappingStatusResponseV1Schema, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      setBulkResult(response);
+      setSelectedBankIds([]);
+      await loadMappings();
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setBulkSubmitting(false);
+    }
+  }
+
+  function refreshAfterMutation(mapping: AdminBankMappingDetailV1) {
+    void loadMappings();
+    navigate(`/admin/bank-mappings/${mapping.bankId}`);
+  }
+
+  return (
+    <section className="admin-page">
+      <PageHeader
+        eyebrow="Catalog operations"
+        title="Bank Mappings"
+        description="B9.21 只做功能性题库整理 UI：列表、筛选、详情编辑、发布/隐藏和批量状态；最终视觉后续再打磨。"
+        action={<button type="button" onClick={() => void loadMappings()} disabled={loading}>刷新列表</button>}
+      />
+
+      <section className="admin-card">
+        <form className="student-filters" onSubmit={submitFilters}>
+          <label>关键字
+            <input value={draftFilters.keyword} onChange={(event) => setDraftFilters({ ...draftFilters, keyword: event.target.value })} placeholder="rawName / bankName / keyword" />
+          </label>
+          <label>状态
+            <select value={draftFilters.status} onChange={(event) => setDraftFilters({ ...draftFilters, status: event.target.value as BankMappingFilters['status'] })}>
+              <option value="">全部</option>
+              <option value="review">review</option>
+              <option value="active">active</option>
+              <option value="hidden">hidden</option>
+              <option value="deprecated">deprecated</option>
+            </select>
+          </label>
+          <label>可见
+            <select value={draftFilters.visible} onChange={(event) => setDraftFilters({ ...draftFilters, visible: event.target.value as BankMappingFilters['visible'] })}>
+              <option value="">全部</option>
+              <option value="true">visible</option>
+              <option value="false">hidden</option>
+            </select>
+          </label>
+          <label>学科
+            <input value={draftFilters.subjectCategory} onChange={(event) => setDraftFilters({ ...draftFilters, subjectCategory: event.target.value })} />
+          </label>
+          <label>分类
+            <input value={draftFilters.subjectName} onChange={(event) => setDraftFilters({ ...draftFilters, subjectName: event.target.value })} />
+          </label>
+          <label>客观题
+            <select value={draftFilters.hasObjectiveQuestions} onChange={(event) => setDraftFilters({ ...draftFilters, hasObjectiveQuestions: event.target.value as BankMappingFilters['hasObjectiveQuestions'] })}>
+              <option value="">全部</option>
+              <option value="true">有客观题</option>
+              <option value="false">无客观题</option>
+            </select>
+          </label>
+          <label>qGroup
+            <input value={draftFilters.qGroup} onChange={(event) => setDraftFilters({ ...draftFilters, qGroup: event.target.value })} inputMode="numeric" />
+          </label>
+          <button type="submit">应用过滤</button>
+        </form>
+      </section>
+
+      <div className="student-layout">
+        <section className="admin-card student-list-card">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Mappings</p>
+              <h2>题库整理列表</h2>
+            </div>
+            <span className="muted">offset {offset}</span>
+          </div>
+          {error ? <ErrorPanel message={error} onRetry={() => void loadMappings()} /> : null}
+          {loading ? <p className="muted">正在加载题库 mapping…</p> : null}
+          {!loading && !error && mappings.length === 0 ? <InfoPanel title="没有匹配题库" detail="过滤条件保留，可直接调整后重新查询。" /> : null}
+          {mappings.length > 0 ? (
+            <BankMappingTable
+              mappings={mappings}
+              selectedBankIds={selectedBankIds}
+              onSelect={toggleSelected}
+              navigate={navigate}
+            />
+          ) : null}
+          <div className="pager">
+            <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
+            <span>offset {offset}</span>
+            <button className="ghost" type="button" disabled={!hasMore || loading} onClick={() => setOffset(offset + limit)}>下一页</button>
+          </div>
+
+          <form className="option-grid" onSubmit={submitBulkStatus}>
+            <h3>Bulk status</h3>
+            <p className="muted">使用当前列表中的 version 做 optimistic concurrency；失败行会保留在结果中。</p>
+            {!canPublish ? <ForbiddenInline /> : null}
+            <label>Bulk status
+              <select value={bulkStatus} onChange={(event) => setBulkStatus(event.target.value as '' | AdminBankMappingStatusV1)} disabled={!canPublish}>
+                <option value="">不修改</option>
+                <option value="review">review</option>
+                <option value="active">active</option>
+                <option value="hidden">hidden</option>
+                <option value="deprecated">deprecated</option>
+              </select>
+            </label>
+            <label>Bulk visible
+              <select value={bulkVisible} onChange={(event) => setBulkVisible(event.target.value as '' | 'true' | 'false')} disabled={!canPublish}>
+                <option value="">不修改</option>
+                <option value="true">visible</option>
+                <option value="false">hidden</option>
+              </select>
+            </label>
+            <button type="submit" disabled={!canPublish || selectedBankIds.length === 0 || bulkSubmitting}>{bulkSubmitting ? '更新中…' : `批量更新状态 (${selectedBankIds.length})`}</button>
+          </form>
+          {bulkResult ? <BankMappingBulkResult result={bulkResult} /> : null}
+        </section>
+
+        <aside className="admin-card student-side-panel">
+          {route.bankId ? (
+            <BankMappingDetailPanel
+              bankId={route.bankId}
+              canWrite={canWrite}
+              canPublish={canPublish}
+              onChanged={refreshAfterMutation}
+              onSessionExpired={onSessionExpired}
+            />
+          ) : (
+            <InfoPanel title="选择一个题库 mapping" detail="从左侧列表点击“查看”，先确认自动映射，再做展示名、标签和发布状态调整。" />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function BankMappingTable({
+  mappings,
+  selectedBankIds,
+  onSelect,
+  navigate,
+}: {
+  mappings: AdminBankMappingListItemV1[];
+  selectedBankIds: string[];
+  onSelect: (bankId: string, checked: boolean) => void;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Select</th>
+            <th>Bank</th>
+            <th>Subject</th>
+            <th>Status</th>
+            <th>Questions</th>
+            <th>Updated</th>
+            <th>Version</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mappings.map((mapping) => (
+            <tr key={mapping.bankId}>
+              <td>
+                <label className="checkbox-label">
+                  <input
+                    aria-label={`选择 ${mapping.bankName}`}
+                    checked={selectedBankIds.includes(mapping.bankId)}
+                    onChange={(event) => onSelect(mapping.bankId, event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
+              </td>
+              <td>
+                <strong>{mapping.bankName}</strong>
+                <br />
+                <span className="muted">{mapping.rawName}</span>
+              </td>
+              <td>{mapping.subjectCategory} / {mapping.subjectName}</td>
+              <td>
+                <div className="badge-row">
+                  {buildBankMappingStatusBadges(mapping).map((badge) => (
+                    <Badge key={badge} tone={bankMappingBadgeTone(badge)}>{badge}</Badge>
+                  ))}
+                </div>
+              </td>
+              <td>{mapping.objectiveQuestionCount} objective / {mapping.questionCount} direct / {mapping.descendantQuestionCount} total</td>
+              <td>{mapping.updatedBy?.displayName ?? '-'}<br /><span className="muted">{formatAdminDate(mapping.updatedAt)}</span></td>
+              <td>{mapping.version}</td>
+              <td><button className="ghost" type="button" onClick={() => navigate(`/admin/bank-mappings/${mapping.bankId}`)}>查看 {mapping.bankName}</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function BankMappingDetailPanel({
+  bankId,
+  canWrite,
+  canPublish,
+  onChanged,
+  onSessionExpired,
+}: {
+  bankId: string;
+  canWrite: boolean;
+  canPublish: boolean;
+  onChanged: (mapping: AdminBankMappingDetailV1) => void;
+  onSessionExpired: () => void;
+}) {
+  const [mapping, setMapping] = useState<AdminBankMappingDetailV1 | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [subjectCategory, setSubjectCategory] = useState('');
+  const [subjectName, setSubjectName] = useState('');
+  const [difficulty, setDifficulty] = useState('');
+  const [examPurpose, setExamPurpose] = useState('');
+  const [audience, setAudience] = useState('');
+  const [keywordsText, setKeywordsText] = useState('');
+  const [description, setDescription] = useState('');
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState<AdminBankMappingStatusV1>('review');
+  const [visible, setVisible] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await requestJson(`/api/admin/bank-mappings/${encodeURIComponent(bankId)}`, AdminBankMappingDetailResponseV1Schema);
+      applyBankMappingToForm(response.bankMapping);
+      setMapping(response.bankMapping);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [bankId, onSessionExpired]);
+
+  function applyBankMappingToForm(next: AdminBankMappingDetailV1) {
+    setBankName(next.bankName);
+    setSubjectCategory(next.subjectCategory);
+    setSubjectName(next.subjectName);
+    setDifficulty(next.difficulty);
+    setExamPurpose(next.examPurpose);
+    setAudience(next.audience);
+    setKeywordsText(next.keywords.join(', '));
+    setDescription(next.description);
+    setNotes(next.notes);
+    setStatus(next.status);
+    setVisible(next.visible);
+  }
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canWrite || !mapping) return;
+    setSaving(true);
+    setError('');
+    setMessage('');
+    try {
+      const changes: {
+        bankName: string;
+        subjectCategory: string;
+        subjectName: string;
+        difficulty: string;
+        examPurpose: string;
+        audience: string;
+        keywords: string[];
+        description: string;
+        notes: string;
+        visible?: boolean;
+        status?: AdminBankMappingStatusV1;
+      } = {
+        bankName: bankName.trim(),
+        subjectCategory: subjectCategory.trim(),
+        subjectName: subjectName.trim(),
+        difficulty: difficulty.trim(),
+        examPurpose: examPurpose.trim(),
+        audience: audience.trim(),
+        keywords: parseKeywords(keywordsText),
+        description,
+        notes,
+      };
+      if (canPublish) {
+        changes.visible = visible;
+        changes.status = status;
+      }
+      const request = UpdateAdminBankMappingRequestV1Schema.parse({
+        expectedVersion: mapping.version,
+        changes,
+      });
+      const response = await requestJson(`/api/admin/bank-mappings/${encodeURIComponent(mapping.bankId)}`, AdminBankMappingDetailResponseV1Schema, {
+        method: 'PATCH',
+        body: JSON.stringify(request),
+      });
+      setMapping(response.bankMapping);
+      applyBankMappingToForm(response.bankMapping);
+      setMessage('题库 mapping 已保存。');
+      onChanged(response.bankMapping);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapBankMappingError(caught));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <InfoPanel title="正在加载题库详情…" />;
+  if (error && !mapping) return <ErrorPanel message={error} onRetry={() => void load()} />;
+  if (!mapping) return <InfoPanel title="题库 mapping 不存在" detail="返回列表后重新选择。" />;
+
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Bank Mapping Detail</p>
+      <h2>{mapping.bankName}</h2>
+      <div className="badge-row">
+        {buildBankMappingStatusBadges(mapping).map((badge) => <Badge key={badge} tone={bankMappingBadgeTone(badge)}>{badge}</Badge>)}
+      </div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {message ? <p className="form-success" role="status">{message}</p> : null}
+      {!canWrite ? <ForbiddenInline /> : null}
+
+      <section className="detail-section">
+        <h3>Student preview</h3>
+        <dl className="key-values single">
+          <div><dt>visibleInStudentCatalog</dt><dd>{mapping.studentPreview.visibleInStudentCatalog ? 'yes' : 'no'}</dd></div>
+          <div><dt>reason</dt><dd>{mapping.studentPreview.reason}</dd></div>
+          <div><dt>parent</dt><dd>{mapping.parentName ?? '-'}</dd></div>
+          <div><dt>questionTypeCounts</dt><dd>{Object.entries(mapping.questionTypeCounts).map(([type, count]) => `${type}: ${count}`).join('；') || '-'}</dd></div>
+        </dl>
+      </section>
+
+      <form className="stack-form" onSubmit={save}>
+        <h3>Curation fields</h3>
+        <label>rawName<input value={mapping.rawName} disabled /></label>
+        <label>bankName<input value={bankName} onChange={(event) => setBankName(event.target.value)} disabled={!canWrite} /></label>
+        <label>subjectCategory<input value={subjectCategory} onChange={(event) => setSubjectCategory(event.target.value)} disabled={!canWrite} /></label>
+        <label>subjectName<input value={subjectName} onChange={(event) => setSubjectName(event.target.value)} disabled={!canWrite} /></label>
+        <label>difficulty<input value={difficulty} onChange={(event) => setDifficulty(event.target.value)} disabled={!canWrite} /></label>
+        <label>examPurpose<input value={examPurpose} onChange={(event) => setExamPurpose(event.target.value)} disabled={!canWrite} /></label>
+        <label>audience<input value={audience} onChange={(event) => setAudience(event.target.value)} disabled={!canWrite} /></label>
+        <label>keywords<input value={keywordsText} onChange={(event) => setKeywordsText(event.target.value)} disabled={!canWrite} placeholder="逗号分隔" /></label>
+        <label>description<textarea value={description} onChange={(event) => setDescription(event.target.value)} disabled={!canWrite} rows={3} /></label>
+        <label>notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={!canWrite} rows={3} /></label>
+        <fieldset className="option-grid">
+          <legend>Publish controls</legend>
+          {!canPublish ? <p className="muted">当前账号没有 `bank_mapping:publish`，只能保存文案字段。</p> : null}
+          <label>status
+            <select value={status} onChange={(event) => setStatus(event.target.value as AdminBankMappingStatusV1)} disabled={!canPublish}>
+              <option value="review">review</option>
+              <option value="active">active</option>
+              <option value="hidden">hidden</option>
+              <option value="deprecated">deprecated</option>
+            </select>
+          </label>
+          <label className="checkbox-label">
+            <input type="checkbox" checked={visible} onChange={(event) => setVisible(event.target.checked)} disabled={!canPublish} />
+            visible in student catalog
+          </label>
+        </fieldset>
+        {mapping.objectiveQuestionCount === 0 ? <p className="form-error">该 mapping 没有客观题；后端会拒绝发布为 active/visible。</p> : null}
+        <button type="submit" disabled={!canWrite || saving}>{saving ? '保存中…' : '保存题库 mapping'}</button>
+      </form>
+
+      <section className="detail-section">
+        <h3>Counts / audit</h3>
+        <dl className="key-values single">
+          <div><dt>bankId</dt><dd>{mapping.bankId}</dd></div>
+          <div><dt>qGroup</dt><dd>{mapping.qGroup}</dd></div>
+          <div><dt>direct / descendant / objective</dt><dd>{mapping.questionCount} / {mapping.descendantQuestionCount} / {mapping.objectiveQuestionCount}</dd></div>
+          <div><dt>version</dt><dd>{mapping.version}</dd></div>
+          <div><dt>updatedBy</dt><dd>{mapping.updatedBy?.displayName ?? '-'}</dd></div>
+          <div><dt>updatedAt</dt><dd>{formatAdminDate(mapping.updatedAt)}</dd></div>
+        </dl>
+      </section>
+    </section>
+  );
+}
+
+function BankMappingBulkResult({ result }: { result: BulkUpdateAdminBankMappingStatusResponseV1 }) {
+  return (
+    <section className="bulk-result" role="status">
+      <h3>Bulk status result</h3>
+      <div className="status-grid three">
+        <StatusCard tone="ok" title="updated" value={`${result.updated.length}`} detail={result.updated.map((item) => `${item.bankId}: v${item.version}`).join('；') || '-'} />
+        <StatusCard tone={result.failed.length > 0 ? 'danger' : 'neutral'} title="failed" value={`${result.failed.length}`} detail={result.failed.map((item) => `${item.bankId}: ${item.error}`).join('；') || '-'} />
+        <StatusCard tone="neutral" title="contract" value="v1" detail="updated/failed partial result is rendered without hiding failed rows." />
+      </div>
+    </section>
   );
 }
 
@@ -1296,6 +1852,7 @@ function getRouteRequiredPermissions(route: AdminRoute): AdminPermissionV1[] {
 function getActiveNavKey(route: AdminRoute): AdminNavKey | null {
   if (route.kind === 'system') return 'system';
   if (route.kind === 'students') return 'students';
+  if (route.kind === 'bank-mappings') return 'bank-mappings';
   if (route.kind === 'placeholder') return route.key;
   return null;
 }
@@ -1319,6 +1876,20 @@ function nullableString(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
+function parseKeywords(value: string): string[] {
+  return value
+    .split(',')
+    .map((keyword) => keyword.trim())
+    .filter(Boolean);
+}
+
+function bankMappingBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'danger' {
+  if (badge === 'active' || badge === 'visible') return 'ok';
+  if (badge === 'review' || badge === 'no-objective-questions') return 'warning';
+  if (badge === 'deprecated' || badge === 'hidden-from-students') return 'danger';
+  return 'neutral';
+}
+
 function readNextPathFromLocation(): string | null {
   const next = new URLSearchParams(window.location.search).get('next');
   if (!next) return null;
@@ -1336,6 +1907,15 @@ function mapLoginError(error: unknown): string {
     if (error.status === 403) return '管理员账号已禁用。';
     if (error.status === 423) return '管理员账号临时锁定，请稍后重试。';
     return error.message;
+  }
+  return getErrorMessage(error);
+}
+
+function mapBankMappingError(error: unknown): string {
+  if (error instanceof AdminApiError) {
+    if (error.status === 409) return '保存失败：题库 mapping version 已变化，请刷新详情后重试。';
+    if (error.status === 422) return `保存失败：${error.message}`;
+    if (error.status === 403) return '保存失败：当前账号缺少题库整理或发布权限。';
   }
   return getErrorMessage(error);
 }

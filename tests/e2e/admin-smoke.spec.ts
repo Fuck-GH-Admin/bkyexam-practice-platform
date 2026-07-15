@@ -4,7 +4,7 @@ import { createMockAdminState, installMockAdminApi } from './mockAdminApi.js';
 
 const adminBaseUrl = 'http://127.0.0.1:5174';
 
-test('admin operational MVP covers login, system status, and student account operations', {
+test('admin operational MVP covers login, system status, student accounts, and bank mappings', {
   tag: '@desktop',
 }, async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
@@ -61,10 +61,30 @@ test('admin operational MVP covers login, system status, and student account ope
   await expect(bulkResult).toContainText('202502040250');
   await expect(bulkResult).toContainText('202502040201: already_exists');
 
+  await page.getByRole('button', { name: 'Bank Mappings' }).click();
+  await expect(page.getByRole('heading', { name: 'Bank Mappings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看 高等数学' })).toBeVisible();
+  await page.getByRole('button', { name: '查看 高等数学' }).click();
+  await expect(page.getByRole('heading', { name: '高等数学' })).toBeVisible();
+  const bankDetail = page.locator('.student-side-panel');
+  await bankDetail.getByLabel('bankName').fill('高等数学（校内版）');
+  await page.getByRole('button', { name: '保存题库 mapping' }).click();
+  await expect(page.getByText('题库 mapping 已保存。')).toBeVisible();
+
+  await page.getByLabel('选择 高等数学（校内版）').check();
+  await page.getByLabel('Bulk status').selectOption('hidden');
+  await page.getByLabel('Bulk visible').selectOption('false');
+  await page.getByRole('button', { name: /批量更新状态/ }).click();
+  await expect(page.getByRole('heading', { name: 'Bulk status result' })).toBeVisible();
+  await expect(page.locator('.bulk-result').filter({ has: page.getByRole('heading', { name: 'Bulk status result' }) })).toContainText('updated');
+
   expect(state.calls).toContain('POST /api/admin/auth/login');
   expect(state.calls).toContain('GET /api/admin/system/status');
   expect(state.calls).toContain('POST /api/admin/students');
   expect(state.calls).toContain('POST /api/admin/students/bulk-create');
+  expect(state.calls).toContain('GET /api/admin/bank-mappings');
+  expect(state.calls).toContain('PATCH /api/admin/bank-mappings/44444444-4444-4444-8444-444444444444');
+  expect(state.calls).toContain('POST /api/admin/bank-mappings/bulk-status');
   expect(runtimeErrors).toEqual([]);
 });
 

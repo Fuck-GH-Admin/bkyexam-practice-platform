@@ -11,7 +11,8 @@ apps/admin = implemented
 Admin Login = implemented
 System Status dashboard = implemented
 Student Accounts operations = implemented
-Bank/Import/Review/Audit/Admin Users = placeholder only
+Bank Mappings = implemented in B9.21
+Import/Review/Audit/Admin Users = placeholder only
 visual polish = deferred
 ```
 
@@ -29,7 +30,7 @@ B9.19 已创建独立 `apps/admin` workspace。它与学生端 `apps/web` 分离
 - `/admin/students/bulk-create` JSON/CSV paste 批量创建学生。
 - Sidebar 根据当前管理员 `permissions` 过滤可见导航。
 - 直接访问无权限页面时显示 403 panel。
-- Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 只做 placeholder，不开放半成品写操作。
+- Bank Mappings 已在 B9.21 升级为 P1 功能页；Import Jobs、Question Review、Audit Logs、Admin Users 仍只做 placeholder，不开放半成品写操作。
 
 ### Contract parsing
 
@@ -102,7 +103,7 @@ B9.19 不声明完成以下内容：
 
 - 最终视觉设计系统。
 - 完整管理平台。
-- Bank Mapping UI。
+- Bank Mapping UI 已在 B9.21 补为功能性 P1；仍未做最终视觉。
 - Import Jobs UI / true import 操作 UI。
 - Question Review UI。
 - Audit Logs UI。
@@ -114,7 +115,7 @@ B9.19 不声明完成以下内容：
 
 ## 5. 下一步建议
 
-B9.19 之后建议进入 **B9.20 Admin P1 Workflow UI Review / Backend Gap Check**，先用真实 `apps/admin` 骨架验证：
+B9.19 后续已经完成 B9.20 工作流缺口审查与 B9.21 Bank Mappings P1 UI。最新记录见 [`admin-p1-workflow-gap-review.md`](admin-p1-workflow-gap-review.md) 与 [`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)。原 B9.20 建议是先用真实 `apps/admin` 骨架验证：
 
 1. Bank Mappings list/detail/edit 的最小 UI 是否需要新增后端字段。
 2. Import Jobs list/detail/error-report 的 UI 是否需要异步/队列前先补状态字段。

@@ -5,6 +5,17 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.21 Admin Bank Mappings P1 UI — 2026-07-15
+
+- [x] 新增 `docs/admin-bank-mappings-p1-ui.md`。
+- [x] `/admin/bank-mappings` 从 placeholder 升级为功能性 P1 页面。
+- [x] 实现 Bank Mappings list/filter/page，覆盖 keyword、status、visible、subjectCategory、subjectName、hasObjectiveQuestions、qGroup。
+- [x] 实现 `/admin/bank-mappings/:bankId` detail/edit，支持文案字段、keywords、description/notes、status/visible。
+- [x] status/visible 控件按 `bank_mapping:publish` 权限启用；文案字段按 `bank_mapping:write` 权限启用。
+- [x] 保存使用 `expectedVersion`，处理 `409` version conflict 和无客观题发布风险提示。
+- [x] 实现 bulk status，渲染 `updated[]` / `failed[]` partial result。
+- [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
+- [x] 不做最终视觉，不做 Import true write/reset/cancel/retry，不做完整 Question Review editor。
 ## Completed Backend B9.20 Admin P1 Workflow UI Review / Backend Gap Check — 2026-07-15
 
 - [x] 新增 `docs/admin-p1-workflow-gap-review.md`。

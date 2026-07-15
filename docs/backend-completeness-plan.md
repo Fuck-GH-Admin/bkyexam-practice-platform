@@ -1545,26 +1545,40 @@ B9.20 结论：
 - **Question Review 可先做 preview-level flag/exclusion UI**：完整审核器还缺 full question detail、批量操作、override 层和导入覆盖策略。
 - **System Status 不承载账号运营统计**：如需要 Admin Dashboard 总览，后续新增独立 ops summary API。
 
+B9.21 已完成 Admin Bank Mappings P1 UI，文档见 [`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)。
+
+B9.21 实际落地：
+
+- `/admin/bank-mappings` list/filter/page。
+- `/admin/bank-mappings/:bankId` detail/edit。
+- 文案字段保存、keywords、description、notes。
+- status/visible 发布控制，按 `bank_mapping:publish` 权限启用。
+- `expectedVersion` 保存与 `409` 冲突提示。
+- `objectiveQuestionCount=0` 发布风险提示。
+- bulk status updated/failed partial result。
+- Admin unit tests、stateful mock Admin API 和 Playwright smoke。
+- 继续不做最终视觉系统。
+
 当前建议下一步执行：
 
-> **B9.21 Admin Bank Mappings P1 UI**，在 `apps/admin` 里落地题库整理 list/filter/page、detail/edit、publish/hidden/deprecated、bulk status partial result、permission-gated controls 与 mock smoke。
+> **B9.22 Admin Import Jobs dry-run/history UI**，只做导入任务列表、创建 dry-run、详情和 error report，不做 true import write/reset/cancel/retry。
 
-B9.21 建议范围：
+B9.22 建议范围：
 
-- Bank Mappings list/filter/page。
-- Detail/Edit drawer 或页面。
-- optimistic concurrency 保存与 `409` 冲突提示。
-- `objectiveQuestionCount=0` 禁止发布提示。
-- visible/status 发布控制与 content_editor 权限降级。
-- bulk status updated/failed 局部结果。
+- Import Jobs list/filter/page。
+- Create dry-run form。
+- Detail summary/progress/errorSummary。
+- Error report panel。
+- import mode disabled / source forbidden / running conflict / reset blocked 状态提示。
 - Admin unit tests + Playwright mock smoke。
 
-B9.21 不做：
+B9.22 不做：
 
-- 不做 Import true write/reset/cancel/retry。
-- 不做 full question editor 或手工修题 override 层。
-- 不做 Audit diff polish。
-- 不进入最终视觉系统。
+- 不做 true import write UI。
+- 不做 resetBeforeImport UI。
+- 不做 cancel/retry。
+- 不做异步 queue/worker。
+- 不做最终视觉系统。
 ## 7. 阶段提交规则
 
 每个阶段都遵守：
@@ -1582,4 +1596,4 @@ B9.21 不做：
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.21 Admin Bank Mappings P1 UI：在已落地的 `apps/admin` 账号运营入口基础上，先实现题库整理 list/filter/detail/edit/bulk status，并继续把 Import true write/reset/cancel/retry 与完整 Question Review editor 后置；最终视觉仍后置。
+最合理的下一步是 B9.22 Admin Import Jobs dry-run/history UI：在已落地的 `apps/admin` 账号运营与题库整理入口基础上，继续补导入任务列表、dry-run 创建、详情和错误摘要；true import write/reset/cancel/retry 与完整 Question Review editor 继续后置，最终视觉仍后置。

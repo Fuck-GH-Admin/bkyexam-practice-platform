@@ -43,7 +43,7 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前只覆盖 Admin Login、System Status 与 Student Accounts。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts 和 System Status 可运营；B9.20 已确认 Bank Mappings 可优先进入 P1 UI，Import true write/reset/cancel/retry 和完整 Question Review editor 继续后置。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，B9.21 Bank Mappings P1 UI 见 [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts、System Status 和 Bank Mappings 可运营；Import true write/reset/cancel/retry 和完整 Question Review editor 继续后置。
 
 ### API / Data Platform
 

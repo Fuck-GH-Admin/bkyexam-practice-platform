@@ -218,7 +218,7 @@ GET /api/admin/ops/summary
 
 推荐下一阶段：
 
-> **B9.21 Admin Bank Mappings P1 UI**
+> **B9.21 Admin Bank Mappings P1 UI**（已完成，见 [`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)）
 
 理由：
 
