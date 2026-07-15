@@ -4,6 +4,8 @@
 
 本文记录“已经被代码和真实环境证明的能力”，不是愿望清单。后续每个里程碑完成后应更新本页。
 
+如果需要从产品/后端/前端/生产四个维度快速审视当前进度，先读 [`project-progress-overview.md`](project-progress-overview.md)。
+
 ## Executive Summary
 
 当前系统已经达到：

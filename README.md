@@ -2,7 +2,7 @@
 
 BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已经形成可真实运行的“学生客观题练习闭环”，不再只是 Phase 1 脚手架。
 
-截至 **2026-07-15**，已实现并验证：
+截至 **2026-07-16**，已实现并验证：
 
 - 将 BKYExam 原始题库导入 PostgreSQL，并自动生成学生可见题库映射。
 - 基于固定用户名的学生身份、服务端 Cookie 会话、退出与会话恢复。
@@ -14,19 +14,20 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 学习概览、趋势、目标与长期复习标记 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Question Review Flags API、Audit Log read API、Admin User manage API 和 `super_admin` bootstrap CLI。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat API、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
+- 独立 `apps/admin` Operational MVP：Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 均已有功能性页面或最小操作闭环。
 - 生产 gate 与旧账号迁移工具：`npm run ops:production-gate`、`npm run ops:legacy-student-password-migration`。
 - 生产部署证据校验、PR CI 与 `main` branch protection / required checks：`npm run ops:deployment-evidence`，GitHub Actions `Quality` 已在 PR #2 上跑绿。
 - 桌面与移动端的基础响应式练习体验。
 
 尚未完成的主要产品范围：
 
-- 完整管理平台、管理端 UI，以及 import reset/异步队列/取消重试等完整导入运营能力。
+- 完整管理平台最终视觉、Question Review diff/审批/回滚、Import Jobs 实时 progress 事件流、Admin dashboard/ops summary 等完整运营体验。
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - PR review / merge 决策、外部监控告警、性能压测、目标环境迁移执行证据和正式部署验收。
 
-当前完整度、验证证据和风险见 [系统状态](docs/status.md)，产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
+当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
 ## Workspace
 
