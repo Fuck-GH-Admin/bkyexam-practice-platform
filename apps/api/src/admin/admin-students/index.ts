@@ -8,9 +8,7 @@ export type {
   ResetAdminStudentPasswordResult,
   RevokeAdminStudentSessionsResult,
   UpdateAdminStudentResult,
-} from './admin-students/index.js';
-export {
-  createAdminStudentService,
-  createMemoryAdminStudentRepository,
-  createPgAdminStudentRepository,
-} from './admin-students/index.js';
+} from './types.js';
+export { createAdminStudentService } from './service.js';
+export { createMemoryAdminStudentRepository } from './memoryRepository.js';
+export { createPgAdminStudentRepository } from './pgRepository.js';
