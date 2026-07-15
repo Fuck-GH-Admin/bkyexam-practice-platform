@@ -182,8 +182,8 @@ GET /api/practice/sessions?status=active|completed&limit=1..50&offset>=0
 
 | URL / Surface | 状态 | 目的 |
 | --- | --- | --- |
-| `/account/password` | B9.16 提议，B9.17 可实现 | `passwordResetRequired=true` 时强制学生修改临时密码 |
-| 用户菜单 / 首页身份卡 | B9.16 提议，B9.17 可实现 | 展示 loginName、displayName、className、groupName 和是否待改密 |
+| `/account/password` | B9.17 已实现 | `passwordResetRequired=true` 时强制学生修改临时密码，也可由用户菜单进入普通改密 |
+| 用户菜单 / 账号页身份卡 | B9.17 已实现 | 展示 loginName、displayName、className、groupName 和是否待改密 |
 | `/learning` | B9.16 提议，后续 P1 | 承载 Learning Dashboard/Trends/Goals/Review Marks，而不是继续堆到首页 |
 
 账号启用规则：
@@ -193,4 +193,4 @@ GET /api/practice/sessions?status=active|completed&limit=1..50&offset>=0
 - 改密页只处理当前密码、新密码、确认新密码和错误状态，不加入注册、找回、邮箱/短信验证。
 - 管理员重置密码后学生再次进入同一流程。
 
-完整前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。
+完整前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。B9.17 已实现账号启用最小 UI；后续仍应先做 Admin 静态 wireframe，再考虑正式视觉重做。

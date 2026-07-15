@@ -222,11 +222,11 @@ admin IA review draft = completed
 已完成质量门：
 
 - `npm run verify:docker`
-- 488 Vitest
+- 490 Vitest
 - 431 API tests
-- 31 Web tests
+- 33 Web tests
 - 26 Shared tests
-- 3 Playwright browser smoke
+- 4 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
 - Web build/typecheck
@@ -1521,37 +1521,36 @@ review_items
 
 ## 6. 推荐下一步具体执行
 
-B9.15 已完成目标环境运维基线；B9.16 已完成前端开工前审查包。当前建议下一步执行：
+B9.15 已完成目标环境运维基线；B9.16 已完成前端开工前审查包；B9.17 已完成学生账号启用最小 UI。当前建议下一步执行：
 
-> **B9.17 Student Activation Minimum UI**，在不重做视觉、不创建完整管理端的前提下，补齐学生首次改密、账号身份显示和 auth gate，让 staging 中 43 个临时密码账号具备完整启用闭环。
+> **B9.18 Admin Static Wireframe Review**，在不创建完整 `apps/admin` 的前提下，用静态表格/低保真页面确认管理端导航、Student Accounts、System Status、权限状态、批量创建/重置密码/撤销会话确认流。
 
 具体第一阶段 commit 目标可定为：
 
 ```text
-feat: add student account activation flow
+docs: add admin static wireframe review
 ```
 
 范围建议只包含：
 
-- 登录后识别 `passwordResetRequired=true`。
-- 提供 `/account/password` 或等价 blocking page，调用 `POST /api/auth/password/change`。
-- 显示 loginName、displayName、className、groupName 和待改密状态。
-- 改密成功后刷新 `GET /api/auth/me`，回到原目标页或首页。
-- 覆盖当前密码错误、新密码不一致、新密码过短、网络失败和会话失效。
-- 补 router/auth gate/unit 或 Playwright smoke。
+- 管理端一级导航和角色可见性矩阵。
+- Student Accounts 列表/详情/批量创建/重置密码/撤销会话静态 wireframe。
+- System Status dashboard 静态 wireframe。
+- Admin Login 与 forbidden/expired session 状态。
+- 操作确认、partial success、duplicate loginName、locked student、passwordResetRequired 等状态表。
+- 明确 B9.19 是否创建 `apps/admin` 以及第一版实现切片。
 
 不做：
 
+- 不实现正式 Admin 前端。
 - 不整体重做学生端视觉。
-- 不创建完整 `apps/admin`。
-- 不开放 public 注册/找回。
-- 不实现邮箱/短信找回。
 - 不做 Learning Dashboard 完整 UI。
+- 不开放 public 注册/找回。
 - 不做 Admin Import reset/异步队列/取消重试。
 - 不改 true import reset gate。
 - 不引入复杂设计系统或微服务。
 
-这样可以先解决账号启用主链路，再进入 Admin 静态 wireframe 或管理端骨架。
+这样可以在写管理端代码前先锁定页面边界和运营状态，避免再次出现前端设计中途反向修改后端语义。
 
 ## 7. 阶段提交规则
 
@@ -1570,4 +1569,4 @@ feat: add student account activation flow
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.17 Student Activation Minimum UI：不重做视觉，只补学生首次改密/账号启用闭环；正式视觉和完整 Admin 前端仍应等 B9.16 审查问题确认后再进入设计实现。
+最合理的下一步是 B9.18 Admin Static Wireframe Review：不写正式管理端代码，只把 Student Accounts/System Status/Admin Login 的静态页面、权限状态和操作确认流定稿；正式视觉和完整 Admin 前端仍应等该审查通过后再进入实现。

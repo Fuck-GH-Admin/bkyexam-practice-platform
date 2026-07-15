@@ -1,5 +1,6 @@
 export type StudentRoute =
   | { view: 'home' }
+  | { view: 'accountPassword' }
   | { view: 'banks' }
   | { view: 'wrong' }
   | { view: 'history' }
@@ -10,6 +11,7 @@ const canonicalUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[
 export function parseStudentRoute(pathname: string): StudentRoute {
   const normalized = normalizePath(pathname);
   if (normalized === '/') return { view: 'home' };
+  if (normalized === '/account/password') return { view: 'accountPassword' };
   if (normalized === '/banks') return { view: 'banks' };
   if (normalized === '/wrong-questions') return { view: 'wrong' };
   if (normalized === '/history') return { view: 'history' };
@@ -23,6 +25,7 @@ export function parseStudentRoute(pathname: string): StudentRoute {
 }
 
 export function buildStudentPath(route: StudentRoute): string {
+  if (route.view === 'accountPassword') return '/account/password';
   if (route.view === 'banks') return '/banks';
   if (route.view === 'wrong') return '/wrong-questions';
   if (route.view === 'history') return '/history';

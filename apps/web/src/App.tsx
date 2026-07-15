@@ -5,6 +5,7 @@ import {
   AuthLogoutResponseV1Schema,
   AuthMeResponseV1Schema,
   CatalogBankListResponseV1Schema,
+  ChangeStudentPasswordResponseV1Schema,
   MarkWrongQuestionMasteredResponseV1Schema,
   ObjectivePracticeQuestionTypesV1,
   PracticePayloadV1Schema,
@@ -151,6 +152,28 @@ export function buildWrongbookStats(items: Array<{ mastered: boolean; lastWrongA
   };
 }
 
+export function validatePasswordChangeForm(fields: {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}) {
+  if (!fields.currentPassword.trim()) return '请输入当前密码。';
+  if (fields.newPassword.length < 8) return '新密码至少需要 8 位。';
+  if (fields.newPassword !== fields.confirmPassword) return '两次输入的新密码不一致。';
+  if (fields.currentPassword === fields.newPassword) return '新密码不能和当前密码相同。';
+  return '';
+}
+
+export function buildStudentIdentityMeta(student: Student, passwordResetRequired: boolean) {
+  return [
+    `账号：${student.loginName}`,
+    `姓名：${student.displayName}`,
+    student.className ? `班级：${student.className}` : '',
+    student.groupName ? `分组：${student.groupName}` : '',
+    passwordResetRequired ? '状态：待首次改密' : '状态：已启用',
+  ].filter(Boolean);
+}
+
 async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -183,6 +206,11 @@ function isCanonicalUuid(value: string) {
 export function App() {
   const [student, setStudent] = useState<Student | null>(null);
   const [loginName, setLoginName] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordResetRequired, setPasswordResetRequired] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [banks, setBanks] = useState<Bank[]>([]);
   const [activeSessions, setActiveSessions] = useState<PracticeSessionCardV1[]>([]);
   const [historySessions, setHistorySessions] = useState<PracticeSessionCardV1[]>([]);
@@ -222,6 +250,7 @@ export function App() {
   const draftSaveFailedRef = useRef(false);
   const currentSessionIdRef = useRef('');
   const practiceRequestRef = useRef(0);
+  const postActivationRouteRef = useRef<StudentRoute | null>(null);
 
   const filterOptions = useMemo(
     () => getFilterOptions(banks),
@@ -247,6 +276,7 @@ export function App() {
   );
   const wrongStats = useMemo(() => buildWrongbookStats(filteredWrongQuestions), [filteredWrongQuestions]);
   const view = route.view;
+  const studentIdentityMeta = student ? buildStudentIdentityMeta(student, passwordResetRequired) : [];
 
   useEffect(() => {
     void restoreSession();
@@ -277,6 +307,19 @@ export function App() {
   useEffect(() => {
     if (!student) return;
 
+    if (passwordResetRequired && route.view !== 'accountPassword') {
+      postActivationRouteRef.current = route;
+      setMessage('请先修改临时密码后继续使用。');
+      navigateTo({ view: 'accountPassword' }, { replace: true, keepMessage: true });
+      return;
+    }
+
+    if (route.view === 'accountPassword') {
+      practiceRequestRef.current += 1;
+      setPracticeLoading(false);
+      return;
+    }
+
     if (route.view !== 'practice') {
       practiceRequestRef.current += 1;
       setPracticeLoading(false);
@@ -299,7 +342,7 @@ export function App() {
       void loadPracticeSession(route.sessionId);
       return;
     }
-  }, [student, route, includeMastered, wrongBankId]);
+  }, [student, passwordResetRequired, route, includeMastered, wrongBankId]);
 
   useEffect(() => {
     if (view !== 'wrong') return;
@@ -318,8 +361,10 @@ export function App() {
     try {
       const result = await api('/api/auth/me', {}, (body) => AuthMeResponseV1Schema.parse(body));
       setStudent(result.student);
+      setPasswordResetRequired(result.passwordResetRequired ?? false);
     } catch {
       setStudent(null);
+      setPasswordResetRequired(false);
     }
   }
 
@@ -332,12 +377,14 @@ export function App() {
         '/api/auth/login',
         {
           method: 'POST',
-          body: JSON.stringify({ loginName }),
+          body: JSON.stringify({ loginName, password }),
         },
         (body) => AuthLoginResponseV1Schema.parse(body),
       );
       setStudent(result.student);
+      setPasswordResetRequired(result.passwordResetRequired ?? false);
       setLoginName('');
+      setPassword('');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '登录失败');
     } finally {
@@ -348,6 +395,7 @@ export function App() {
   async function logout() {
     await api('/api/auth/logout', { method: 'POST', body: '{}' }, (body) => AuthLogoutResponseV1Schema.parse(body));
     setStudent(null);
+    setPasswordResetRequired(false);
     setSession(null);
     setQuestions([]);
     setActiveSessions([]);
@@ -357,9 +405,49 @@ export function App() {
     setReviewFlags({});
     setSessionResults({});
     setUserMenuOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    postActivationRouteRef.current = null;
     practiceRequestRef.current += 1;
     currentSessionIdRef.current = '';
     navigateTo({ view: 'home' }, { replace: true });
+  }
+
+  async function changeStudentPassword(event: FormEvent) {
+    event.preventDefault();
+    const validationError = validatePasswordChangeForm({ currentPassword, newPassword, confirmPassword });
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+
+    setMessage('');
+    setLoading(true);
+    try {
+      await api(
+        '/api/auth/password/change',
+        {
+          method: 'POST',
+          body: JSON.stringify({ currentPassword, newPassword }),
+        },
+        (body) => ChangeStudentPasswordResponseV1Schema.parse(body),
+      );
+      const me = await api('/api/auth/me', {}, (body) => AuthMeResponseV1Schema.parse(body));
+      setStudent(me.student);
+      setPasswordResetRequired(me.passwordResetRequired ?? false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      const nextRoute = postActivationRouteRef.current ?? { view: 'home' as const };
+      postActivationRouteRef.current = null;
+      setMessage('密码已更新，可以继续使用。');
+      navigateTo(nextRoute, { replace: true, keepMessage: true });
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '密码修改失败');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function navigateTo(nextRoute: StudentRoute, options: { replace?: boolean; keepMessage?: boolean } = {}) {
@@ -739,7 +827,14 @@ export function App() {
           <p className="lede">登录后保留草稿、标记存疑题，完成整套练习后再统一查看结果和错题。</p>
           <form onSubmit={login} className="login-form">
             <input value={loginName} onChange={(event) => setLoginName(event.target.value)} placeholder="例如：student01" autoFocus />
-            <button disabled={loading || !loginName.trim()}>{loading ? '登录中...' : '进入题库'}</button>
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="请输入密码"
+              type="password"
+              autoComplete="current-password"
+            />
+            <button disabled={loading || !loginName.trim() || !password}>{loading ? '登录中...' : '进入题库'}</button>
           </form>
           {message && <p className="error-text">{message}</p>}
         </section>
@@ -755,14 +850,20 @@ export function App() {
           <h1>学生练习台</h1>
         </div>
         <div className="topbar-actions">
-          <button className="ghost" onClick={() => navigateTo({ view: 'home' })}>首页</button>
-          <button className="ghost" onClick={() => navigateTo({ view: 'banks' })}>题库</button>
-          <button className="ghost" onClick={() => navigateTo({ view: 'wrong' })}>错题 {wrongQuestions.length}</button>
-          <button className="ghost" onClick={() => navigateTo({ view: 'history' })}>历史</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'home' })} disabled={passwordResetRequired}>首页</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'banks' })} disabled={passwordResetRequired}>题库</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'wrong' })} disabled={passwordResetRequired}>错题 {wrongQuestions.length}</button>
+          <button className="ghost" onClick={() => navigateTo({ view: 'history' })} disabled={passwordResetRequired}>历史</button>
           <div className="user-menu">
             <button className="ghost" onClick={() => setUserMenuOpen((open) => !open)}>{student.displayName || student.loginName}</button>
             {userMenuOpen && (
               <div className="user-menu-panel">
+                <div className="user-menu-meta">
+                  {studentIdentityMeta.map((item) => <span key={item}>{item}</span>)}
+                </div>
+                <button className="ghost" onClick={() => navigateTo({ view: 'accountPassword' })}>
+                  {passwordResetRequired ? '立即修改密码' : '修改密码'}
+                </button>
                 <button className="ghost" onClick={logout}>注销登录</button>
               </div>
             )}
@@ -771,6 +872,70 @@ export function App() {
       </header>
 
       {message && <div className="notice">{message}</div>}
+
+      {view === 'accountPassword' && (
+        <section className="panel account-panel">
+          <div className="section-head">
+            <div>
+              <p className="eyebrow">Account activation</p>
+              <h2>{passwordResetRequired ? '首次登录需要修改临时密码' : '修改登录密码'}</h2>
+              <p className="lede">
+                {passwordResetRequired
+                  ? '这是管理员发放或重置后的临时密码状态。完成改密后才能继续进入题库、练习和错题本。'
+                  : '建议定期更新密码。修改成功后当前登录会继续保持。'}
+              </p>
+            </div>
+          </div>
+          <div className="account-grid">
+            <article className="account-card">
+              <p className="eyebrow">Student identity</p>
+              <h3>{student.displayName}</h3>
+              <ul>
+                {studentIdentityMeta.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </article>
+            <form className="password-form" onSubmit={changeStudentPassword}>
+              <label>
+                当前密码
+                <input
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  type="password"
+                  autoComplete="current-password"
+                />
+              </label>
+              <label>
+                新密码
+                <input
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </label>
+              <label>
+                再次输入新密码
+                <input
+                  value={confirmPassword}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                />
+              </label>
+              <button disabled={loading}>
+                {loading ? '正在更新...' : passwordResetRequired ? '完成首次改密' : '保存新密码'}
+              </button>
+              {!passwordResetRequired && (
+                <button className="ghost" type="button" onClick={() => navigateTo({ view: 'home' })}>
+                  返回首页
+                </button>
+              )}
+            </form>
+          </div>
+        </section>
+      )}
 
       {view === 'home' && (
         <StudentHome

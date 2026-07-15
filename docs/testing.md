@@ -71,7 +71,7 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 488 个 Vitest 测试覆盖：
+当前 490 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
@@ -83,7 +83,7 @@ npm run test:e2e
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 431 项、Web 31 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 431 项、Web 33 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
@@ -101,6 +101,7 @@ npm run test:e2e
 - 提交前未答/存疑统计正确。
 - 整卷提交后只读结果数量和正确数正确。
 - 错题列表及详情不泄漏原始 option UUID。
+- 临时密码账号会被强制进入 `/account/password`，改密成功后回到原练习 URL。
 - Web 对 Practice/Wrongbook mock response 使用与生产相同的 shared Zod runtime parser。
 - 移动 viewport 的练习台与提交弹窗没有横向溢出。
 - 关键流程没有未预期的 console error 或 page error。

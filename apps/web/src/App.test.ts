@@ -6,6 +6,7 @@ import {
   buildQuestionStatus,
   buildQuestionTypeLabel,
   buildSectionScores,
+  buildStudentIdentityMeta,
   buildResultsFromQuestions,
   buildWrongbookStats,
   filterBanks,
@@ -23,6 +24,7 @@ import {
   hasSubmittedAnswer,
   hydrateAnswersFromQuestions,
   hydrateReviewFlagsFromQuestions,
+  validatePasswordChangeForm,
 } from './App';
 
 describe('hasSubmittedAnswer', () => {
@@ -115,6 +117,26 @@ describe('bank filtering helpers', () => {
   test('searches bank names, subjects, categories, keywords, and descriptions case-insensitively', () => {
     expect(filterBanks(sampleBanks, { category: '', keyword: 'python' }).map((bank) => bank.bankId)).toEqual(['python']);
     expect(filterBanks(sampleBanks, { category: '', keyword: '阅读' }).map((bank) => bank.bankId)).toEqual(['english']);
+  });
+});
+
+describe('student account activation helpers', () => {
+  test('validates password change form before calling the API', () => {
+    expect(validatePasswordChangeForm({ currentPassword: '', newPassword: 'newpass123', confirmPassword: 'newpass123' })).toBe('请输入当前密码。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'short', confirmPassword: 'short' })).toBe('新密码至少需要 8 位。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'newpass123', confirmPassword: 'newpass124' })).toBe('两次输入的新密码不一致。');
+    expect(validatePasswordChangeForm({ currentPassword: 'samepass123', newPassword: 'samepass123', confirmPassword: 'samepass123' })).toBe('新密码不能和当前密码相同。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'newpass123', confirmPassword: 'newpass123' })).toBe('');
+  });
+
+  test('builds student identity metadata without leaking passwords', () => {
+    expect(buildStudentIdentityMeta({
+      id: 'student-id',
+      loginName: '202502040201',
+      displayName: '202502040201',
+      className: '2班',
+      groupName: null,
+    }, true)).toEqual(['账号：202502040201', '姓名：202502040201', '班级：2班', '状态：待首次改密']);
   });
 });
 

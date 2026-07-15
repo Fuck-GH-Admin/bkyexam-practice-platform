@@ -51,6 +51,7 @@ export type MockPracticeState = {
   questions: MockQuestion[];
   correctAnswers: Map<string, MockAnswer>;
   wrongQuestions: MockWrongQuestion[];
+  passwordResetRequired: boolean;
   calls: string[];
 };
 
@@ -144,6 +145,7 @@ export function createMockPracticeState(): MockPracticeState {
       [questionId(7), false],
     ]),
     wrongQuestions: [],
+    passwordResetRequired: false,
     calls: [],
   };
 }
@@ -159,15 +161,21 @@ export async function installMockPracticeApi(page: Page, state: MockPracticeStat
     if (method === 'GET' && pathname === '/api/auth/me') {
       return fulfillJson(route, {
         student: { id: 'student-1', loginName: 'qa_student', displayName: '稳定性测试用户' },
+        passwordResetRequired: state.passwordResetRequired,
       });
     }
     if (method === 'POST' && pathname === '/api/auth/login') {
       return fulfillJson(route, {
         student: { id: 'student-1', loginName: 'qa_student', displayName: '稳定性测试用户' },
+        passwordResetRequired: state.passwordResetRequired,
       });
     }
     if (method === 'POST' && pathname === '/api/auth/logout') {
       return fulfillJson(route, { success: true });
+    }
+    if (method === 'POST' && pathname === '/api/auth/password/change') {
+      state.passwordResetRequired = false;
+      return fulfillJson(route, { success: true, passwordResetRequired: false });
     }
     if (method === 'GET' && pathname === '/api/banks') {
       return fulfillJson(route, {

@@ -5,6 +5,17 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.17 Student Activation Minimum UI — 2026-07-15
+
+- [x] 登录表单已要求密码，并发送 `{ loginName, password }`。
+- [x] 新增学生账号入口 `/account/password`。
+- [x] `passwordResetRequired=true` 时自动拦截到改密页，阻止进入题库/练习/错题/历史。
+- [x] 改密调用 `POST /api/auth/password/change`，成功后刷新 `GET /api/auth/me`。
+- [x] 改密成功后回到原目标路由；直接进入改密页时回到首页。
+- [x] 用户菜单和账号页展示 loginName、displayName、className、groupName、待改密/已启用状态。
+- [x] 单元测试覆盖密码表单校验和身份展示；Playwright 覆盖临时密码账号强制改密后返回原练习 URL。
+- [x] 未重做整体学生端视觉；未创建 `apps/admin`；未实现 public 注册/找回。
+
 ## Completed Backend B9.16 Pre-Frontend Review Packet — 2026-07-15
 
 - [x] 新增 `docs/frontend-kickoff-review.md`，固定正式前端开工前的学生端/管理端审查范围。
@@ -66,7 +77,7 @@
 - [x] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（`exam.acgbot.cc.cd`）已完成：production gate `ok=true`、legacy passwordless `0`、HTTPS smoke PASS、deployment evidence `ready=true`。
 - [x] B9.15 Staging Operations Hardening：服务器侧 synthetic monitor/systemd alert hook、systemd/nginx/env runbook 复核、低成本 load baseline、实机 backup/restore drill 已完成；第三方通知目标仍待配置。
 - [x] PR #2 review / merge 决策材料已完成：CI green，实际 merge 仍等待 required approving review。
-- [x] 前端正式设计仍暂缓；B9.16 已完成前端开工前审查包。下一步建议 B9.17 只做学生账号启用最小 UI，不直接做整体视觉。
+- [x] B9.17 Student Activation Minimum UI 已完成；前端正式视觉仍暂缓。下一步建议 B9.18 Admin Static Wireframe Review。
 
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 

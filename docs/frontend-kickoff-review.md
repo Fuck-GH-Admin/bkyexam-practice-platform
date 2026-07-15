@@ -224,3 +224,25 @@ apps/admin/src/
 > **B9.17 Student Activation Minimum UI**：在不重做视觉的前提下，补学生首次改密/账号身份入口、auth gate 和最小测试，让 staging 的 43 个临时密码账号具备完整启用闭环。
 
 B9.17 完成后，再执行 Admin 静态 wireframe 或 `apps/admin` 骨架，而不是直接整体美化学生端。
+
+## 9. B9.17 执行结果
+
+B9.17 已按本审查包的最小范围实现，不包含整体视觉重做和管理端实现。
+
+已完成：
+
+- 学生登录表单要求密码，并调用正式 `POST /api/auth/login` 请求体。
+- 新增 `/account/password` 学生账号启用/改密入口。
+- 登录或恢复 session 后，如果 `passwordResetRequired=true`，自动拦截到 `/account/password`。
+- 改密调用 `POST /api/auth/password/change`，成功后重新读取 `GET /api/auth/me` 并回到原目标页。
+- 用户菜单和账号页显示 loginName、displayName、className、groupName、待改密/已启用状态。
+- Playwright 覆盖“临时密码账号访问练习 -> 强制改密 -> 返回原练习 URL”。
+
+仍未做：
+
+- 不重做学生端视觉。
+- 不新增 Learning Dashboard 完整页面。
+- 不创建 `apps/admin`。
+- 不实现 public 注册/找回、邮箱/短信找回。
+
+B9.17 后推荐下一步：**B9.18 Admin Static Wireframe Review**，用静态表格/低保真页面确认 `apps/admin` 的导航、Student Accounts、System Status、权限状态和操作确认，再决定是否进入 Admin Operational MVP。

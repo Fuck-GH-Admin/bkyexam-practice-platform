@@ -97,6 +97,31 @@ test('student home exposes multiple sessions and browser history restores the se
   expect(runtimeErrors).toEqual([]);
 });
 
+test('student with temporary password must activate account before opening practice', {
+  tag: '@desktop',
+}, async ({ page }) => {
+  const runtimeErrors = collectRuntimeErrors(page);
+  const state = createMockPracticeState();
+  state.passwordResetRequired = true;
+
+  await installMockPracticeApi(page, state);
+  await page.goto(`/practice/${state.session.id}`, { waitUntil: 'networkidle' });
+  await expect(page).toHaveURL(/\/account\/password$/);
+  await expect(page.getByRole('heading', { name: '首次登录需要修改临时密码' })).toBeVisible();
+  await expect(page.getByText('账号：qa_student')).toBeVisible();
+
+  await page.getByLabel('当前密码', { exact: true }).fill('temp-pass-123');
+  await page.getByLabel('新密码', { exact: true }).fill('new-pass-123');
+  await page.getByLabel('再次输入新密码', { exact: true }).fill('new-pass-123');
+  await page.getByRole('button', { name: '完成首次改密' }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/practice/${state.session.id}$`));
+  await expect(page.locator('.practice-question-card')).toBeVisible();
+  expect(state.passwordResetRequired).toBe(false);
+  expect(state.calls).toContain('POST /api/auth/password/change');
+  expect(runtimeErrors).toEqual([]);
+});
+
 test('mobile practice and submit inspector have no horizontal overflow', {
   tag: '@mobile',
 }, async ({ page }) => {

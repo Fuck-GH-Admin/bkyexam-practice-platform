@@ -116,7 +116,7 @@ select {
 
 .login-form {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 12px;
   margin-top: 28px;
 }
@@ -158,10 +158,12 @@ select {
 }
 
 .user-menu-panel {
+  display: grid;
+  gap: 8px;
   position: absolute;
   right: 0;
   z-index: 5;
-  min-width: 150px;
+  min-width: 260px;
   margin-top: 8px;
   border: 1px solid #d3dfeb;
   border-radius: 18px;
@@ -172,6 +174,15 @@ select {
 
 .user-menu-panel button {
   width: 100%;
+}
+
+.user-menu-meta {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px 12px;
+  color: #52657a;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .panel,
@@ -249,9 +260,48 @@ select {
 .section-head h2,
 .section-title-row h3,
 .session-card h3,
-.route-loading h2 {
+.route-loading h2,
+.account-panel h2,
+.account-card h3 {
   margin: 0;
   color: #111827;
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.account-card,
+.password-form {
+  border: 1px solid #d9e3ed;
+  border-radius: 24px;
+  background: white;
+  box-shadow: 0 12px 34px rgba(36, 67, 103, 0.08);
+  padding: 18px;
+}
+
+.account-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  color: #52657a;
+  list-style: none;
+}
+
+.password-form {
+  display: grid;
+  gap: 14px;
+}
+
+.password-form label {
+  display: grid;
+  gap: 7px;
+  color: #314258;
+  font-weight: 800;
 }
 
 .section-title-row,
@@ -1432,6 +1482,7 @@ button.review-active {
   .wrongbook-layout,
   .wrong-stats,
   .review-columns,
+  .account-grid,
   .practice-layout,
   .login-form { grid-template-columns: 1fr; }
   .answer-grid.two { grid-template-columns: 1fr; }

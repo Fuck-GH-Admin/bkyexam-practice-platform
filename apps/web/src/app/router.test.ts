@@ -6,6 +6,7 @@ const sessionId = 'aaaaaaaa-2222-4222-8222-222222222222';
 describe('student router', () => {
   it('maps stable student paths to product views', () => {
     expect(parseStudentRoute('/')).toEqual({ view: 'home' });
+    expect(parseStudentRoute('/account/password')).toEqual({ view: 'accountPassword' });
     expect(parseStudentRoute('/banks/')).toEqual({ view: 'banks' });
     expect(parseStudentRoute('/wrong-questions')).toEqual({ view: 'wrong' });
     expect(parseStudentRoute('/history')).toEqual({ view: 'history' });
@@ -20,6 +21,7 @@ describe('student router', () => {
 
   it('builds a restorable path for every supported route', () => {
     expect(buildStudentPath({ view: 'home' })).toBe('/');
+    expect(buildStudentPath({ view: 'accountPassword' })).toBe('/account/password');
     expect(buildStudentPath({ view: 'banks' })).toBe('/banks');
     expect(buildStudentPath({ view: 'wrong' })).toBe('/wrong-questions');
     expect(buildStudentPath({ view: 'history' })).toBe('/history');
