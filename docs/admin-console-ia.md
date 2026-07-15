@@ -6,12 +6,13 @@
 
 ## 1. 当前结论
 
-正式 Admin 前端仍不应立即开工。当前可以进入“静态信息架构审核”：
+正式 Admin 前端仍不应立即开工。B9.18 已补静态 wireframe 审查包，当前可以进入 owner/reviewer 审核：
 
 - 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review、System Status、Audit Logs、Admin Users、Admin Students。
 - 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`；B9.14 staging 已创建 `admin` 并初始化 `202502040201`–`202502040230` 的 `2班` 学生账号。
 - 仍缺正式 Admin 前端；true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
 - 因此前端之前必须先确认管理端页面分区和各页面状态，不做视觉精修。
+- B9.18 static wireframe review: [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
 
 ## 2. 第一版 Sitemap
 
@@ -260,15 +261,15 @@ UI must not include public self-registration, public password recovery, email/SM
 
 Before building `apps/admin`, confirm these with static sketches or tables:
 
-- [ ] Navigation labels and grouping.
-- [ ] Student Accounts section placement and operator visibility.
-- [ ] Which roles can see each nav item.
-- [ ] Empty/loading/error states for each page.
-- [ ] Table columns and default sort for each list.
-- [ ] Detail drawer/page contents.
-- [ ] Write action confirmation dialogs.
-- [ ] Student reset-password confirmation and one-time temporary password handling.
-- [ ] Conflict and partial-success UI.
+- [x] Navigation labels and grouping（B9.18 静态稿已给出）。
+- [x] Student Accounts section placement and operator visibility（B9.18 建议 B9.19 第一版实现）。
+- [x] Which roles can see each nav item（B9.18 role/nav matrix 已给出）。
+- [x] Empty/loading/error states for B9.19 first slice；P1 页面仍待后续。
+- [x] Student Accounts table columns and default filters；Bank/Import/Review list 留到 P1。
+- [x] Student detail drawer/page contents 已固定。
+- [x] Student create/reset/revoke confirmations 已固定。
+- [x] Student reset-password confirmation and one-time temporary password handling 已固定。
+- [x] Bulk-create partial success UI 已固定；Bank Mapping conflict 留到 P1。
 - [ ] Audit diff presentation.
 - [ ] No student-only field leaks into admin routes by accident.
 - [ ] No admin-only field leaks into student routes by accident.
@@ -284,4 +285,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.15 运维基线、凭据交付流程、本 IA 与 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md) 已形成可审核稿；下一步仍应先做学生账号启用最小前端和 Admin 静态 wireframe 审核，不直接进入正式 Admin 视觉实现。
+当前建议：B9.18 静态 wireframe 审查包已形成可审核稿；若 owner 接受，下一步进入 B9.19 Admin Operational MVP，只实现 Admin Login、System Status 与 Student Accounts，不直接进入完整 Admin 视觉实现。

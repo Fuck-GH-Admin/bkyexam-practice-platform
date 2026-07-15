@@ -246,3 +246,17 @@ B9.17 已按本审查包的最小范围实现，不包含整体视觉重做和�
 - 不实现 public 注册/找回、邮箱/短信找回。
 
 B9.17 后推荐下一步：**B9.18 Admin Static Wireframe Review**，用静态表格/低保真页面确认 `apps/admin` 的导航、Student Accounts、System Status、权限状态和操作确认，再决定是否进入 Admin Operational MVP。
+
+## 10. B9.18 执行结果
+
+B9.18 已补管理端静态 wireframe 审查包：[`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
+
+已固定：
+
+- 推荐独立 `apps/admin`。
+- B9.19 第一版范围：Admin Login、System Status、Student Accounts。
+- Student Accounts 列表/详情/创建/批量创建/重置密码/撤销会话的静态 wireframe。
+- operator/content_editor/super_admin 的导航可见性矩阵。
+- 403、空列表、partial success、locked student、passwordResetRequired、reset password one-time display 等状态。
+
+B9.18 仍未创建正式 Admin 前端，也未做视觉系统。若 owner 接受，下一步建议 B9.19 Admin Operational MVP。

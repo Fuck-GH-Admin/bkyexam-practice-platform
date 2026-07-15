@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Backend B9.18 Admin Static Wireframe Review — 2026-07-15
+
+- [x] 新增 `docs/admin-static-wireframe-review.md`。
+- [x] 固定 Admin Login、Admin Shell、System Status、Student Accounts list/detail/create/bulk-create/reset-password/revoke-sessions 静态 wireframe。
+- [x] 固定 operator/content_editor/super_admin 的导航可见性矩阵。
+- [x] 固定 Student Accounts 的 empty/error/forbidden/partial-success/locked/passwordResetRequired 状态。
+- [x] 明确 B9.19 推荐范围：独立 `apps/admin`、Admin Login、System Status、Student Accounts。
+- [x] 明确 Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 在 B9.19 只做 placeholder 或暂缓。
+- [x] 未创建正式 `apps/admin`；未实现 Admin UI；未做最终视觉。
+
 ## Completed Frontend B9.17 Student Activation Minimum UI — 2026-07-15
 
 - [x] 登录表单已要求密码，并发送 `{ loginName, password }`。
@@ -77,7 +87,7 @@
 - [x] B9.14 Staging Production Gate / Deployment Smoke / Performance Evidence（`exam.acgbot.cc.cd`）已完成：production gate `ok=true`、legacy passwordless `0`、HTTPS smoke PASS、deployment evidence `ready=true`。
 - [x] B9.15 Staging Operations Hardening：服务器侧 synthetic monitor/systemd alert hook、systemd/nginx/env runbook 复核、低成本 load baseline、实机 backup/restore drill 已完成；第三方通知目标仍待配置。
 - [x] PR #2 review / merge 决策材料已完成：CI green，实际 merge 仍等待 required approving review。
-- [x] B9.17 Student Activation Minimum UI 已完成；前端正式视觉仍暂缓。下一步建议 B9.18 Admin Static Wireframe Review。
+- [x] B9.18 Admin Static Wireframe Review 已完成；下一步建议 B9.19 Admin Operational MVP。
 
 ## Completed Backend B9.12 Remote Publication / CI Validation — 2026-07-15
 

@@ -43,7 +43,7 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 
 管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流，建议后续创建 `apps/admin`。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；正式前端仍需先确认 Student Accounts、System Status、Import true mode 暂缓策略和 IA checklist。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；正式前端仍需先确认 Student Accounts、System Status、Import true mode 暂缓策略和 IA checklist。
 
 ### API / Data Platform
 
