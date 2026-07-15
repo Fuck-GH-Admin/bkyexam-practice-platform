@@ -41,9 +41,9 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 - 抽查题干、选项、答案与解析的质量。
 - 处理异常数据和必要的学生支持。
 
-管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流，建议后续创建 `apps/admin`。
+管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前只覆盖 Admin Login、System Status 与 Student Accounts。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；正式前端仍需先确认 Student Accounts、System Status、Import true mode 暂缓策略和 IA checklist。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts 和 System Status 可运营，但 Bank Mapping、Import Jobs、Question Review、Audit Logs、Admin Users 完整 UI 仍需后续确认。
 
 ### API / Data Platform
 
@@ -333,7 +333,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 - 固定学生端和管理端导航。
 - 固定对象、状态机、空状态、错误状态。
 - 用文档、流程图、字段表和必要的静态 wireframe 定义功能。
-- 不在这个阶段启动正式 `apps/admin` 或大规模 UI 实现。
+- B9.19 已启动最小 `apps/admin` 运行壳；后续仍避免大规模 UI/视觉实现，先用它验证真实工作流和后端缺口。
 - 目标是尽早暴露后端缺失 contract，而不是先堆页面。
 
 ### Layer B — Next: Contract And Backend Workflow Stabilization
@@ -357,7 +357,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 - 做完整 responsive 和可用性测试。
 - 只在已经稳定的流程上精修，不再靠视觉稿猜业务。
 
-前端在 Layer A/B 是“产品规格探针”，不是装饰，也不是正式实现；可运行前端放到 Layer C，最终视觉精修放到 Layer D，可以避免再次出现漂亮页面与真实状态/后端语义冲突。
+前端在 Layer A/B 是“产品规格探针”，不是装饰；B9.19 的 `apps/admin` 属于最小运行探针。完整可运行前端继续放到 Layer C，最终视觉精修放到 Layer D，可以避免再次出现漂亮页面与真实状态/后端语义冲突。
 
 ## 7. Decision Gate Before Final UI
 

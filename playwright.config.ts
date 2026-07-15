@@ -40,12 +40,22 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'npm run dev:web',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !isCI,
-    timeout: 120_000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  webServer: [
+    {
+      command: 'npm run dev:web',
+      url: 'http://127.0.0.1:5173',
+      reuseExistingServer: !isCI,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+    {
+      command: 'npm run dev:admin',
+      url: 'http://127.0.0.1:5174/admin/login',
+      reuseExistingServer: !isCI,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  ],
 });

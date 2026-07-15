@@ -9,9 +9,9 @@
 
 ```text
 B9.18 static review packet = ready for owner review
-formal admin implementation = hold
-recommended first runtime slice = B9.19 Admin Operational MVP
-B9.19 scope = apps/admin shell + admin login + system status + student accounts
+B9.19 Admin Operational MVP = implemented in apps/admin
+implemented slice = admin login + system status + student accounts
+remaining admin UI = Bank Mappings / Import Jobs / Question Review / Audit Logs / Admin Users
 visual polish = defer
 import reset/async queue = defer
 ```
@@ -387,3 +387,16 @@ If approved, execute:
 > **B9.19 Admin Operational MVP**: create the admin app skeleton with shared contract parsing, admin login/session guard, System Status dashboard, Student Accounts list/detail/create/bulk-create/reset-password/revoke-sessions, and Playwright/admin route smoke.
 
 B9.19 must still avoid final visual polish. The goal is an operator-usable management surface, not a finished design system.
+
+## 16. B9.19 Result
+
+B9.19 已按本审查包建议落地最小运行版：
+
+- 独立 `apps/admin`。
+- Admin Login / session guard / logout / 403 fallback。
+- System Status dashboard。
+- Student Accounts list/detail/create/bulk-create/update/reset-password/revoke-sessions。
+- Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 仍为 placeholder。
+- Admin unit tests 与 Playwright smoke 已覆盖。
+
+详细记录见 [`admin-operational-mvp.md`](admin-operational-mvp.md)。本文件仍作为后续 P1 管理工作流 UI 的静态边界参考。

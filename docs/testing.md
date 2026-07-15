@@ -14,7 +14,7 @@ npm run verify
 
 该命令依次运行：
 
-1. `npm run test`：shared、API、Web 的 Vitest 测试。
+1. `npm run test`：shared、API、Web、Admin 的 Vitest 测试。
 2. `npm run typecheck`：全部 workspace 与 Playwright spec 的 TypeScript 检查。
 3. `npm run build`：全部 workspace 的生产构建。
 4. `npm run test:e2e`：桌面与移动端 Playwright smoke。
@@ -71,7 +71,7 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 490 个 Vitest 测试覆盖：
+当前 495 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
@@ -79,17 +79,18 @@ npm run test:e2e
 - Fastify route 的输入、输出和错误映射。
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint、production gate CLI/env/student migration summary、legacy student password migration CLI、管理员登录失败锁定。
 - Web 练习 model 与关键状态转换。
+- Admin route、RBAC nav、student query、bulk-create parser 与状态 badge helper。
 - 学生端 URL parser/builder。
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error boundary、true import gate、管理员账号边界、题目质检 flag/exclusion boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 431 项、Web 33 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 431 项、Web 33 项、Admin 5 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
 ### Deterministic Browser Smoke
 
-`tests/e2e/` 在浏览器层拦截 `/api/*`，使用带状态的 mock practice API。它验证：
+`tests/e2e/` 在浏览器层拦截 `/api/*`，使用带状态的 mock practice/admin API。它验证：
 
 - 服务端草稿语义在刷新后可恢复。
 - 首页同时展示多个 active session，不再自动选择第一条。
@@ -104,6 +105,7 @@ npm run test:e2e
 - 临时密码账号会被强制进入 `/account/password`，改密成功后回到原练习 URL。
 - Web 对 Practice/Wrongbook mock response 使用与生产相同的 shared Zod runtime parser。
 - 移动 viewport 的练习台与提交弹窗没有横向溢出。
+- Admin Login、System Status、Student Accounts list/detail/update/reset-password/revoke-sessions/create/bulk-create 可以在独立 `apps/admin` 中跑通。
 - 关键流程没有未预期的 console error 或 page error。
 
 这层不启动 Fastify，也不连接 PostgreSQL，适合成为每次提交都运行的稳定浏览器回归门。

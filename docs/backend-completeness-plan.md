@@ -222,14 +222,16 @@ admin IA review draft = completed
 已完成质量门：
 
 - `npm run verify:docker`
-- 490 Vitest
+- 495 Vitest
 - 431 API tests
 - 33 Web tests
+- 5 Admin tests
 - 26 Shared tests
-- 4 Playwright browser smoke
+- 5 Playwright browser smoke
 - 1 PostgreSQL integration profile
 - API build/typecheck
 - Web build/typecheck
+- Admin build/typecheck
 - Full corpus slow smoke profile
 
 当前定位：**后端质量门已经可重复运行**。
@@ -1521,38 +1523,37 @@ review_items
 
 ## 6. 推荐下一步具体执行
 
-B9.15 已完成目标环境运维基线；B9.16 已完成前端开工前审查包；B9.17 已完成学生账号启用最小 UI；B9.18 已完成 Admin 静态 wireframe 审查包。当前建议下一步执行：
+B9.15 已完成目标环境运维基线；B9.16 已完成前端开工前审查包；B9.17 已完成学生账号启用最小 UI；B9.18 已完成 Admin 静态 wireframe 审查包；B9.19 已完成 Admin Operational MVP。
 
-> **B9.19 Admin Operational MVP**，创建最小 `apps/admin` 管理端骨架，实现 Admin Login、System Status 与 Student Accounts 的 list/detail/create/bulk-create/reset-password/revoke-sessions；Bank Mappings/Import Jobs/Question Review 先保留 placeholder。
+B9.19 实际落地：
 
-具体第一阶段 commit 目标可定为：
+- 独立 `apps/admin` workspace。
+- Admin Login / logout / session guard / target route restore / 403 fallback。
+- RBAC-filtered sidebar；Bank Mappings / Import Jobs / Question Review / Audit Logs / Admin Users placeholder。
+- System Status dashboard，使用 shared v1 response schema parse。
+- Student Accounts list/detail/create/bulk-create/update/reset-password/revoke-sessions。
+- Bulk create 支持 JSON 或简单 CSV paste，并渲染 created/skipped/failed partial result。
+- Admin unit tests 与 Playwright admin smoke。
+- 文档：[`admin-operational-mvp.md`](admin-operational-mvp.md)。
 
-```text
-feat: add admin operational mvp shell
-```
+当前建议下一步执行：
 
-范围建议只包含：
+> **B9.20 Admin P1 Workflow UI Review / Backend Gap Check**，先在已运行的 `apps/admin` 骨架上确认 Bank Mappings、Import Jobs、Question Review 三条工作流还缺哪些后端字段、状态和 command，再决定是继续做 P1 管理 UI，还是先补 import queue/reset/cancel/retry 后端。
 
-- 创建 `apps/admin` workspace 或等价独立 admin shell。
-- 实现 Admin Login / logout / session guard / 403 fallback。
-- 实现 System Status dashboard，严格使用 shared v1 schema parse。
-- 实现 Student Accounts list/detail/create/bulk-create/reset-password/revoke-sessions。
-- 覆盖 passwordResetRequired、locked、disabled、partial success、not found、forbidden 状态。
-- 补 Admin route/unit/Playwright smoke。
+B9.20 建议范围：
+
+- 对照现有 shared Admin Bank Mapping contract，设计并验证 list/detail/edit/bulk-status UI 所需字段。
+- 对照 Import Jobs contract，确认 dry-run/import gate/error-report 的页面状态，明确是否必须先补异步队列与 cancel/retry。
+- 对照 Question Review contract，确认 flag/exclusion 操作流是否足够运营使用。
+- 评估是否新增 Admin dashboard summary API，而不是把账号运营统计塞进 System Status。
+- 继续不做最终视觉 polish；只做功能与状态验证。
 
 不做：
 
-- 不做最终视觉 polish。
-- 不整体重做学生端视觉。
-- 不做 Learning Dashboard 完整 UI。
+- 不直接进入完整设计系统。
 - 不开放 public 注册/找回。
-- 不做 Admin Import reset/异步队列/取消重试。
-- 不实现完整 Bank Mapping / Import Jobs / Question Review UI。
-- 不改 true import reset gate。
-- 不引入复杂设计系统或微服务。
-
-这样可以让管理员真正具备账号运营入口，同时仍把题库整理、导入任务和最终视觉留到更稳定的后续阶段。
-
+- 不在未确认 reset/队列语义前实现 import reset UI。
+- 不把学生端和管理端合并为一个导航。
 ## 7. 阶段提交规则
 
 每个阶段都遵守：
@@ -1570,4 +1571,4 @@ feat: add admin operational mvp shell
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.19 Admin Operational MVP：创建最小管理端运行壳，实现 Admin Login、System Status 与 Student Accounts，让账号运营可在正式管理入口完成；最终视觉、题库整理 UI 和导入任务 UI 仍后置。
+最合理的下一步是 B9.20 Admin P1 Workflow UI Review / Backend Gap Check：在已落地的 `apps/admin` 账号运营入口基础上，继续确认题库整理、导入任务和题目质检 UI 是否需要新增后端字段或先补队列/reset/cancel/retry；最终视觉仍后置。

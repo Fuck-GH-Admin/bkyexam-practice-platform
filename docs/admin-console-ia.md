@@ -6,13 +6,14 @@
 
 ## 1. 当前结论
 
-正式 Admin 前端仍不应立即开工。B9.18 已补静态 wireframe 审查包，当前可以进入 owner/reviewer 审核：
+B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完整 Admin 前端和最终视觉仍不应立即铺开。当前状态：
 
 - 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review、System Status、Audit Logs、Admin Users、Admin Students。
 - 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`；B9.14 staging 已创建 `admin` 并初始化 `202502040201`–`202502040230` 的 `2班` 学生账号。
-- 仍缺正式 Admin 前端；true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
-- 因此前端之前必须先确认管理端页面分区和各页面状态，不做视觉精修。
+- B9.19 已实现 Admin Login、System Status 与 Student Accounts Operational MVP；仍缺 Bank Mapping、Import Jobs、Question Review、Audit Logs、Admin Users 完整 UI。
+- true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护，reset/队列/取消重试仍未做。
 - B9.18 static wireframe review: [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
+- B9.19 runtime slice: [`admin-operational-mvp.md`](./admin-operational-mvp.md)。
 
 ## 2. 第一版 Sitemap
 
@@ -285,4 +286,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.18 静态 wireframe 审查包已形成可审核稿；若 owner 接受，下一步进入 B9.19 Admin Operational MVP，只实现 Admin Login、System Status 与 Student Accounts，不直接进入完整 Admin 视觉实现。
+当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；下一步先做 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认，不直接进入完整 Admin 视觉实现。

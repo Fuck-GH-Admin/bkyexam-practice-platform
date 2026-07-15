@@ -12,7 +12,7 @@
     "prepare": "npm run build:shared",
     "dev": "npm run build:shared && npm run dev -w @bkyexam-practice/api",
     "dev:web": "npm run build:shared && npm run dev -w @bkyexam-practice/web",
-    "build": "npm run build:shared && npm run build -w @bkyexam-practice/api && npm run build -w @bkyexam-practice/web",
+    "build": "npm run build:shared && npm run build -w @bkyexam-practice/api && npm run build -w @bkyexam-practice/web && npm run build -w @bkyexam-practice/admin",
     "test": "npm run build:shared && npm run test --workspaces",
     "test:integration:db": "npm run build:shared && npm run test:integration:db -w @bkyexam-practice/api",
     "test:integration:db:docker": "node scripts/run-postgres-integration.mjs",
@@ -32,7 +32,8 @@
     "ops:production-gate": "npm run ops:production-gate -w @bkyexam-practice/api --",
     "ops:legacy-student-password-migration": "npm run ops:legacy-student-password-migration -w @bkyexam-practice/api --",
     "ops:deployment-evidence": "npm run ops:deployment-evidence -w @bkyexam-practice/api --",
-    "ops:staging-load-baseline": "node scripts/run-staging-load-baseline.mjs"
+    "ops:staging-load-baseline": "node scripts/run-staging-load-baseline.mjs",
+    "dev:admin": "npm run build:shared && npm run dev -w @bkyexam-practice/admin"
   },
   "engines": {
     "node": ">=24.0.0"

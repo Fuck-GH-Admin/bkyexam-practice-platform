@@ -5,6 +5,19 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.19 Admin Operational MVP — 2026-07-15
+
+- [x] 创建独立 `apps/admin` workspace，Vite dev server 固定 5174。
+- [x] 根脚本新增 `dev:admin`，`npm run build` 纳入 Admin 生产构建。
+- [x] 实现 `/admin/login`、Admin session restore、logout、目标路由恢复和 403 fallback。
+- [x] 实现 role/permission filtered sidebar；Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 只做 placeholder。
+- [x] 实现 `/admin/system`，严格按 shared v1 `AdminSystemStatusResponseV1Schema` 渲染 API/DB/corpus/import/quality 状态。
+- [x] 实现 `/admin/students` list/filter/page、detail、单个创建、批量创建、资料更新、重置密码、撤销会话。
+- [x] 批量创建支持 JSON 或简单 CSV paste，客户端转换为 contract JSON 后提交，并渲染 created/skipped/failed partial result。
+- [x] 所有 Admin API response 写入 React state 前执行 shared v1 schema parse；非 2xx 使用 `ApiErrorResponseV1Schema`。
+- [x] 新增 Admin unit tests 和 Admin Playwright smoke；`npm run test:e2e` 现在为 5 passed。
+- [x] 新增 `docs/admin-operational-mvp.md`。
+- [x] 未实现 Bank Mapping / Import Jobs / Question Review / Audit Logs / Admin Users 完整 UI；未做最终视觉。
 ## Completed Backend B9.18 Admin Static Wireframe Review — 2026-07-15
 
 - [x] 新增 `docs/admin-static-wireframe-review.md`。
@@ -540,8 +553,8 @@
 
 ### Frontend
 
-- [ ] 创建独立 `apps/admin`。
-- [ ] 实现管理 shell、导航和权限守卫。
+- [x] 创建独立 `apps/admin`。
+- [x] 实现管理 shell、导航和权限守卫（B9.19 最小 Admin runtime slice）。
 - [ ] 实现题库整理表格/详情。
 - [ ] 实现导入任务状态。
 - [ ] 实现只读题目质检与异常标记。
