@@ -5,6 +5,29 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed B9.29 Backend modularization follow-up — 2026-07-16
+
+- [x] 新增 `docs/backend-modularization-b9.29.md`。
+- [x] 将 `apps/api/src/admin/import-jobs/repository.ts` 收敛为 facade。
+- [x] 新增 `memoryRepository.ts`，承载 Import Jobs in-memory repository。
+- [x] 新增 `pgRepository.ts`，承载 Import Jobs PostgreSQL repository 与 queue/claim/heartbeat/recover SQL。
+- [x] 新增 `jobMapper.ts`，承载 row mapping 与 clone helper。
+- [x] 保留 `apps/api/src/admin/importJobs.ts` 兼容 facade。
+- [x] 不改行为、不改 public API、不拆更大范围 Learning/Admin 大文件。
+
+## Completed B9.28 Import Jobs durable worker / heartbeat / stuck recovery — 2026-07-16
+
+- [x] 新增 `docs/import-jobs-durable-worker.md`。
+- [x] 新增 migration `0013_import_job_worker.sql`，为 `import_jobs` 增加 `worker_id` 与 `heartbeat_at`。
+- [x] 新增 `import_jobs_worker_scan_idx` 与 `import_jobs_one_active_kind_idx`。
+- [x] shared `AdminImportJobV1` 增加可选 `workerId` / `heartbeatAt`。
+- [x] repository 支持 `createQueuedImportJob`、`claimNextImportJob`、`heartbeatImportJob`、`recoverStaleImportJobs`。
+- [x] 新增 `createAdminImportJobWorker`，支持 background start/stop、runOnce、heartbeat 和 stale recovery。
+- [x] 生产 `index.ts` 在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_WORKER_ENABLED=true` 时启用 queued execution。
+- [x] `apps/admin` Import Job detail 显示 workerId / heartbeatAt。
+- [x] 扩展 API route/service/repository/schema/migration tests。
+- [x] 不做外部队列服务、不做 SSE/WebSocket 实时 progress、不做最终视觉。
+
 ## Completed B9.27 Import Jobs control and backend modularization — 2026-07-16
 
 - [x] 新增 `docs/import-jobs-control-and-backend-modularization.md`。
@@ -17,7 +40,7 @@
 - [x] 拆分 `apps/api/src/admin/importJobs.ts` 为 `admin/import-jobs/{types,repository,service,runner}.ts`，原路径保留 facade。
 - [x] 新增 `apps/api/src/import/cancellation.ts`，`importQuestionBank` 支持 `resetBeforeImport` 与 `shouldAbort`。
 - [x] 扩展 API service/route/PostgreSQL integration/Admin Playwright smoke。
-- [x] 不做 durable queue/worker、不做 heartbeat/stuck recovery、不做实时 progress 事件流、不做最终视觉。
+- [x] B9.27 当时不做 durable queue/worker、heartbeat/stuck recovery、实时 progress 事件流和最终视觉；durable worker/heartbeat/stuck recovery 已在 B9.28 补齐。
 
 ## Completed B9.26 Question Review override layer — 2026-07-15
 
@@ -88,7 +111,7 @@
 - [x] 新增 `docs/admin-p1-workflow-gap-review.md`。
 - [x] 对照 shared v1 Admin Bank Mapping contract，确认 list/detail/edit/bulk-status UI 字段和状态足够支撑 P1。
 - [x] 确认 Bank Mappings 是下一阶段最稳的管理端 P1 UI 候选；无阻塞性后端缺口。
-- [x] 对照 Import Jobs contract 和 service，确认 B9.20 当时 dry-run/history/error-report UI 可做，但 true import write/reset/cancel/retry 需要先补控制后端；该控制后端已在 B9.27 补齐，durable worker 仍后置。
+- [x] 对照 Import Jobs contract 和 service，确认 B9.20 当时 dry-run/history/error-report UI 可做，但 true import write/reset/cancel/retry 需要先补控制后端；该控制后端已在 B9.27 补齐，durable worker 已在 B9.28 补齐。
 - [x] 对照 Question Review contract，确认可先做 preview-level flag/exclusion UI；完整审核器仍缺 full question detail/override 层。
 - [x] 明确 Admin dashboard summary 不应塞入 System Status；如需要账号运营统计，后续新增独立 ops summary API。
 - [x] 不实现最终视觉，不新增业务代码，不改变 API contract。
@@ -638,7 +661,8 @@
 - [x] Admin User 管理。
 - [x] 真正执行写入的 import mode（受 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护）。
 - [x] import reset、cancel/retry。
-- [ ] 异步 durable worker/队列、heartbeat 和 stuck job recovery。
+- [x] API 进程内 durable worker/队列、heartbeat 和 stuck job recovery。
+- [ ] SSE/WebSocket 实时 progress 事件流与阶段级进度细化。
 
 ### Frontend
 

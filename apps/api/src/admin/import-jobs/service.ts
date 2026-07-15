@@ -21,6 +21,7 @@ export function createAdminImportJobService(
   const dryRun = options.dryRun ?? dryRunQuestionBankImport;
   const importRun = options.importRun;
   const enableImportMode = options.enableImportMode ?? false;
+  const executionMode = options.executionMode ?? 'inline';
 
   async function createImportJob({
     request,
@@ -29,7 +30,7 @@ export function createAdminImportJobService(
     request: CreateAdminImportJobRequestV1;
     actor: AdminImportJobActor;
   }) {
-    if (request.mode === 'import' && (!enableImportMode || !importRun)) {
+    if (request.mode === 'import' && (!enableImportMode || (executionMode === 'inline' && !importRun))) {
       return { status: 'import_mode_not_enabled' as const };
     }
 
@@ -42,14 +43,26 @@ export function createAdminImportJobService(
       return { status: 'source_dir_forbidden' as const };
     }
 
-    const created = await repository.createRunningImportJob({
-      kind: request.kind,
-      mode: request.mode,
-      sourceDir,
-      options: request.options,
-      createdBy: actor,
-    });
+    const created = await (executionMode === 'queued'
+      ? repository.createQueuedImportJob({
+        kind: request.kind,
+        mode: request.mode,
+        sourceDir,
+        options: request.options,
+        createdBy: actor,
+      })
+      : repository.createRunningImportJob({
+        kind: request.kind,
+        mode: request.mode,
+        sourceDir,
+        options: request.options,
+        createdBy: actor,
+      }));
     if (created.status !== 'created') {
+      return created;
+    }
+
+    if (executionMode === 'queued') {
       return created;
     }
 

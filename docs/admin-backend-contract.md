@@ -544,7 +544,7 @@ Rules：
 | `failed` | 任务失败。 |
 | `cancelled` | 已取消；B9.27 已实现 cancel endpoint。 |
 
-第一版可以由 API process 同步执行，不必先引入 worker/queue。即使同步执行，也要以 job 记录表达状态和结果。
+B9.28 起生产 `USE_DATABASE=true` 且 `ADMIN_IMPORT_WORKER_ENABLED=true` 时使用 queued execution：API create/retry 返回 `queued`，后台 worker claim 为 `running` 并维护 heartbeat。测试/显式关闭 worker 时仍可使用 inline execution。
 
 ### 6.2 `GET /api/admin/import-jobs`
 
@@ -573,6 +573,8 @@ Response：
       "createdAt": "2026-07-13T09:00:00.000Z",
       "startedAt": "2026-07-13T09:00:05.000Z",
       "finishedAt": "2026-07-13T09:02:27.000Z",
+      "workerId": null,
+      "heartbeatAt": "2026-07-13T09:00:05.500Z",
       "progress": {
         "phase": "done",
         "current": 89922,
@@ -633,8 +635,8 @@ Response：
 
 Rules：
 
-- 同一时间只允许一个 `full_corpus_import` job running。
-- 有 running job 时返回 `409`。
+- 同一时间只允许一个 `full_corpus_import` job queued/running。
+- 有 queued/running active job 时返回 `409`。
 - `sourceDir` 第一版只允许服务端 allowlist 路径，不能任意读文件系统。
 - `resetBeforeImport=true` 是高风险操作，只允许 `super_admin`。
 - 当前实现中 `mode=import` 还必须显式配置 `ADMIN_IMPORT_ENABLE_WRITE=true`。
@@ -656,7 +658,7 @@ Rules：
 - 仅 `queued` / `running` / `cancelled` 可返回成功；`cancelled` 幂等返回。
 - `succeeded` / `failed` 返回 `409 Import job cannot be cancelled`。
 - 写 `import_job.cancel` audit log。
-- 取消为 checkpoint cooperative cancel；当前没有 durable worker/heartbeat。
+- queued job 会直接标为 cancelled；running job 为 checkpoint cooperative cancel。B9.28 已新增 worker heartbeat，cancelled job 不会被 worker complete/fail 覆盖。
 
 ### 6.3.2 `POST /api/admin/import-jobs/:id/retry`
 
@@ -665,7 +667,7 @@ Permission：`import_job:create`
 Rules：
 
 - 仅 `failed` / `cancelled` 可 retry。
-- 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id。
+- 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id；queued execution 下新 job 初始状态为 `queued`。
 - 原 job 若为 `resetBeforeImport=true`，当前 actor 仍必须是 `super_admin`。
 - 写 `import_job.retry` audit log。
 
@@ -1306,6 +1308,19 @@ Rules：
 - `apps/api/src/admin/importJobs.ts` 拆成 `admin/import-jobs/{types,repository,service,runner}.ts`。
 - `apps/api/src/import/cancellation.ts` 封装 cancellation error/helper。
 
+### B9.28 Import Jobs Durable Worker / Heartbeat / Stuck Recovery
+
+状态：**已完成，2026-07-16。**
+
+交付：
+
+- 新增 migration `0013_import_job_worker.sql`：`worker_id`、`heartbeat_at`、worker scan index、one active kind partial unique index。
+- `AdminImportJobV1` 增加可选 `workerId` / `heartbeatAt`。
+- repository 新增 `createQueuedImportJob`、`claimNextImportJob`、`heartbeatImportJob`、`recoverStaleImportJobs`。
+- 新增 `createAdminImportJobWorker`，支持 background start/stop、`runOnce`、heartbeat 和 stale recovery。
+- `buildApp` 支持 `adminImportExecutionMode`；生产 `index.ts` 在 worker enabled 时使用 queued execution。
+- stale running job 超过 `ADMIN_IMPORT_WORKER_STALE_AFTER_MS` 会标记为 `failed`，写入 `Import job heartbeat timed out`。
+
 ## 13. Acceptance Criteria For B5
 
 B5 完成时必须满足：
@@ -1318,7 +1333,8 @@ B5 完成时必须满足：
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
 - 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行 true import；`super_admin` 可以执行 reset import，并得到幂等/回滚保护。
-- 管理员可以取消 running import job，并 retry failed/cancelled import job。
+- 管理员可以取消 queued/running import job，并 retry failed/cancelled import job。
+- Import Jobs 在生产数据库模式下由后台 worker claim queued job，维护 heartbeat，并恢复 stale running job。
 - 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
 - 管理员可以通过 CLI 创建第一个 `super_admin`。
 - `super_admin` 可以查询 audit logs。
@@ -1337,7 +1353,7 @@ B5.1 到 B5.9 已实现；进入正式 Admin UI 前仍需要确认：
 2. `sourceDir` allowlist 放在哪里？
    - 已采用环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
 3. `mode=import` 是否默认打开？
-   - 否。已采用 `ADMIN_IMPORT_ENABLE_WRITE=true` 显式开启；`resetBeforeImport` 仍禁用。
+   - 否。已采用 `ADMIN_IMPORT_ENABLE_WRITE=true` 显式开启；`resetBeforeImport` 仅 `super_admin` 可用。
 4. question quality flag 是否立即影响学生选题？
    - 已固定为 `excludedFromPractice=true` 才影响新建普通练习选题。
 5. bank mapping `status=review` 是否应该是导入后的默认状态？

@@ -2,6 +2,7 @@ import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   createAdminImportJobService,
+  createAdminImportJobWorker,
   createMemoryAdminImportJobRepository,
   createPgAdminImportJobRepository,
   createPgQuestionBankImportRunner,
@@ -290,6 +291,124 @@ describe('admin import job service', () => {
       },
     });
   });
+
+  it('queues jobs for the durable worker and completes them with heartbeat ownership', async () => {
+    const repository = createMemoryAdminImportJobRepository();
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      executionMode: 'queued',
+    });
+
+    const created = await service.createImportJob({
+      request: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    });
+
+    expect(created).toMatchObject({
+      status: 'created',
+      job: {
+        status: 'queued',
+        progress: { phase: 'queued', current: 0, total: 0 },
+        startedAt: null,
+      },
+    });
+
+    const worker = createAdminImportJobWorker(repository, {
+      workerId: 'test-worker-1',
+      dryRun: async (_receivedSourceDir, _receivedOptions, context) => {
+        if (!context) throw new Error('Expected import job run context.');
+        const running = await repository.findImportJobById(context.jobId);
+        expect(running).toMatchObject({
+          status: 'running',
+          workerId: 'test-worker-1',
+          progress: { phase: 'running' },
+          heartbeatAt: expect.any(String),
+        });
+        return { questions: 3, skippedOptions: 1 };
+      },
+    });
+
+    await expect(worker.runOnce()).resolves.toMatchObject({
+      status: 'succeeded',
+      workerId: null,
+      progress: { phase: 'done', current: 3, total: 3 },
+      summary: { questions: 3, skippedOptions: 1 },
+    });
+  });
+
+  it('recovers stale running jobs and lets retry create a new queued job', async () => {
+    const repository = createMemoryAdminImportJobRepository([{
+      ...baseJob,
+      workerId: 'dead-worker',
+      heartbeatAt: '2026-07-13T10:00:00.000Z',
+    }]);
+
+    await expect(repository.recoverStaleImportJobs({
+      staleAfterMs: 60_000,
+      now: new Date('2026-07-13T10:10:00.000Z'),
+    })).resolves.toMatchObject([{
+      id: jobId,
+      status: 'failed',
+      progress: { phase: 'failed' },
+      errorSummary: [{ message: 'Import job heartbeat timed out' }],
+      workerId: null,
+    }]);
+
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      executionMode: 'queued',
+    });
+
+    await expect(service.retryImportJob({
+      jobId,
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    })).resolves.toMatchObject({
+      status: 'created',
+      sourceJob: { id: jobId, status: 'failed' },
+      job: { status: 'queued', progress: { phase: 'queued' } },
+    });
+  });
+
+  it('returns a cancelled job when a queued worker runner observes cancellation', async () => {
+    const repository = createMemoryAdminImportJobRepository();
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      executionMode: 'queued',
+    });
+
+    const created = await service.createImportJob({
+      request: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    });
+    if (created.status !== 'created') throw new Error('Expected queued job.');
+
+    const worker = createAdminImportJobWorker(repository, {
+      workerId: 'test-worker-2',
+      dryRun: async (_receivedSourceDir, _receivedOptions, context) => {
+        if (!context) throw new Error('Expected import job run context.');
+        await repository.cancelImportJob({ jobId: context.jobId });
+        await throwIfImportCancelled(context.shouldAbort);
+        return { questions: 99 };
+      },
+    });
+
+    await expect(worker.runOnce()).resolves.toMatchObject({
+      id: created.job.id,
+      status: 'cancelled',
+      progress: { phase: 'cancelled' },
+      summary: {},
+    });
+  });
 });
 
 describe('PostgreSQL question bank import runner', () => {
@@ -391,7 +510,70 @@ describe('PostgreSQL admin import job repository', () => {
     });
 
     expect(client.queries[0].sql).toContain('WHERE NOT EXISTS');
-    expect(client.queries[0].sql).toContain("status = 'running'");
+    expect(client.queries[0].sql).toContain("status IN ('queued', 'running')");
+  });
+
+  it('queues, claims, heartbeats, and recovers durable worker jobs', async () => {
+    const client = new FakeQueryClient([
+      [createPgJobRow({
+        status: 'queued',
+        progress: { phase: 'queued', current: 0, total: 0 },
+        started_at: null,
+        finished_at: null,
+      })],
+      [createPgJobRow({
+        status: 'running',
+        progress: { phase: 'running', current: 0, total: 0 },
+        worker_id: 'worker-1',
+        heartbeat_at: new Date('2026-07-13T10:00:01.000Z'),
+      })],
+      [createPgJobRow({
+        status: 'running',
+        worker_id: 'worker-1',
+        heartbeat_at: new Date('2026-07-13T10:00:02.000Z'),
+      })],
+      [createPgJobRow({
+        status: 'failed',
+        progress: { phase: 'failed', current: 0, total: 0 },
+        error_summary: [{ message: 'Import job heartbeat timed out' }],
+        worker_id: null,
+        finished_at: new Date('2026-07-13T10:10:00.000Z'),
+      })],
+    ]);
+    const repository = createPgAdminImportJobRepository(client);
+
+    await expect(repository.createQueuedImportJob({
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      sourceDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      createdBy: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    })).resolves.toMatchObject({
+      status: 'created',
+      job: { status: 'queued', startedAt: null },
+    });
+    await expect(repository.claimNextImportJob({ workerId: 'worker-1' })).resolves.toMatchObject({
+      status: 'running',
+      workerId: 'worker-1',
+      heartbeatAt: '2026-07-13T10:00:01.000Z',
+    });
+    await expect(repository.heartbeatImportJob({ jobId, workerId: 'worker-1' })).resolves.toMatchObject({
+      status: 'running',
+      heartbeatAt: '2026-07-13T10:00:02.000Z',
+    });
+    await expect(repository.recoverStaleImportJobs({ staleAfterMs: 60_000 })).resolves.toMatchObject([{
+      status: 'failed',
+      progress: { phase: 'failed' },
+      errorSummary: [{ message: 'Import job heartbeat timed out' }],
+      workerId: null,
+    }]);
+
+    expect(client.queries[0].sql).toContain("'queued'");
+    expect(client.queries[0].sql).toContain("status IN ('queued', 'running')");
+    expect(client.queries[1].sql).toContain('FOR UPDATE SKIP LOCKED');
+    expect(client.queries[1].sql).toContain('worker_id = $1');
+    expect(client.queries[2].sql).toContain('heartbeat_at = now()');
+    expect(client.queries[3].sql).toContain('COALESCE(heartbeat_at, started_at, created_at)');
   });
 });
 

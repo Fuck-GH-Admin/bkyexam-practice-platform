@@ -162,11 +162,16 @@ export const importJobs = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    workerId: text('worker_id'),
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
   },
   (table) => [
     index('import_jobs_status_created_at_idx').on(table.status, table.createdAt.desc()),
     index('import_jobs_created_by_idx').on(table.createdByAdminId, table.createdAt.desc()),
+    index('import_jobs_worker_scan_idx').on(table.status, table.heartbeatAt, table.createdAt),
     uniqueIndex('import_jobs_one_running_kind_idx').on(table.kind).where(sql`${table.status} = 'running'`),
+    uniqueIndex('import_jobs_one_active_kind_idx').on(table.kind)
+      .where(sql`${table.status} IN ('queued', 'running')`),
     check('import_jobs_kind_check', sql`${table.kind} IN ('full_corpus_import')`),
     check('import_jobs_mode_check', sql`${table.mode} IN ('dry_run', 'import')`),
     check('import_jobs_status_check', sql`${table.status} IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')`),

@@ -11,12 +11,12 @@ B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完�
 - 后端 command/query 已覆盖 Auth、Bank Mapping、Import Jobs dry-run/Error Report/true import gate、Question Review flags/detail/override、System Status、Audit Logs、Admin Users、Admin Students。
 - 已有 `npm run admin:bootstrap` 创建第一个 `super_admin`；B9.14 staging 已创建 `admin` 并初始化 `202502040201`–`202502040230` 的 `2班` 学生账号。
 - B9.19 已实现 Admin Login、System Status 与 Student Accounts Operational MVP；B9.21/B9.22/B9.23/B9.24/B9.25/B9.26 已补 Bank Mappings、Import Jobs dry-run/history、Question Review preview、Audit Logs read-only、Admin Users management UI 与 Question Review override 最小编辑闭环。
-- true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护；reset/cancel/retry 已在 B9.27 完成，durable worker/heartbeat 仍未做。
+- true import 已由 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护；reset/cancel/retry 已在 B9.27 完成，durable worker/heartbeat/stuck recovery 已在 B9.28 完成，实时 progress 事件流仍未做。
 - B9.18 static wireframe review: [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)。
 - B9.19 runtime slice: [`admin-operational-mvp.md`](./admin-operational-mvp.md)。
-- B9.20 P1 workflow/gap review: [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，结论是优先做 Bank Mappings P1 UI；B9.27 已补 Import reset/cancel/retry。
+- B9.20 P1 workflow/gap review: [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，结论是优先做 Bank Mappings P1 UI；B9.27 已补 Import reset/cancel/retry，B9.28 已补 durable worker/heartbeat。
 - B9.21 Bank Mappings P1 UI: [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，已落地 list/filter/detail/edit/bulk-status，最终视觉后置。
-- B9.22 Import Jobs dry-run/history UI: [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，已落地 list/create dry-run/detail/error-report；B9.27 已补 import/reset/cancel/retry。
+- B9.22 Import Jobs dry-run/history UI: [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，已落地 list/create dry-run/detail/error-report；B9.27 已补 import/reset/cancel/retry，B9.28 已补 durable worker/heartbeat。
 - B9.23 Question Review preview UI: [`admin-question-review-preview-ui.md`](./admin-question-review-preview-ui.md)，已落地 list/filter/detail preview、add flag、resolve/ignore 和 excludedFromPractice。
 - B9.26 Question Review override layer: [`question-review-override-layer.md`](./question-review-override-layer.md)，已落地完整 detail、题干/答案/解析/选项 override、version conflict 和 audit；diff/审批/回滚后置。
 - B9.24 Audit Logs read-only UI: [`admin-audit-logs-readonly-ui.md`](./admin-audit-logs-readonly-ui.md)，已落地 list/filter/detail preview 和 before/after/metadata JSON preview，复杂 diff/export 后置。
@@ -299,4 +299,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI；B9.22 已完成 Import Jobs dry-run/history UI；B9.23 已完成 Question Review preview UI；B9.24 已完成 Audit Logs read-only UI；B9.25 已完成 Admin Users management UI；B9.26 已完成 Question Review override 最小编辑闭环；B9.27 已完成 Import reset/cancel/retry 与后端模块化。下一步优先做 durable import worker/heartbeat、管理端整体工作流验收或继续后端模块化；override diff/审批/回滚、MFA/SSO 和最终视觉继续后置。
+当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI；B9.22 已完成 Import Jobs dry-run/history UI；B9.23 已完成 Question Review preview UI；B9.24 已完成 Audit Logs read-only UI；B9.25 已完成 Admin Users management UI；B9.26 已完成 Question Review override 最小编辑闭环；B9.27 已完成 Import reset/cancel/retry 与后端模块化；B9.28 已完成 durable import worker/heartbeat/stuck recovery。下一步优先继续后端模块化或管理端整体工作流验收；实时 progress、override diff/审批/回滚、MFA/SSO 和最终视觉继续后置。

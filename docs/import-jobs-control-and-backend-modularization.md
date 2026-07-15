@@ -4,6 +4,8 @@
 
 目标：把 Import Jobs 从“dry-run/history + gated true import”推进到可运营的控制闭环，并顺手拆分原本混在 `admin/importJobs.ts` 里的后端模块边界。
 
+2026-07-16 后续更新：B9.28 已补 durable worker / heartbeat / stuck recovery，见 [`import-jobs-durable-worker.md`](import-jobs-durable-worker.md)。本文第 4 节保留的是 B9.27 当时未做范围。
+
 ## 1. 本阶段完成内容
 
 ### 1.1 True import reset
@@ -40,9 +42,9 @@ POST /api/admin/import-jobs/:jobId/cancel
 - 写入 audit action：`import_job.cancel`。
 - runner 通过 job context 在 source load / batch checkpoint 检查 job 是否已经变成 `cancelled`；发现 cancel 后抛出 cancellation error，并回滚当前导入事务。
 
-限制：
+限制（B9.27 当时）：
 
-- 当前是 request 内同步 runner + checkpoint cooperative cancel，不是独立 durable worker。
+- B9.27 当时是 request 内同步 runner + checkpoint cooperative cancel，不是独立 durable worker；B9.28 已改为生产 queued execution + worker。
 - 如果正在执行单个 DB query，需要等该 query 返回后才会进入下一个 cancel checkpoint。
 
 ### 1.3 Retry
@@ -100,10 +102,10 @@ export * from './import-jobs/index.js';
 
 最新计数在 `docs/status.md` / `docs/testing.md` 中维护。
 
-## 4. 仍未做
+## 4. B9.27 当时仍未做
 
-- 独立 durable queue/worker。
-- heartbeat、stuck job recovery、worker ownership/fencing。
+- 独立 durable queue/worker（B9.28 已补 API 进程内 worker）。
+- heartbeat、stuck job recovery、worker ownership/fencing（B9.28 已补）。
 - 阶段级实时 progress 事件流。
 - reset 二次确认 UI / typed confirmation。
 - import error report 的文件级/行级下载。

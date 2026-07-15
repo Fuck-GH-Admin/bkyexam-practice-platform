@@ -2,7 +2,11 @@ import { createAuditService, createPgAuditLogRepository } from './admin/audit.js
 import { createPgAdminUserRepository } from './admin/adminUsers.js';
 import { createPgAdminAuthRepository } from './admin/auth.js';
 import { createPgAdminBankMappingRepository } from './admin/bankMappings.js';
-import { createPgAdminImportJobRepository, createPgQuestionBankImportRunner } from './admin/importJobs.js';
+import {
+  createAdminImportJobWorker,
+  createPgAdminImportJobRepository,
+  createPgQuestionBankImportRunner,
+} from './admin/importJobs.js';
 import { createPgAdminQuestionReviewRepository } from './admin/questionReview.js';
 import { createAdminSessionService, createPgAdminSessionRepository } from './admin/session.js';
 import { createPgAdminStudentRepository } from './admin/adminStudents.js';
@@ -22,14 +26,25 @@ import { createPgWrongQuestionRepository } from './wrongQuestions/repository.js'
 const config = loadConfig();
 const pool = config.USE_DATABASE ? createPgPool(config.DATABASE_URL) : undefined;
 const auditLogRepository = pool ? createPgAuditLogRepository(pool) : undefined;
+const adminImportJobRepository = pool ? createPgAdminImportJobRepository(pool) : undefined;
+const adminImportRunner = pool ? createPgQuestionBankImportRunner(pool) : undefined;
+const adminImportWorker = adminImportJobRepository && config.ADMIN_IMPORT_WORKER_ENABLED
+  ? createAdminImportJobWorker(adminImportJobRepository, {
+    importRun: adminImportRunner,
+    pollIntervalMs: config.ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS,
+    heartbeatIntervalMs: config.ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS,
+    staleAfterMs: config.ADMIN_IMPORT_WORKER_STALE_AFTER_MS,
+  })
+  : undefined;
 const app = buildApp({
   authRepository: pool ? createPgStudentAuthRepository(pool) : undefined,
   adminAuthRepository: pool ? createPgAdminAuthRepository(pool) : undefined,
   adminBankMappingRepository: pool ? createPgAdminBankMappingRepository(pool) : undefined,
-  adminImportJobRepository: pool ? createPgAdminImportJobRepository(pool) : undefined,
+  adminImportJobRepository,
   adminImportAllowedRoots: config.ADMIN_IMPORT_ALLOWED_ROOTS,
   adminImportModeEnabled: config.ADMIN_IMPORT_ENABLE_WRITE,
-  adminImportRunner: pool ? createPgQuestionBankImportRunner(pool) : undefined,
+  adminImportRunner,
+  adminImportExecutionMode: adminImportWorker ? 'queued' : 'inline',
   adminQuestionReviewRepository: pool ? createPgAdminQuestionReviewRepository(pool) : undefined,
   adminStudentRepository: pool ? createPgAdminStudentRepository(pool) : undefined,
   adminSystemStatusRepository: pool ? createPgAdminSystemStatusRepository(pool) : undefined,
@@ -70,6 +85,13 @@ const app = buildApp({
 });
 
 if (pool) {
+  if (adminImportWorker) {
+    adminImportWorker.start();
+    app.addHook('onClose', async () => {
+      await adminImportWorker.stop();
+    });
+  }
+
   app.addHook('onClose', async () => {
     await pool.end();
   });

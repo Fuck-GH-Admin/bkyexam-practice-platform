@@ -11,7 +11,11 @@ import {
 import type { AdminUserRepository } from './admin/adminUsers.js';
 import type { AdminBankMappingRepository } from './admin/bankMappings.js';
 import type { AdminAuthRepository } from './admin/auth.js';
-import type { AdminImportJobRepository, AdminImportJobRunner } from './admin/importJobs.js';
+import type {
+  AdminImportJobExecutionMode,
+  AdminImportJobRepository,
+  AdminImportJobRunner,
+} from './admin/importJobs.js';
 import type { AdminQuestionReviewRepository } from './admin/questionReview.js';
 import type { AdminStudentRepository } from './admin/adminStudents.js';
 import { createAdminSessionService, createMemoryAdminSessionRepository } from './admin/session.js';
@@ -59,6 +63,7 @@ interface BuildAppOptions {
   adminImportAllowedRoots?: readonly string[];
   adminImportModeEnabled?: boolean;
   adminImportRunner?: AdminImportJobRunner;
+  adminImportExecutionMode?: AdminImportJobExecutionMode;
   adminQuestionReviewRepository?: AdminQuestionReviewRepository;
   adminStudentRepository?: AdminStudentRepository;
   adminSystemStatusRepository?: AdminSystemStatusRepository;
@@ -155,6 +160,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     allowedRoots: options.adminImportAllowedRoots,
     importModeEnabled: options.adminImportModeEnabled ?? false,
     importRunner: options.adminImportRunner,
+    executionMode: options.adminImportExecutionMode,
   }));
   void app.register(createAdminQuestionReviewRoutes({
     repository: options.adminQuestionReviewRepository,

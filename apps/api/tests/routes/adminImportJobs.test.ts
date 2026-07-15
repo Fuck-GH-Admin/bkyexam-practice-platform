@@ -175,7 +175,39 @@ describe('admin import job routes', () => {
     });
 
     expect(response.statusCode).toBe(409);
-    expect(response.json()).toEqual({ error: 'Import job already running' });
+    expect(response.json()).toEqual({ error: 'Import job already queued or running' });
+  });
+
+  it('can create queued jobs for the durable worker execution mode', async () => {
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: createMemoryAdminImportJobRepository(),
+      adminImportAllowedRoots: [fixtureDir],
+      adminImportExecutionMode: 'queued',
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir: fixtureDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      job: {
+        mode: 'dry_run',
+        status: 'queued',
+        progress: { phase: 'queued', current: 0, total: 0 },
+        startedAt: null,
+      },
+    });
   });
 
   it('honors generateMappings=false in dry-run summaries', async () => {

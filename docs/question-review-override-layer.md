@@ -46,11 +46,11 @@ B9.26 把题目质检从 preview/flag 队列推进到“可修订题目展示内
 
 ## 后续建议
 
-1. **B9.27：Import operation hardening**
+1. **B9.27/B9.28：Import operation hardening**
    - 保持 true import gate。
    - 先补 import reset/cancel/retry 的后端语义或明确继续延期。
    - 给导入结果增加“override 受影响题目数/疑似 drift”报告会很有价值。
-2. **B9.28：Admin workflow completeness review**
+2. **B9.29：Admin workflow completeness review**
    - 从管理员视角串起 Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users。
    - 不急着做最终视觉，先确认命令、状态和权限是否还缺口。
 3. **前端正式设计仍后置**

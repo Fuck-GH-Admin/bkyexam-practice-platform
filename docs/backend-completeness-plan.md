@@ -13,15 +13,15 @@
 
 后端已经完成的是：**学生客观题内部试用版的主闭环**，并且 B9.14 已在真实服务器完成 staging production gate / deployment smoke / deployment evidence 验收。
 
-后端尚未完成的是：**完整平台化后端**，尤其是 durable import worker、非客观题流程、生产运维、推荐策略和更大范围模块化边界。
+后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围模块化边界和实时 progress/外部可观测性。
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 92%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI、`main` required checks 与 B9.14 真实服务器 staging evidence 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、外部监控告警和系统性性能压测。 |
-| 后端模块化程度 | **约 40–50%** | 业务上下文已清楚；Practice 与 Import Jobs 已做第一轮拆分，但 route、Admin、Learning 等仍存在大文件和边界混杂。 |
-| 完整平台后端 | **约 86–88%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 公开生产后端就绪 | **约 92%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import/reset/cancel/retry、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence、B9.15 运维基线和 B9.16 前端开工前审查包；仍缺 PR review/merge、第三方外部告警通知、持续性能压测、学生首次改密前端入口和正式生产发布验收。 |
+| 后端工程可验证性 | **约 93%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI、`main` required checks 与 B9.14 真实服务器 staging evidence 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、外部监控告警、实时进度事件流和系统性性能压测。 |
+| 后端模块化程度 | **约 45–55%** | 业务上下文已清楚；Practice 与 Import Jobs 已做第一轮拆分，Import Jobs repository 已继续拆成 memory/pg/mapper，但 route、Admin、Learning 等仍存在大文件和边界混杂。 |
+| 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
+| 公开生产后端就绪 | **约 93%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import/reset/cancel/retry、import worker heartbeat/stuck recovery、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence、B9.15 运维基线和 B9.16 前端开工前审查包；仍缺 PR review/merge、第三方外部告警通知、持续性能压测、学生首次改密前端入口和正式生产发布验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -222,8 +222,8 @@ admin IA review draft = completed
 已完成质量门：
 
 - `npm run verify:docker`
-- 507 Vitest
-- 437 API tests
+- 513 Vitest
+- 443 API tests
 - 33 Web tests
 - 11 Admin tests
 - 26 Shared tests
@@ -271,8 +271,8 @@ admin IA review draft = completed
 - Admin Auth/RBAC/session/audit foundation
 - Bank Mapping list/detail/update/bulk-status APIs
 - System Status API
-- Import Jobs dry-run/Error Report APIs
-- True Import Mode Gate（`ADMIN_IMPORT_ENABLE_WRITE=true` 才允许写入；reset 仍禁用）
+- Import Jobs dry-run/Error Report/reset/cancel/retry/worker heartbeat APIs
+- True Import Mode Gate（`ADMIN_IMPORT_ENABLE_WRITE=true` 才允许写入；reset 仅 `super_admin` 可用）
 - Question Review flag/exclusion APIs
 - Audit Log read API
 - Admin User manage API
@@ -280,10 +280,10 @@ admin IA review draft = completed
 
 未完成：
 
-- import reset、异步 worker/队列、cancel/retry
-- 管理端前端
+- 实时 progress 事件流和错误文件级下载
+- 管理端前端最终视觉/完整工作流
 
-这是完整平台后端剩余最大的业务缺口之一；另一个大缺口是学生长期学习数据。
+Import Jobs 控制和耐久性主链路已补齐；剩余缺口转为实时进度、错误可观测性、完整审核流程和更大范围模块化。
 
 ### 3.3 Catalog 已有管理 API，但运营工作流未完成
 
@@ -297,14 +297,14 @@ admin IA review draft = completed
 
 ### 3.4 Import 已有 gated true import，但还不是完整平台任务系统
 
-已完成 CLI 导入、smoke、`import_jobs` 表、dry-run 触发、`ADMIN_IMPORT_ENABLE_WRITE=true` 下真实写入导入、running lock、进度/summary/error 摘要、失败回滚、幂等验证和 source allowlist，但缺：
+已完成 CLI 导入、smoke、`import_jobs` 表、dry-run 触发、`ADMIN_IMPORT_ENABLE_WRITE=true` 下真实写入导入、active lock、queued worker、heartbeat、stuck recovery、进度/summary/error 摘要、失败回滚、幂等验证和 source allowlist，但缺：
 
 - 错误下载/按文件行号查看
 - 增量导入策略
-- resetBeforeImport 的安全实现
-- retry/cancel 策略
-- 异步 worker/队列策略
-- 管理端可视化
+- typed reset 二次确认
+- SSE/WebSocket 实时 progress 事件流
+- 阶段级 progress current/total 细化
+- 管理端最终可视化
 
 ### 3.5 Question Review 已有 flag/exclusion，尚无完整质检工作台
 
@@ -754,7 +754,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
 7. question review flags — **已完成**
 8. admin bootstrap / audit log read / admin IA gate — **已完成**
 9. admin user manage — **已完成**
-10. import error report / true import mode gate — **已完成；true import 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下启用，reset 仍关闭**
+10. import error report / true import mode gate / reset/cancel/retry/worker heartbeat — **已完成；true import 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下启用，reset 仅 `super_admin` 可用**
 
 验收：
 
@@ -1541,7 +1541,7 @@ B9.20 已完成 Admin P1 工作流与后端缺口审查，文档见 [`admin-p1-w
 B9.20 结论：
 
 - **Bank Mappings P1 UI 可以优先做**：list/detail/edit/bulk-status、optimistic concurrency、无客观题禁止发布、partial bulk result 和 audit 都已有后端语义。
-- **Import Jobs 已从 dry-run/history/error-report 推进到 reset/cancel/retry 最小控制闭环**：B9.27 已补 cancel/retry endpoint 与 reset 事务策略；durable worker、heartbeat、实时 progress 仍后置。
+- **Import Jobs 已从 dry-run/history/error-report 推进到 reset/cancel/retry 最小控制闭环**：B9.27 已补 cancel/retry endpoint 与 reset 事务策略；B9.28 已补 durable worker、heartbeat 和 stuck recovery；实时 progress 事件流仍后置。
 - **Question Review 已经从 preview-level 升级到 detail/override 最小闭环**：B9.26 已补齐 full question detail、override 保存、版本冲突和导入覆盖语义；后续再补 diff/审批/回滚与批量操作。
 - **System Status 不承载账号运营统计**：如需要 Admin Dashboard 总览，后续新增独立 ops summary API。
 
@@ -1569,7 +1569,7 @@ B9.22 实际落地：
 - `/api/admin/import-jobs/:jobId/errors` error report panel。
 - import mode disabled / source forbidden / running conflict / reset blocked 错误提示。
 - Admin unit tests、stateful mock Admin API 和 Playwright smoke。
-- B9.22 当时继续不做 true import write/reset/cancel/retry、异步 queue/worker 和最终视觉系统；B9.27 已补 true import reset/cancel/retry，durable queue/worker 与最终视觉仍后置。
+- B9.22 当时继续不做 true import write/reset/cancel/retry、异步 queue/worker 和最终视觉系统；B9.27 已补 true import reset/cancel/retry；B9.28 已补 durable queue/worker/heartbeat；最终视觉仍后置。
 
 B9.23 已完成 Admin Question Review preview UI，文档见 [`admin-question-review-preview-ui.md`](admin-question-review-preview-ui.md)。
 
@@ -1633,7 +1633,28 @@ B9.27 实际落地：
 - cancel checkpoint 与 cancel-safe complete/fail，避免已取消 job 被覆盖。
 - `apps/admin` Import Jobs create form 支持 dry_run/import/reset，detail 支持 cancel/retry。
 - `apps/api/src/admin/importJobs.ts` 拆成 `admin/import-jobs/{types,repository,service,runner}.ts`，保留兼容 facade。
-- 继续不做 durable queue/worker、heartbeat/stuck recovery、实时 progress 事件流和最终视觉系统。
+- B9.27 当时继续不做 durable queue/worker、heartbeat/stuck recovery、实时 progress 事件流和最终视觉系统；B9.28 已补 durable worker/heartbeat/stuck recovery。
+
+B9.28 已完成 Import Jobs durable worker / heartbeat / stuck recovery，文档见 [`import-jobs-durable-worker.md`](import-jobs-durable-worker.md)。
+
+B9.28 实际落地：
+
+- `import_jobs` 新增 `worker_id` / `heartbeat_at`。
+- 新增 `import_jobs_worker_scan_idx` 与 `import_jobs_one_active_kind_idx`。
+- repository 支持 queued create、worker claim、heartbeat 和 stale recovery。
+- 新增 `createAdminImportJobWorker`，生产 `index.ts` 在 worker enabled 时启用 queued execution。
+- stale running job 会标记 failed 并写入 `Import job heartbeat timed out`，可通过 retry 重新排队。
+- `apps/admin` detail 显示 `workerId` / `heartbeatAt`。
+- 继续不做外部队列服务、SSE/WebSocket 实时 progress 事件流和最终视觉系统。
+
+B9.29 已完成 Backend modularization follow-up，文档见 [`backend-modularization-b9.29.md`](backend-modularization-b9.29.md)。
+
+B9.29 实际落地：
+
+- `apps/api/src/admin/import-jobs/repository.ts` 收敛为 facade。
+- 新增 `memoryRepository.ts` / `pgRepository.ts` / `jobMapper.ts`。
+- 保留 `apps/api/src/admin/importJobs.ts` 兼容路径。
+- 继续不改行为、不改 public API；Learning/Admin 更大范围拆分后置。
 
 ## 7. 阶段提交规则
 
@@ -1650,6 +1671,6 @@ B9.27 实际落地：
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry、Question Review Flags、Question Review Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺更大范围模块化、非客观题、推荐策略/完整长期档案、durable import worker/heartbeat、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags、Question Review Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry/worker heartbeat、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺更大范围模块化、非客观题、推荐策略/完整长期档案、实时 progress 事件流、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 durable import worker/heartbeat 或继续扩大后端目录拆分/模块化：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview/override、审计日志只读和 Admin Users 管理基础上，继续补齐导入执行耐久性与后端边界整理；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。
+最合理的下一步是继续扩大 Learning/Admin 后端目录拆分/模块化：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview/override、审计日志只读和 Admin Users 管理基础上，继续补齐后端边界整理、实时 progress 和运营可观测性；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。

@@ -143,6 +143,10 @@ The API currently reads configuration from environment variables through `apps/a
 - `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
 - `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
 - `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. When enabled, `resetBeforeImport=true` is allowed only for `super_admin` and performs destructive corpus reset in the import transaction.
+- `ADMIN_IMPORT_WORKER_ENABLED`: defaults to `true`; when `USE_DATABASE=true`, production API creates queued import jobs and runs the in-process worker to claim them.
+- `ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS`: worker poll interval; default `2000`.
+- `ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS`: running job heartbeat interval; default `5000`.
+- `ADMIN_IMPORT_WORKER_STALE_AFTER_MS`: stale running job timeout before marking failed; default `300000`.
 - `RATE_LIMIT_ENABLED`: set to `true` to enable the in-memory minimum API rate limiter; default `false`.
 - `RATE_LIMIT_WINDOW_MS`: positive integer rate-limit window in milliseconds, default `60000`.
 - `RATE_LIMIT_MAX`: positive integer request count per client/method/route/window, default `600`.

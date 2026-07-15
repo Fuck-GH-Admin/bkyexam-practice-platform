@@ -205,4 +205,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、Admin Auth、Admin User manage、Admin Student Manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate/reset/cancel/retry、Question Review 与 Audit Log read shared Zod schema/route 已实现；student self password change / force-change flow、durable import worker/heartbeat、正式告警 payload 和最终 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、Admin Auth、Admin User manage、Admin Student Manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review 与 Audit Log read shared Zod schema/route 已实现；student self password change / force-change flow、实时 progress 事件流、正式告警 payload 和最终 Admin UI 尚未实现。

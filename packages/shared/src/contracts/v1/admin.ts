@@ -543,6 +543,8 @@ export const AdminImportJobV1Schema = z.object({
   createdAt: z.string().datetime(),
   startedAt: z.string().datetime().nullable(),
   finishedAt: z.string().datetime().nullable(),
+  workerId: z.string().nullable().optional(),
+  heartbeatAt: z.string().datetime().nullable().optional(),
 }).strict();
 export type AdminImportJobV1 = z.infer<typeof AdminImportJobV1Schema>;
 

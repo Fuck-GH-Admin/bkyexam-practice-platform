@@ -18,6 +18,7 @@ import {
 import {
   createAdminImportJobService,
   createMemoryAdminImportJobRepository,
+  type AdminImportJobExecutionMode,
   type AdminImportJobRepository,
   type AdminImportJobRunner,
   type AdminImportJobService,
@@ -40,6 +41,7 @@ interface AdminImportJobRoutesOptions {
   allowedRoots?: readonly string[];
   importModeEnabled?: boolean;
   importRunner?: AdminImportJobRunner;
+  executionMode?: AdminImportJobExecutionMode;
 }
 
 function errorResponse(error: string) {
@@ -67,6 +69,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
     allowedRoots: options.allowedRoots ?? [],
     enableImportMode: options.importModeEnabled ?? false,
     importRun: options.importRunner,
+    executionMode: options.executionMode,
   });
   const sessionService = options.sessionService
     ?? createAdminSessionService(createMemoryAdminSessionRepository(), { ttlHours: 8 });
@@ -157,7 +160,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       });
 
       if (result.status === 'running_conflict') {
-        return reply.status(409).send(errorResponse('Import job already running'));
+        return reply.status(409).send(errorResponse('Import job already queued or running'));
       }
       if (result.status === 'source_dir_forbidden') {
         return reply.status(403).send(errorResponse('Import source directory is not allowed'));
@@ -258,7 +261,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
         return reply.status(409).send(errorResponse('Import job cannot be retried'));
       }
       if (result.status === 'running_conflict') {
-        return reply.status(409).send(errorResponse('Import job already running'));
+        return reply.status(409).send(errorResponse('Import job already queued or running'));
       }
       if (result.status === 'source_dir_forbidden') {
         return reply.status(403).send(errorResponse('Import source directory is not allowed'));

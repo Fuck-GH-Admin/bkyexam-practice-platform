@@ -4,7 +4,7 @@
 
 本文是 B9.20 的阶段产物：在 B9.19 已运行的 `apps/admin` 骨架上，先审查 Bank Mappings、Import Jobs、Question Review 三条 P1 管理工作流是否可以直接进入 UI 实现，以及是否还存在必须先补的后端 command、字段或状态。
 
-2026-07-16 更新：本文保留 B9.20 当时的审查结论；其中 Import true write/reset/cancel/retry 已在 B9.27 补齐，当前剩余的是 durable worker/heartbeat/实时进度与更完整的导入可观测性。
+2026-07-16 更新：本文保留 B9.20 当时的审查结论；其中 Import true write/reset/cancel/retry 已在 B9.27 补齐，durable worker/heartbeat/stuck recovery 已在 B9.28 补齐，当前剩余的是实时 progress 事件流与更完整的导入可观测性。
 
 本阶段不做最终视觉，不新增业务代码，不改变 API contract；目标是避免再次出现“先做页面，做到一半才发现后端语义不够”的问题。
 
@@ -30,7 +30,7 @@
 1. **Import true write/reset/cancel/retry 在 B9.20 当时不应先做完整 UI。**
    - B9.20 当时 create job 在 request 内同步执行 runner，`running` 只是持久化状态，不是独立后台 worker 队列。
    - B9.20 当时 `resetBeforeImport=true` 在 import mode 中仍被后端显式禁止；B9.27 已改为仅 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许。
-   - B9.20 当时没有 cancel/retry endpoint，也没有异步 job worker、heartbeat、阶段级进度事件；B9.27 已补 cancel/retry endpoint，durable worker/heartbeat/实时进度仍后置。
+   - B9.20 当时没有 cancel/retry endpoint，也没有异步 job worker、heartbeat、阶段级进度事件；B9.27 已补 cancel/retry endpoint，B9.28 已补 durable worker/heartbeat/stuck recovery，实时 progress 事件流仍后置。
    - 因此 B9.20 的 Import P1 UI 先限定为 dry-run 和历史查看；真正写入导入控制已拆到 B9.27 完成最小闭环。
 
 2. **Question Review 完整审核器还缺 full question payload。**

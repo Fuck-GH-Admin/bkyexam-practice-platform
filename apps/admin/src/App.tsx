@@ -1765,6 +1765,8 @@ function ImportJobDetailPanel({
           <div><dt>createdAt</dt><dd>{formatAdminDate(job.createdAt)}</dd></div>
           <div><dt>startedAt</dt><dd>{formatAdminDate(job.startedAt)}</dd></div>
           <div><dt>finishedAt</dt><dd>{formatAdminDate(job.finishedAt)}</dd></div>
+          <div><dt>workerId</dt><dd>{job.workerId ?? '-'}</dd></div>
+          <div><dt>heartbeatAt</dt><dd>{formatAdminDate(job.heartbeatAt ?? null)}</dd></div>
         </dl>
       </section>
 

@@ -38,6 +38,8 @@ export type CreateRunningImportJobResult =
   | { status: 'created'; job: AdminImportJobV1 }
   | { status: 'running_conflict' };
 
+export type AdminImportJobExecutionMode = 'inline' | 'queued';
+
 export type CancelImportJobResult =
   | { status: 'cancelled'; beforeStatus: AdminImportJobStatusV1; job: AdminImportJobV1 }
   | { status: 'not_found' }
@@ -55,6 +57,7 @@ export type RetryImportJobResult =
 export interface AdminImportJobRepository {
   listImportJobs(filters: AdminImportJobListFilters): Promise<AdminImportJobPage>;
   findImportJobById(jobId: string): Promise<AdminImportJobV1 | null>;
+  createQueuedImportJob(input: CreateRunningImportJobInput): Promise<CreateRunningImportJobResult>;
   createRunningImportJob(input: CreateRunningImportJobInput): Promise<CreateRunningImportJobResult>;
   completeImportJob(input: {
     jobId: string;
@@ -63,6 +66,9 @@ export interface AdminImportJobRepository {
   }): Promise<AdminImportJobV1 | null>;
   failImportJob(input: { jobId: string; message: string }): Promise<AdminImportJobV1 | null>;
   cancelImportJob(input: { jobId: string }): Promise<AdminImportJobV1 | null>;
+  claimNextImportJob(input: { workerId: string }): Promise<AdminImportJobV1 | null>;
+  heartbeatImportJob(input: { jobId: string; workerId: string }): Promise<AdminImportJobV1 | null>;
+  recoverStaleImportJobs(input: { staleAfterMs: number; now?: Date; message?: string }): Promise<AdminImportJobV1[]>;
 }
 
 export interface AdminImportJobService {
@@ -101,6 +107,7 @@ export interface AdminImportJobServiceOptions {
   dryRun?: AdminImportJobRunner;
   importRun?: AdminImportJobRunner;
   enableImportMode?: boolean;
+  executionMode?: AdminImportJobExecutionMode;
 }
 
 export interface QueryRows<T> {
@@ -122,8 +129,10 @@ export interface AdminImportJobRow {
   created_at: Date | string;
   started_at: Date | string | null;
   finished_at: Date | string | null;
+  worker_id?: string | null;
+  heartbeat_at?: Date | string | null;
 }
 
-export function initialProgress(): AdminImportJobProgressV1 {
-  return { phase: 'running', current: 0, total: 0 };
+export function initialProgress(phase: 'queued' | 'running' = 'running'): AdminImportJobProgressV1 {
+  return { phase, current: 0, total: 0 };
 }

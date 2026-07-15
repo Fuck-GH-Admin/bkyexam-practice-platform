@@ -859,9 +859,11 @@ Rules：
 
 ## Admin Import Jobs
 
-Admin Import Jobs 是 B5.5/B5.8/B5.9/B9.27 已实现的导入任务后端。`mode=dry_run` 会同步解析指定 source directory、生成导入摘要并写入 `import_jobs`；B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode；B9.27 增加 reset/cancel/retry 与 import job 模块拆分。
+Admin Import Jobs 是 B5.5/B5.8/B5.9/B9.27/B9.28 已实现的导入任务后端。B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode；B9.27 增加 reset/cancel/retry 与 import job 模块拆分；B9.28 增加 queued execution、worker heartbeat 和 stuck job recovery。
 
 运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。`mode=import` 只有在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时才启用；否则返回 `422`。开启 true import 后，`resetBeforeImport=true` 只允许 `super_admin` 使用，并会在同一导入事务内先执行 `TRUNCATE classifications CASCADE` 再重导，因此会清空 corpus 及所有依赖 corpus FK 的练习/错题/收藏/质检/override 数据。
+
+生产 `index.ts` 在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_WORKER_ENABLED=true` 时使用 queued execution：create/retry 先返回 `queued` job，再由后台 worker claim 为 `running`。内存测试模式和显式关闭 worker 时仍可使用 inline execution。
 
 ### `GET /api/admin/import-jobs`
 
@@ -906,7 +908,9 @@ Response：
       "createdBy": { "id": "admin-user-uuid", "displayName": "Operator" },
       "createdAt": "2026-07-13T10:00:00.000Z",
       "startedAt": "2026-07-13T10:00:00.000Z",
-      "finishedAt": "2026-07-13T10:00:01.000Z"
+      "finishedAt": "2026-07-13T10:00:01.000Z",
+      "workerId": null,
+      "heartbeatAt": "2026-07-13T10:00:00.500Z"
     }
   ],
   "page": { "limit": 20, "offset": 0, "hasMore": false }
@@ -934,13 +938,22 @@ Request：
 
 Rules：
 
-- 同一 `kind` 同时只能有一个 `running` job；冲突返回 `409`。
+- 同一 `kind` 同时只能有一个 `queued` 或 `running` active job；冲突返回 `409`。
 - `sourceDir` 必须在 `ADMIN_IMPORT_ALLOWED_ROOTS` 内；否则返回 `403`。
 - `resetBeforeImport=true` 必须由 `super_admin` 执行；否则返回 `403`。
 - `mode=import` 默认关闭；只有 `ADMIN_IMPORT_ENABLE_WRITE=true` 且服务端连接 PostgreSQL 时才写入。
 - `mode=import` 复用导入器事务，写入 classifications/questions/question_options/bank_mappings，并保持幂等 upsert；`generateMappings=false` 时跳过 bank_mappings 生成。
 - `mode=import` 中 `resetBeforeImport=true` 会在同一事务中先 reset corpus；导入失败或 cancel 会 rollback。
-- 成功创建后写 `import_job.create` audit log；dry-run 或 import 过程中解析/写入失败会把 job 标为 `failed` 并返回失败摘要，写入失败由导入事务回滚。
+- 成功创建后写 `import_job.create` audit log；queued execution 会先返回 `queued`，worker 完成后更新为 `succeeded` / `failed` / `cancelled`。dry-run 或 import 过程中解析/写入失败会把 job 标为 `failed` 并保存失败摘要，写入失败由导入事务回滚。
+
+Worker 配置：
+
+| Env | Default |
+| --- | --- |
+| `ADMIN_IMPORT_WORKER_ENABLED` | `true` |
+| `ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS` | `2000` |
+| `ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS` | `5000` |
+| `ADMIN_IMPORT_WORKER_STALE_AFTER_MS` | `300000` |
 
 ### `GET /api/admin/import-jobs/:jobId`
 
@@ -998,7 +1011,7 @@ Rules：
 - 仅 `queued` / `running` job 可取消；已 `cancelled` 的 job 幂等返回。
 - `succeeded` / `failed` job 返回 `409 Import job cannot be cancelled`。
 - 写 `import_job.cancel` audit log。
-- 当前实现是 checkpoint-based cooperative cancel；若 runner 正在等待单条 DB query，需要该 query 返回后才会看到 cancel。
+- queued job 会直接标为 cancelled；running job 是 checkpoint-based cooperative cancel，若 runner 正在等待单条 DB query，需要该 query 返回后才会看到 cancel。
 
 ### `POST /api/admin/import-jobs/:jobId/retry`
 
@@ -1018,7 +1031,7 @@ Response：
 Rules：
 
 - 仅 `failed` / `cancelled` job 可 retry。
-- retry 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id。
+- retry 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id；queued execution 下新 job 初始状态为 `queued`。
 - 如果原 job 是 `resetBeforeImport=true`，retry 操作者仍必须是 `super_admin`。
 - 写 `import_job.retry` audit log，metadata 包含 `sourceJobId`、`sourceStatus` 和 `options`。
 
@@ -1028,7 +1041,7 @@ Errors：
 - `401`：缺少有效 `bky_admin_session`。
 - `403`：缺少 `import_job:read/create`、sourceDir 不在 allowlist，或非 super_admin 使用 `resetBeforeImport`。
 - `404`：job 不存在。
-- `409`：同类 job 已在运行，或 cancel/retry 的 job 状态不允许该操作。
+- `409`：同类 job 已 queued/running，或 cancel/retry 的 job 状态不允许该操作。
 - `422`：请求 `mode=import` 但 `ADMIN_IMPORT_ENABLE_WRITE` 未开启。
 
 ## Admin Question Review
@@ -2177,9 +2190,9 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness/metrics DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，reset import、cancel/retry 已在 B9.27 补齐；durable import worker/heartbeat/实时 progress 仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness/metrics DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，reset import、cancel/retry 已在 B9.27 补齐，durable import worker/heartbeat/stuck recovery 已在 B9.28 补齐；实时 progress 事件流仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。
 - 逐题 submit 与整卷 submit 同时存在。
-- Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate/reset/cancel/retry、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；正式 Admin UI 已有 P1 operational slice，最终视觉与完整工作流仍未实现。
+- Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Admin Question Review 与 Admin Audit Log route/shared schema 已实现；正式 Admin UI 已有 P1 operational slice，最终视觉与完整工作流仍未实现。
