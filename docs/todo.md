@@ -1,5 +1,14 @@
 # Roadmap
 
+## Completed B9.30 Learning backend modularization — 2026-07-16
+
+- [x] 新增 `docs/backend-modularization-b9.30-learning.md`。
+- [x] 将 `apps/api/src/learning/repository.ts` 收敛为兼容 facade。
+- [x] 拆出 `types.ts`、`memoryRepository.ts`、`pgRepository.ts`、`utils.ts`。
+- [x] 保持 Learning Dashboard / Trends / Goals / Review Marks public API 与 SQL 行为不变。
+- [x] 通过 API typecheck、Learning repository/routes 局部测试与最终 `npm run verify:docker`。
+- [x] 不做 Admin 更大文件拆分、不做实时 progress 事件流、不做最终前端视觉。
+
 路线图按依赖和风险排序，不再继续使用已失真的 Phase 3B/3C/3D 清单。
 
 后端完成度、未达成目标与下一步执行计划详见

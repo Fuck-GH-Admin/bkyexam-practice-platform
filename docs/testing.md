@@ -75,7 +75,7 @@ npm run test:e2e
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
-- identity、student identity security model、password login enforcement、catalog、practice、wrongbook、learning dashboard/trends/goals/review-marks 的 repository 行为。
+- identity、student identity security model、password login enforcement、catalog、practice、wrongbook、learning dashboard/trends/goals/review-marks 的 repository 行为；B9.30 已把 Learning repository 拆成 facade/types/memory/pg/utils，测试计数不变。
 - Fastify route 的输入、输出和错误映射。
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint、production gate CLI/env/student migration summary、legacy student password migration CLI、管理员登录失败锁定。
 - Web 练习 model 与关键状态转换。
@@ -85,6 +85,8 @@ npm run test:e2e
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
 其中 shared 26 项、API 443 项、Web 33 项、Admin 11 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+
+B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 

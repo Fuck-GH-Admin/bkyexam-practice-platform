@@ -13,13 +13,13 @@
 
 后端已经完成的是：**学生客观题内部试用版的主闭环**，并且 B9.14 已在真实服务器完成 staging production gate / deployment smoke / deployment evidence 验收。
 
-后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围模块化边界和实时 progress/外部可观测性。
+后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围 Admin 模块化边界和实时 progress/外部可观测性。
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
 | 后端工程可验证性 | **约 93%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、旧账号迁移 CLI、部署证据校验 CLI、管理员锁定测试、PR CI、`main` required checks 与 B9.14 真实服务器 staging evidence 已建立；readiness/guardrail 已纳入测试；仍缺更多异常 fixture、外部监控告警、实时进度事件流和系统性性能压测。 |
-| 后端模块化程度 | **约 45–55%** | 业务上下文已清楚；Practice 与 Import Jobs 已做第一轮拆分，Import Jobs repository 已继续拆成 memory/pg/mapper，但 route、Admin、Learning 等仍存在大文件和边界混杂。 |
+| 后端模块化程度 | **约 55–60%** | 业务上下文已清楚；Practice、Import Jobs 与 Learning repository 已完成第一轮拆分，Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils；route 与 Admin 大文件仍存在边界混杂。 |
 | 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
 | 公开生产后端就绪 | **约 93%** | 已补第一个 `super_admin` bootstrap、Admin User manage API、Admin Student Manage API、学生密码登录 enforcement、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、管理员登录锁定、gated true import/reset/cancel/retry、import worker heartbeat/stuck recovery、readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、身份策略与学生身份安全数据模型、PR CI、`main` branch protection/required checks，以及 B9.14 真实服务器 staging production gate/smoke/evidence、B9.15 运维基线和 B9.16 前端开工前审查包；仍缺 PR review/merge、第三方外部告警通知、持续性能压测、学生首次改密前端入口和正式生产发布验收。 |
 
@@ -1656,6 +1656,15 @@ B9.29 实际落地：
 - 保留 `apps/api/src/admin/importJobs.ts` 兼容路径。
 - 继续不改行为、不改 public API；Learning/Admin 更大范围拆分后置。
 
+B9.30 已完成 Learning backend modularization，文档见 [`backend-modularization-b9.30-learning.md`](backend-modularization-b9.30-learning.md)。
+
+B9.30 实际落地：
+
+- `apps/api/src/learning/repository.ts` 收敛为 facade。
+- 新增 `types.ts` / `memoryRepository.ts` / `pgRepository.ts` / `utils.ts`。
+- 保持 Learning Dashboard / Trends / Goals / Review Marks public API、SQL 语义和 route contract 不变。
+- 继续不做 Admin Question Review/Admin Students/Bank Mappings 大文件拆分、实时 progress 事件流和最终视觉系统。
+
 ## 7. 阶段提交规则
 
 每个阶段都遵守：
@@ -1671,6 +1680,6 @@ B9.29 实际落地：
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags、Question Review Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry/worker heartbeat、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺更大范围模块化、非客观题、推荐策略/完整长期档案、实时 progress 事件流、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags、Question Review Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry/worker heartbeat、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺更大范围 Admin 模块化、非客观题、推荐策略/完整长期档案、实时 progress 事件流、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是继续扩大 Learning/Admin 后端目录拆分/模块化：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview/override、审计日志只读和 Admin Users 管理基础上，继续补齐后端边界整理、实时 progress 和运营可观测性；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。
+最合理的下一步是继续扩大 Admin 后端目录拆分/模块化：在已落地的 `apps/admin` 账号运营、题库整理、导入 dry-run/history、题目质检 preview/override、审计日志只读和 Admin Users 管理基础上，继续补齐后端边界整理、实时 progress 和运营可观测性；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。
