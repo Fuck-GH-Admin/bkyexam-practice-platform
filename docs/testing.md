@@ -88,6 +88,8 @@ npm run test:e2e
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
+B9.31 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/admin/questionReview.test.ts tests/routes/adminQuestionReview.test.ts`；阶段最终 `npm run verify:docker` 已通过。
+
 多数 API 测试使用 fake/in-memory dependency，因此反馈快，但不证明 SQL、migration 或真实 PostgreSQL 行为。
 
 ### Deterministic Browser Smoke

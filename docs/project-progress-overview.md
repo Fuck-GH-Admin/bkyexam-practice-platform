@@ -24,7 +24,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | 学生客观题核心闭环 | 内部可用 | **约 95%** | 登录、首页、多会话、题库、练习、草稿、提交、结果、历史、错题、错题再练已经可用；Learning 后端已具备概览/趋势/目标/长期复习标记；缺 Learning 前端与最终 UX。 |
 | 后端主功能 | 基本成型 | **约 88–89%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs、Question Review、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控、实时 progress、部分完整运营流。 |
 | 后端工程化/可验证性 | 稳定 | **约 93%** | `verify:docker`、PostgreSQL integration、Playwright、production gate、backup/restore drill、staging evidence 均已建立；缺持续性能压测、更多异常 fixture、外部告警。 |
-| 后端模块化 | 正在改善 | **约 55–60%** | Practice、Import Jobs、Learning repository 已拆分；剩余 Admin questionReview/adminStudents/bankMappings、routes validation/error mapping 等仍偏大。 |
+| 后端模块化 | 正在改善 | **约 60–65%** | Practice、Import Jobs、Learning repository、Admin Question Review 已拆分；剩余 Admin Students/Bank Mappings、routes validation/error mapping 等仍偏大。 |
 | 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
 | 公开生产就绪 | 接近但未最终发布 | **约 93–94%** | 真实服务器 staging、HTTPS smoke、production gate、旧账号迁移、正式 2 班账号初始化、healthcheck、restore drill、deployment evidence 已完成；缺外部监控告警、持续压测、PR human approval/merge、正式生产发布验收。 |
@@ -213,10 +213,9 @@ deployment evidence = ready=true
 
 优先拆：
 
-1. `apps/api/src/admin/questionReview.ts`
-2. `apps/api/src/admin/adminStudents.ts`
-3. `apps/api/src/admin/bankMappings.ts`
-4. route validation / error mapping helpers
+1. `apps/api/src/admin/adminStudents.ts`
+2. `apps/api/src/admin/bankMappings.ts`
+3. route validation / error mapping helpers
 
 ### P1：Question Review 完整运营流
 
@@ -289,30 +288,25 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 ## 7. 推荐下一阶段路线
 
-### 推荐 B9.31：Admin Question Review 后端模块化
+### 推荐 B9.32：Admin Students / Bank Mappings 后端模块化
 
 目标：不改行为，只拆文件。
 
-建议拆成：
+优先二选一：
 
 ```text
-apps/api/src/admin/question-review/index.ts
-apps/api/src/admin/question-review/types.ts
-apps/api/src/admin/question-review/repository.ts
-apps/api/src/admin/question-review/flags.ts
-apps/api/src/admin/question-review/overrides.ts
-apps/api/src/admin/question-review/effectiveQuestion.ts
-apps/api/src/admin/question-review/mappers.ts
+apps/api/src/admin/admin-students/{index,types,memoryRepository,pgRepository,mappers}.ts
+apps/api/src/admin/bank-mappings/{index,types,memoryRepository,pgRepository,mappers}.ts
 ```
 
 验收：
 
 - public import path 保持兼容。
-- Question Review tests 不变或只做 import 调整。
+- 对应 Admin tests 不变或只做 import 调整。
 - `npm run verify:docker` 通过。
 - 文档更新。
 
-### 备选 B9.31：Import Jobs realtime progress
+### 备选 B9.32：Import Jobs realtime progress
 
 如果当前最想提升管理端导入体验，可以先做：
 
@@ -346,4 +340,4 @@ apps/api/src/admin/question-review/mappers.ts
    可以做，但不要做最终视觉。
 
 我的建议是：
-**先做 B9.31 Admin Question Review 后端模块化，然后再考虑 Import realtime progress 或 Question Review 完整运营流。**
+**B9.31 Admin Question Review 后端模块化已完成；下一步建议继续 Admin Students/Bank Mappings 模块化，或转入 Import realtime progress。**

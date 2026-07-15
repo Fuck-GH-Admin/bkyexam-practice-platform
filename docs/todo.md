@@ -1,5 +1,14 @@
 # Roadmap
 
+## Completed B9.31 Admin Question Review backend modularization — 2026-07-16
+
+- [x] 新增 `docs/backend-modularization-b9.31-question-review.md`。
+- [x] 将 `apps/api/src/admin/questionReview.ts` 收敛为兼容 facade。
+- [x] 拆出 `admin/question-review/{index,types,memoryRepository,pgRepository,mappers}.ts`。
+- [x] 保持 Question Review list/detail/flag/exclusion/override public API 与 SQL 行为不变。
+- [x] 通过 API typecheck、Question Review repository/routes 局部测试与最终 `npm run verify:docker`。
+- [x] 不做 diff/审批/回滚/批量操作、不做 Import realtime progress、不做最终前端视觉。
+
 ## Completed B9.30 Learning backend modularization — 2026-07-16
 
 - [x] 新增 `docs/backend-modularization-b9.30-learning.md`。

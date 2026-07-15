@@ -7,5 +7,6 @@ export type {
   UpdateAdminQuestionOverrideResult,
   UpdateAdminQuestionReviewInput,
   UpdateAdminQuestionReviewResult,
-} from './question-review/index.js';
-export { createMemoryAdminQuestionReviewRepository, createPgAdminQuestionReviewRepository } from './question-review/index.js';
+} from './types.js';
+export { createMemoryAdminQuestionReviewRepository } from './memoryRepository.js';
+export { createPgAdminQuestionReviewRepository } from './pgRepository.js';
