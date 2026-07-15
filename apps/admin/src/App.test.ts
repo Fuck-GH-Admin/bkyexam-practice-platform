@@ -1,10 +1,17 @@
 import { describe, expect, test } from 'vitest';
-import type { AdminBankMappingListItemV1, AdminPermissionV1, AdminStudentV1 } from '@bkyexam-practice/shared';
+import type {
+  AdminBankMappingListItemV1,
+  AdminImportJobV1,
+  AdminPermissionV1,
+  AdminStudentV1,
+} from '@bkyexam-practice/shared';
 
 import {
   buildAdminPath,
   buildBankMappingListQuery,
   buildBankMappingStatusBadges,
+  buildImportJobListQuery,
+  buildImportJobStatusBadges,
   buildStudentListQuery,
   buildStudentStatusBadges,
   buildVisibleAdminNavigation,
@@ -22,9 +29,17 @@ describe('admin route helpers', () => {
       kind: 'bank-mappings',
       bankId: '11111111-1111-4111-8111-111111111111',
     });
+    expect(parseAdminRoute('/admin/import-jobs/create')).toEqual({ kind: 'import-jobs', panel: 'create' });
+    expect(parseAdminRoute('/admin/import-jobs/33333333-3333-4333-8333-333333333333')).toEqual({
+      kind: 'import-jobs',
+      jobId: '33333333-3333-4333-8333-333333333333',
+    });
     expect(buildAdminPath({ kind: 'students', studentId: 'student-1' })).toBe('/admin/students/student-1');
     expect(buildAdminPath({ kind: 'bank-mappings', bankId: '11111111-1111-4111-8111-111111111111' })).toBe(
       '/admin/bank-mappings/11111111-1111-4111-8111-111111111111',
+    );
+    expect(buildAdminPath({ kind: 'import-jobs', jobId: '33333333-3333-4333-8333-333333333333' })).toBe(
+      '/admin/import-jobs/33333333-3333-4333-8333-333333333333',
     );
   });
 
@@ -94,6 +109,39 @@ describe('bank mapping helpers', () => {
       'hidden-from-students',
       'no-objective-questions',
       'child-bank',
+    ]);
+  });
+});
+
+describe('import job helpers', () => {
+  test('builds import job query and status badges', () => {
+    expect(buildImportJobListQuery({ status: 'failed' }, 20, 20)).toBe('limit=20&offset=20&status=failed');
+
+    const job: AdminImportJobV1 = {
+      id: '33333333-3333-4333-8333-333333333333',
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'failed',
+      sourceDir: 'C:\\questionbank',
+      options: {
+        batchSize: 1000,
+        resetBeforeImport: true,
+        generateMappings: true,
+      },
+      progress: { phase: 'failed', current: 0, total: 0 },
+      summary: {},
+      errorSummary: [{ message: 'bad source' }],
+      createdBy: { id: '99999999-9999-4999-8999-999999999999', displayName: 'Admin' },
+      createdAt: '2026-07-15T10:00:00.000Z',
+      startedAt: '2026-07-15T10:00:01.000Z',
+      finishedAt: '2026-07-15T10:00:02.000Z',
+    };
+
+    expect(buildImportJobStatusBadges(job)).toEqual([
+      'failed',
+      'dry_run',
+      'reset-requested',
+      'has-errors',
     ]);
   });
 });

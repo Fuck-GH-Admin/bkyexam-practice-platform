@@ -16,6 +16,7 @@ B9.19 已按 B9.18 静态 wireframe 审查包落地最小 `apps/admin`，但完�
 - B9.19 runtime slice: [`admin-operational-mvp.md`](./admin-operational-mvp.md)。
 - B9.20 P1 workflow/gap review: [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，结论是优先做 Bank Mappings P1 UI，Import true write/reset/cancel/retry 后置。
 - B9.21 Bank Mappings P1 UI: [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，已落地 list/filter/detail/edit/bulk-status，最终视觉后置。
+- B9.22 Import Jobs dry-run/history UI: [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，已落地 list/create dry-run/detail/error-report，true import/reset/cancel/retry 后置。
 
 ## 2. 第一版 Sitemap
 
@@ -288,4 +289,4 @@ Only start formal Admin frontend when all are true:
 - API contract churn is low.
 - We agree on whether Admin is separate `apps/admin` or a route inside `apps/web`.
 
-当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI。下一步优先做 Import Jobs dry-run/history UI 或 Question Review preview UI；Import true write/reset/cancel/retry、完整 Question Review editor 和最终视觉继续后置。
+当前建议：B9.19 Admin Operational MVP 已形成可运行账号运营入口；B9.20 已完成 Bank Mapping / Import Jobs / Question Review 的 P1 工作流 UI review 与后端缺口确认；B9.21 已完成 Bank Mappings P1 UI；B9.22 已完成 Import Jobs dry-run/history UI。下一步优先做 Question Review preview UI；Import true write/reset/cancel/retry、完整 Question Review editor 和最终视觉继续后置。

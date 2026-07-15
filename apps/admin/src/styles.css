@@ -441,6 +441,20 @@ label {
   border-color: rgba(190, 71, 71, 0.20);
 }
 
+.error-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.error-list pre {
+  overflow: auto;
+  border-radius: 12px;
+  background: #f4f7fb;
+  padding: 10px;
+}
+
 .error-panel {
   border-color: rgba(190, 71, 71, 0.26);
 }

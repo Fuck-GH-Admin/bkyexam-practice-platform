@@ -5,6 +5,16 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed Frontend B9.22 Admin Import Jobs dry-run/history UI — 2026-07-15
+
+- [x] 新增 `docs/admin-import-jobs-dry-run-ui.md`。
+- [x] `/admin/import-jobs` 从 placeholder 升级为功能性 dry-run/history 页面。
+- [x] 实现 Import Jobs list/filter/page，覆盖 status 与 limit/offset。
+- [x] 实现 `/admin/import-jobs/create` dry-run 创建表单，固定 `mode=dry_run` 与 `resetBeforeImport=false`。
+- [x] 实现 `/admin/import-jobs/:jobId` detail，展示 progress、summary、questionTypes、options 和 lifecycle timestamps。
+- [x] 实现 error report panel，调用 `/api/admin/import-jobs/:jobId/errors` 并展示 `errorSummary`。
+- [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
+- [x] 不做 true import write UI，不做 reset/cancel/retry，不做异步 queue/worker，不做最终视觉。
 ## Completed Frontend B9.21 Admin Bank Mappings P1 UI — 2026-07-15
 
 - [x] 新增 `docs/admin-bank-mappings-p1-ui.md`。

@@ -2,6 +2,9 @@ import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import {
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
+  AdminImportJobDetailResponseV1Schema,
+  AdminImportJobErrorReportResponseV1Schema,
+  AdminImportJobListResponseV1Schema,
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminMeResponseV1Schema,
@@ -13,6 +16,8 @@ import {
   BulkUpdateAdminBankMappingStatusResponseV1Schema,
   BulkCreateAdminStudentsRequestV1Schema,
   BulkCreateAdminStudentsResponseV1Schema,
+  CreateAdminImportJobRequestV1Schema,
+  CreateAdminImportJobResponseV1Schema,
   CreateAdminStudentRequestV1Schema,
   ResetAdminStudentPasswordRequestV1Schema,
   ResetAdminStudentPasswordResponseV1Schema,
@@ -22,6 +27,9 @@ import {
   type AdminBankMappingDetailV1,
   type AdminBankMappingListItemV1,
   type AdminBankMappingStatusV1,
+  type AdminImportJobErrorSummaryV1,
+  type AdminImportJobStatusV1,
+  type AdminImportJobV1,
   type AdminPermissionV1,
   type AdminStudentStatusV1,
   type AdminStudentV1,
@@ -35,7 +43,7 @@ import {
 type Parser<T> = { parse: (payload: unknown) => T };
 
 type AdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs' | 'question-review' | 'audit-logs' | 'admin-users';
-type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings';
+type ImplementedAdminNavKey = 'system' | 'students' | 'bank-mappings' | 'import-jobs';
 type PlaceholderAdminNavKey = Exclude<AdminNavKey, ImplementedAdminNavKey>;
 
 type AdminRoute =
@@ -43,6 +51,7 @@ type AdminRoute =
   | { kind: 'system' }
   | { kind: 'students'; studentId?: string; panel?: 'create' | 'bulk-create' }
   | { kind: 'bank-mappings'; bankId?: string }
+  | { kind: 'import-jobs'; jobId?: string; panel?: 'create' }
   | { kind: 'placeholder'; key: PlaceholderAdminNavKey }
   | { kind: 'unknown'; path: string };
 
@@ -77,6 +86,10 @@ type BankMappingFilters = {
   hasObjectiveQuestions: '' | 'true' | 'false';
 };
 
+type ImportJobFilters = {
+  status: '' | AdminImportJobStatusV1;
+};
+
 const defaultStudentFilters: StudentFilters = {
   keyword: '',
   className: '',
@@ -95,6 +108,12 @@ const defaultBankMappingFilters: BankMappingFilters = {
   qGroup: '',
   hasObjectiveQuestions: '',
 };
+
+const defaultImportJobFilters: ImportJobFilters = {
+  status: '',
+};
+
+const defaultImportSourceDir = 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank';
 
 const defaultBulkText = `loginName,displayName,className,groupName
 202502040201,202502040201,2班,
@@ -137,8 +156,8 @@ const adminNavigation: Array<{
     label: 'Import Jobs',
     path: '/admin/import-jobs',
     permissions: ['import_job:read'],
-    implemented: false,
-    description: '导入任务 UI 后续阶段开放；B9.19 不开放 reset/cancel/retry。',
+    implemented: true,
+    description: '导入任务 dry-run、历史、详情和错误摘要；true import/reset/cancel/retry 后置。',
   },
   {
     key: 'question-review',
@@ -192,6 +211,12 @@ export function parseAdminRoute(pathname: string): AdminRoute {
     const bankId = decodeURIComponent(path.slice('/admin/bank-mappings/'.length));
     return { kind: 'bank-mappings', bankId };
   }
+  if (path === '/admin/import-jobs') return { kind: 'import-jobs' };
+  if (path === '/admin/import-jobs/create') return { kind: 'import-jobs', panel: 'create' };
+  if (path.startsWith('/admin/import-jobs/')) {
+    const jobId = decodeURIComponent(path.slice('/admin/import-jobs/'.length));
+    return { kind: 'import-jobs', jobId };
+  }
   const placeholder = adminNavigation.find((item) => item.path === path && !item.implemented);
   if (placeholder) return { kind: 'placeholder', key: placeholder.key as PlaceholderAdminNavKey };
   return { kind: 'unknown', path };
@@ -209,6 +234,11 @@ export function buildAdminPath(route: AdminRoute): string {
   if (route.kind === 'bank-mappings') {
     if (route.bankId) return `/admin/bank-mappings/${encodeURIComponent(route.bankId)}`;
     return '/admin/bank-mappings';
+  }
+  if (route.kind === 'import-jobs') {
+    if (route.panel === 'create') return '/admin/import-jobs/create';
+    if (route.jobId) return `/admin/import-jobs/${encodeURIComponent(route.jobId)}`;
+    return '/admin/import-jobs';
   }
   if (route.kind === 'placeholder') {
     return adminNavigation.find((item) => item.key === route.key)?.path ?? '/admin/system';
@@ -254,6 +284,14 @@ export function buildBankMappingListQuery(filters: BankMappingFilters, limit: nu
   return params.toString();
 }
 
+export function buildImportJobListQuery(filters: ImportJobFilters, limit: number, offset: number): string {
+  const params = new URLSearchParams();
+  params.set('limit', String(limit));
+  params.set('offset', String(offset));
+  addOptionalParam(params, 'status', filters.status);
+  return params.toString();
+}
+
 export function parseBulkStudentInput(input: string): BulkStudentDraft[] {
   const trimmed = input.trim();
   if (!trimmed) return [];
@@ -291,6 +329,13 @@ export function buildBankMappingStatusBadges(mapping: AdminBankMappingListItemV1
   const badges = [mapping.status, mapping.visible ? 'visible' : 'hidden-from-students'];
   if (mapping.objectiveQuestionCount === 0) badges.push('no-objective-questions');
   if (mapping.parentId) badges.push('child-bank');
+  return badges;
+}
+
+export function buildImportJobStatusBadges(job: AdminImportJobV1): string[] {
+  const badges: string[] = [job.status, job.mode];
+  if (job.options.resetBeforeImport) badges.push('reset-requested');
+  if (job.errorSummary.length > 0) badges.push('has-errors');
   return badges;
 }
 
@@ -414,6 +459,13 @@ export function App() {
         />
       ) : route.kind === 'bank-mappings' ? (
         <BankMappingsPage
+          admin={admin}
+          route={route}
+          navigate={navigate}
+          onSessionExpired={expireSession}
+        />
+      ) : route.kind === 'import-jobs' ? (
+        <ImportJobsPage
           admin={admin}
           route={route}
           navigate={navigate}
@@ -1126,6 +1178,359 @@ function BankMappingBulkResult({ result }: { result: BulkUpdateAdminBankMappingS
         <StatusCard tone="neutral" title="contract" value="v1" detail="updated/failed partial result is rendered without hiding failed rows." />
       </div>
     </section>
+  );
+}
+
+function ImportJobsPage({
+  admin,
+  route,
+  navigate,
+  onSessionExpired,
+}: {
+  admin: AdminUserV1;
+  route: Extract<AdminRoute, { kind: 'import-jobs' }>;
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+  onSessionExpired: () => void;
+}) {
+  const [draftFilters, setDraftFilters] = useState<ImportJobFilters>(defaultImportJobFilters);
+  const [filters, setFilters] = useState<ImportJobFilters>(defaultImportJobFilters);
+  const [offset, setOffset] = useState(0);
+  const [jobs, setJobs] = useState<AdminImportJobV1[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const limit = 20;
+
+  const canCreate = admin.permissions.includes('import_job:create');
+
+  const loadJobs = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const query = buildImportJobListQuery(filters, limit, offset);
+      const response = await requestJson(`/api/admin/import-jobs?${query}`, AdminImportJobListResponseV1Schema);
+      setJobs(response.jobs);
+      setHasMore(response.page.hasMore);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [filters, offset, onSessionExpired]);
+
+  useEffect(() => {
+    void loadJobs();
+  }, [loadJobs]);
+
+  function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOffset(0);
+    setFilters(draftFilters);
+  }
+
+  function refreshAfterCreate(job: AdminImportJobV1) {
+    void loadJobs();
+    navigate(`/admin/import-jobs/${job.id}`);
+  }
+
+  return (
+    <section className="admin-page">
+      <PageHeader
+        eyebrow="Import operations"
+        title="Import Jobs"
+        description="B9.22 只做 dry-run、历史、详情和错误摘要；true import write/reset/cancel/retry 继续后置。"
+        action={(
+          <div className="button-row">
+            <button type="button" onClick={() => navigate('/admin/import-jobs/create')} disabled={!canCreate}>创建 dry-run</button>
+            <button className="ghost" type="button" onClick={() => void loadJobs()} disabled={loading}>刷新列表</button>
+          </div>
+        )}
+      />
+
+      <section className="admin-card">
+        <form className="student-filters" onSubmit={submitFilters}>
+          <label>状态
+            <select value={draftFilters.status} onChange={(event) => setDraftFilters({ status: event.target.value as ImportJobFilters['status'] })}>
+              <option value="">全部</option>
+              <option value="queued">queued</option>
+              <option value="running">running</option>
+              <option value="succeeded">succeeded</option>
+              <option value="failed">failed</option>
+              <option value="cancelled">cancelled</option>
+            </select>
+          </label>
+          <button type="submit">应用过滤</button>
+        </form>
+      </section>
+
+      <div className="student-layout">
+        <section className="admin-card student-list-card">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Jobs</p>
+              <h2>导入任务历史</h2>
+            </div>
+            <span className="muted">offset {offset}</span>
+          </div>
+          {error ? <ErrorPanel message={error} onRetry={() => void loadJobs()} /> : null}
+          {loading ? <p className="muted">正在加载导入任务…</p> : null}
+          {!loading && !error && jobs.length === 0 ? <InfoPanel title="没有匹配导入任务" detail="当前只开放 dry-run 与历史查看。" /> : null}
+          {jobs.length > 0 ? <ImportJobTable jobs={jobs} navigate={navigate} /> : null}
+          <div className="pager">
+            <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
+            <span>offset {offset}</span>
+            <button className="ghost" type="button" disabled={!hasMore || loading} onClick={() => setOffset(offset + limit)}>下一页</button>
+          </div>
+        </section>
+
+        <aside className="admin-card student-side-panel">
+          {route.panel === 'create' ? (
+            <CreateImportJobPanel canCreate={canCreate} onCreated={refreshAfterCreate} onSessionExpired={onSessionExpired} />
+          ) : route.jobId ? (
+            <ImportJobDetailPanel jobId={route.jobId} onSessionExpired={onSessionExpired} />
+          ) : (
+            <InfoPanel title="选择一个导入任务" detail="从左侧列表查看 dry-run summary、progress 和 error report；写入导入控制暂不开放。" />
+          )}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function ImportJobTable({
+  jobs,
+  navigate,
+}: {
+  jobs: AdminImportJobV1[];
+  navigate: (target: string | AdminRoute, options?: { replace?: boolean }) => void;
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Status</th>
+            <th>Source</th>
+            <th>Summary</th>
+            <th>Progress</th>
+            <th>Created</th>
+            <th>Finished</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {jobs.map((job) => (
+            <tr key={job.id}>
+              <td>
+                <strong>{job.kind}</strong>
+                <br />
+                <span className="muted">{job.id}</span>
+              </td>
+              <td>
+                <div className="badge-row">
+                  {buildImportJobStatusBadges(job).map((badge) => (
+                    <Badge key={badge} tone={importJobBadgeTone(badge)}>{badge}</Badge>
+                  ))}
+                </div>
+              </td>
+              <td>{job.sourceDir}</td>
+              <td>{formatImportJobSummary(job)}</td>
+              <td>{formatImportJobProgress(job)}</td>
+              <td>{job.createdBy?.displayName ?? '-'}<br /><span className="muted">{formatAdminDate(job.createdAt)}</span></td>
+              <td>{formatAdminDate(job.finishedAt)}</td>
+              <td><button className="ghost" type="button" onClick={() => navigate(`/admin/import-jobs/${job.id}`)}>查看任务</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function CreateImportJobPanel({
+  canCreate,
+  onCreated,
+  onSessionExpired,
+}: {
+  canCreate: boolean;
+  onCreated: (job: AdminImportJobV1) => void;
+  onSessionExpired: () => void;
+}) {
+  const [sourceDir, setSourceDir] = useState(defaultImportSourceDir);
+  const [batchSize, setBatchSize] = useState('1000');
+  const [generateMappings, setGenerateMappings] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [createdJob, setCreatedJob] = useState<AdminImportJobV1 | null>(null);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canCreate) return;
+    setSubmitting(true);
+    setError('');
+    setCreatedJob(null);
+    try {
+      const request = CreateAdminImportJobRequestV1Schema.parse({
+        kind: 'full_corpus_import',
+        sourceDir,
+        mode: 'dry_run',
+        options: {
+          batchSize: Number(batchSize),
+          resetBeforeImport: false,
+          generateMappings,
+        },
+      });
+      const response = await requestJson('/api/admin/import-jobs', CreateAdminImportJobResponseV1Schema, {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      setCreatedJob(response.job);
+      onCreated(response.job);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapImportJobError(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Create Import Job</p>
+      <h2>创建 dry-run</h2>
+      <p className="muted">此表单固定 `mode=dry_run` 和 `resetBeforeImport=false`；true import 写入、reset、cancel、retry 后续再设计。</p>
+      {!canCreate ? <ForbiddenInline /> : null}
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {createdJob ? <p className="form-success" role="status">dry-run 已创建：{createdJob.status} / {createdJob.id}</p> : null}
+      <form className="stack-form" onSubmit={submit}>
+        <label>sourceDir
+          <input value={sourceDir} onChange={(event) => setSourceDir(event.target.value)} disabled={!canCreate || submitting} />
+        </label>
+        <label>batchSize
+          <input value={batchSize} onChange={(event) => setBatchSize(event.target.value)} inputMode="numeric" disabled={!canCreate || submitting} />
+        </label>
+        <label className="checkbox-label">
+          <input type="checkbox" checked={generateMappings} onChange={(event) => setGenerateMappings(event.target.checked)} disabled={!canCreate || submitting} />
+          generateMappings
+        </label>
+        <button type="submit" disabled={!canCreate || submitting}>{submitting ? '创建中…' : '提交 dry-run'}</button>
+      </form>
+    </section>
+  );
+}
+
+function ImportJobDetailPanel({
+  jobId,
+  onSessionExpired,
+}: {
+  jobId: string;
+  onSessionExpired: () => void;
+}) {
+  const [job, setJob] = useState<AdminImportJobV1 | null>(null);
+  const [errorReport, setErrorReport] = useState<AdminImportJobErrorSummaryV1 | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadingErrors, setLoadingErrors] = useState(false);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    setErrorReport(null);
+    try {
+      const response = await requestJson(`/api/admin/import-jobs/${encodeURIComponent(jobId)}`, AdminImportJobDetailResponseV1Schema);
+      setJob(response.job);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoading(false);
+    }
+  }, [jobId, onSessionExpired]);
+
+  const loadErrors = useCallback(async () => {
+    setLoadingErrors(true);
+    setError('');
+    try {
+      const response = await requestJson(`/api/admin/import-jobs/${encodeURIComponent(jobId)}/errors`, AdminImportJobErrorReportResponseV1Schema);
+      setErrorReport(response.errorSummary);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(getErrorMessage(caught));
+    } finally {
+      setLoadingErrors(false);
+    }
+  }, [jobId, onSessionExpired]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (loading) return <InfoPanel title="正在加载导入任务详情…" />;
+  if (error && !job) return <ErrorPanel message={error} onRetry={() => void load()} />;
+  if (!job) return <InfoPanel title="导入任务不存在" detail="返回列表后重新选择。" />;
+
+  return (
+    <section className="student-detail">
+      <p className="eyebrow">Import Job Detail</p>
+      <h2>{job.kind}</h2>
+      <div className="badge-row">
+        {buildImportJobStatusBadges(job).map((badge) => <Badge key={badge} tone={importJobBadgeTone(badge)}>{badge}</Badge>)}
+      </div>
+      {error ? <p className="form-error" role="alert">{error}</p> : null}
+      <div className="button-row">
+        <button className="ghost" type="button" onClick={() => void load()}>刷新详情</button>
+        <button className="ghost" type="button" onClick={() => void loadErrors()} disabled={loadingErrors}>{loadingErrors ? '读取中…' : '查看 error report'}</button>
+      </div>
+
+      <section className="detail-section">
+        <h3>Progress / summary</h3>
+        <dl className="key-values single">
+          <div><dt>jobId</dt><dd>{job.id}</dd></div>
+          <div><dt>sourceDir</dt><dd>{job.sourceDir}</dd></div>
+          <div><dt>progress</dt><dd>{formatImportJobProgress(job)}</dd></div>
+          <div><dt>summary</dt><dd>{formatImportJobSummary(job)}</dd></div>
+          <div><dt>questionTypes</dt><dd>{job.summary.questionTypes ? Object.entries(job.summary.questionTypes).map(([type, count]) => `${type}: ${count}`).join('；') : '-'}</dd></div>
+        </dl>
+      </section>
+
+      <section className="detail-section">
+        <h3>Options / lifecycle</h3>
+        <dl className="key-values single">
+          <div><dt>batchSize</dt><dd>{job.options.batchSize}</dd></div>
+          <div><dt>generateMappings</dt><dd>{String(job.options.generateMappings)}</dd></div>
+          <div><dt>resetBeforeImport</dt><dd>{String(job.options.resetBeforeImport)}（UI 不开放 reset 写入）</dd></div>
+          <div><dt>createdBy</dt><dd>{job.createdBy?.displayName ?? '-'}</dd></div>
+          <div><dt>createdAt</dt><dd>{formatAdminDate(job.createdAt)}</dd></div>
+          <div><dt>startedAt</dt><dd>{formatAdminDate(job.startedAt)}</dd></div>
+          <div><dt>finishedAt</dt><dd>{formatAdminDate(job.finishedAt)}</dd></div>
+        </dl>
+      </section>
+
+      <section className="detail-section">
+        <h3>Error report</h3>
+        {errorReport ? <ImportJobErrorReport errors={errorReport} /> : (
+          <p className="muted">点击“查看 error report”读取后端 errorSummary；成功任务通常为空。</p>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function ImportJobErrorReport({ errors }: { errors: AdminImportJobErrorSummaryV1 }) {
+  if (errors.length === 0) {
+    return <InfoPanel title="没有错误摘要" detail="当前任务 errorSummary 为空。" />;
+  }
+  return (
+    <ul className="error-list">
+      {errors.map((entry, index) => (
+        <li key={`${entry.message}-${index}`}>
+          <strong>{entry.message}</strong>
+          {Object.keys(entry).length > 1 ? <pre>{JSON.stringify(entry, null, 2)}</pre> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -1853,6 +2258,7 @@ function getActiveNavKey(route: AdminRoute): AdminNavKey | null {
   if (route.kind === 'system') return 'system';
   if (route.kind === 'students') return 'students';
   if (route.kind === 'bank-mappings') return 'bank-mappings';
+  if (route.kind === 'import-jobs') return 'import-jobs';
   if (route.kind === 'placeholder') return route.key;
   return null;
 }
@@ -1890,6 +2296,30 @@ function bankMappingBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'da
   return 'neutral';
 }
 
+function importJobBadgeTone(badge: string): 'ok' | 'neutral' | 'warning' | 'danger' {
+  if (badge === 'succeeded') return 'ok';
+  if (badge === 'failed' || badge === 'has-errors') return 'danger';
+  if (badge === 'queued' || badge === 'running' || badge === 'reset-requested') return 'warning';
+  return 'neutral';
+}
+
+function formatImportJobProgress(job: AdminImportJobV1): string {
+  return `${job.progress.phase} ${job.progress.current}/${job.progress.total}`;
+}
+
+function formatImportJobSummary(job: AdminImportJobV1): string {
+  const summary = job.summary;
+  const parts = [
+    ['questions', summary.questions],
+    ['options', summary.options],
+    ['skipped', summary.skippedOptions],
+    ['mappings', summary.bankMappings],
+  ]
+    .filter((entry): entry is [string, number] => typeof entry[1] === 'number')
+    .map(([label, value]) => `${label}: ${value}`);
+  return parts.length > 0 ? parts.join(' · ') : '-';
+}
+
 function readNextPathFromLocation(): string | null {
   const next = new URLSearchParams(window.location.search).get('next');
   if (!next) return null;
@@ -1916,6 +2346,15 @@ function mapBankMappingError(error: unknown): string {
     if (error.status === 409) return '保存失败：题库 mapping version 已变化，请刷新详情后重试。';
     if (error.status === 422) return `保存失败：${error.message}`;
     if (error.status === 403) return '保存失败：当前账号缺少题库整理或发布权限。';
+  }
+  return getErrorMessage(error);
+}
+
+function mapImportJobError(error: unknown): string {
+  if (error instanceof AdminApiError) {
+    if (error.status === 403) return `导入任务被拒绝：${error.message}`;
+    if (error.status === 409) return '已有导入任务正在运行，请稍后刷新列表。';
+    if (error.status === 422) return `导入任务未开放：${error.message}`;
   }
   return getErrorMessage(error);
 }

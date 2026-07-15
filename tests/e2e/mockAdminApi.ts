@@ -2,6 +2,7 @@ import type { Page, Route } from '@playwright/test';
 
 import type {
   AdminBankMappingDetailV1,
+  AdminImportJobV1,
   AdminPermissionV1,
   AdminStudentV1,
   BulkCreateAdminStudentItemV1,
@@ -12,6 +13,7 @@ export type MockAdminState = {
   calls: string[];
   students: AdminStudentV1[];
   bankMappings: AdminBankMappingDetailV1[];
+  importJobs: AdminImportJobV1[];
 };
 
 const adminId = '99999999-9999-4999-8999-999999999999';
@@ -71,6 +73,19 @@ export function createMockAdminState(): MockAdminState {
         status: 'active',
         visible: true,
         objectiveQuestionCount: 18,
+      }),
+    ],
+    importJobs: [
+      buildImportJob({
+        id: '33333333-3333-4333-8333-333333333333',
+        status: 'succeeded',
+        sourceDir: 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank',
+      }),
+      buildImportJob({
+        id: '66666666-6666-4666-8666-666666666666',
+        status: 'failed',
+        sourceDir: 'C:\\bad-source',
+        errorSummary: [{ message: 'source file is missing', file: 'questions.json' }],
       }),
     ],
   };
@@ -165,6 +180,63 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         bankMappings: pageItems.slice(0, limit).map(toBankMappingListItem),
         page: { limit, offset, hasMore: pageItems.length > limit },
       });
+    }
+
+    if (method === 'GET' && pathname === '/api/admin/import-jobs') {
+      const limit = Number(url.searchParams.get('limit') ?? 20);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      const status = url.searchParams.get('status');
+      const filtered = state.importJobs.filter((job) => {
+        if (status && job.status !== status) return false;
+        return true;
+      });
+      const pageItems = filtered.slice(offset, offset + limit + 1);
+      return fulfillJson(route, {
+        jobs: pageItems.slice(0, limit),
+        page: { limit, offset, hasMore: pageItems.length > limit },
+      });
+    }
+
+    if (method === 'POST' && pathname === '/api/admin/import-jobs') {
+      const body = readBody<{
+        sourceDir: string;
+        mode: AdminImportJobV1['mode'];
+        options: AdminImportJobV1['options'];
+      }>(route);
+      if (body.mode !== 'dry_run') {
+        return fulfillJson(route, { error: 'Import mode is not enabled yet' }, 422);
+      }
+      if (body.sourceDir.toLowerCase().includes('forbidden')) {
+        return fulfillJson(route, { error: 'Import source directory is not allowed' }, 403);
+      }
+      const job = buildImportJob({
+        id: nextImportJobId(state.importJobs.length + 1),
+        status: 'succeeded',
+        sourceDir: body.sourceDir,
+        options: body.options,
+      });
+      state.importJobs.unshift(job);
+      return fulfillJson(route, { job });
+    }
+
+    const importJobErrorsMatch = pathname.match(/^\/api\/admin\/import-jobs\/([^/]+)\/errors$/);
+    if (importJobErrorsMatch) {
+      const jobId = importJobErrorsMatch[1];
+      const job = state.importJobs.find((item) => item.id === jobId);
+      if (!job) return fulfillJson(route, { error: 'Import job not found' }, 404);
+      return fulfillJson(route, {
+        jobId: job.id,
+        status: job.status,
+        errorSummary: job.errorSummary,
+      });
+    }
+
+    const importJobMatch = pathname.match(/^\/api\/admin\/import-jobs\/([^/]+)$/);
+    if (importJobMatch) {
+      const jobId = importJobMatch[1];
+      const job = state.importJobs.find((item) => item.id === jobId);
+      if (!job) return fulfillJson(route, { error: 'Import job not found' }, 404);
+      return fulfillJson(route, { job });
     }
 
     if (method === 'POST' && pathname === '/api/admin/bank-mappings/bulk-status') {
@@ -417,8 +489,57 @@ function buildStudentPreview(mapping: AdminBankMappingDetailV1) {
   };
 }
 
+function buildImportJob(input: {
+  id: string;
+  status: AdminImportJobV1['status'];
+  sourceDir: string;
+  options?: AdminImportJobV1['options'];
+  errorSummary?: AdminImportJobV1['errorSummary'];
+}): AdminImportJobV1 {
+  const questions = input.status === 'failed' ? 0 : 89922;
+  const errorSummary = input.errorSummary ?? [];
+  return {
+    id: input.id,
+    kind: 'full_corpus_import',
+    mode: 'dry_run',
+    status: input.status,
+    sourceDir: input.sourceDir,
+    options: input.options ?? {
+      batchSize: 1000,
+      resetBeforeImport: false,
+      generateMappings: true,
+    },
+    progress: input.status === 'failed'
+      ? { phase: 'failed', current: 0, total: 0 }
+      : { phase: 'done', current: questions, total: questions },
+    summary: input.status === 'failed'
+      ? {}
+      : {
+        classifications: 2941,
+        questions,
+        rawOptions: 180323,
+        options: 154899,
+        skippedOptions: 25424,
+        bankMappings: 2662,
+        questionTypes: {
+          single_choice: 60000,
+          true_false: 29922,
+        },
+      },
+    errorSummary,
+    createdBy: { id: adminId, displayName: '平台管理员' },
+    createdAt: now,
+    startedAt: '2026-07-15T10:00:01.000Z',
+    finishedAt: input.status === 'running' ? null : '2026-07-15T10:02:00.000Z',
+  };
+}
+
 function nextStudentId(index: number) {
   return `aaaaaaaa-aaaa-4aaa-8aaa-${String(index).padStart(12, '0')}`;
+}
+
+function nextImportJobId(index: number) {
+  return `bbbbbbbb-bbbb-4bbb-8bbb-${String(index).padStart(12, '0')}`;
 }
 
 function readBody<T>(route: Route): T {

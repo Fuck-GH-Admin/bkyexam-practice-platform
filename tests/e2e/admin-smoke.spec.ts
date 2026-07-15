@@ -4,7 +4,7 @@ import { createMockAdminState, installMockAdminApi } from './mockAdminApi.js';
 
 const adminBaseUrl = 'http://127.0.0.1:5174';
 
-test('admin operational MVP covers login, system status, student accounts, and bank mappings', {
+test('admin operational MVP covers login, system status, student accounts, bank mappings, and import jobs', {
   tag: '@desktop',
 }, async ({ page }) => {
   const runtimeErrors = collectRuntimeErrors(page);
@@ -78,6 +78,19 @@ test('admin operational MVP covers login, system status, student accounts, and b
   await expect(page.getByRole('heading', { name: 'Bulk status result' })).toBeVisible();
   await expect(page.locator('.bulk-result').filter({ has: page.getByRole('heading', { name: 'Bulk status result' }) })).toContainText('updated');
 
+  await page.getByRole('button', { name: 'Import Jobs' }).click();
+  await expect(page.getByRole('heading', { name: 'Import Jobs' })).toBeVisible();
+  await expect(page.getByText(/questions: 89922/).first()).toBeVisible();
+  await page.getByRole('button', { name: '创建 dry-run' }).click();
+  await expect(page.getByRole('heading', { name: '创建 dry-run' })).toBeVisible();
+  await page.getByLabel('sourceDir').fill('C:\\Users\\Bot\\Bot\\BKYExam\\questionbank');
+  await page.getByLabel('batchSize').fill('500');
+  await page.getByRole('button', { name: '提交 dry-run' }).click();
+  await expect(page.getByRole('heading', { name: 'full_corpus_import' })).toBeVisible();
+  await expect(page.getByText(/questions: 89922/).first()).toBeVisible();
+  await page.getByRole('button', { name: '查看 error report' }).click();
+  await expect(page.getByRole('heading', { name: '没有错误摘要' })).toBeVisible();
+
   expect(state.calls).toContain('POST /api/admin/auth/login');
   expect(state.calls).toContain('GET /api/admin/system/status');
   expect(state.calls).toContain('POST /api/admin/students');
@@ -85,6 +98,9 @@ test('admin operational MVP covers login, system status, student accounts, and b
   expect(state.calls).toContain('GET /api/admin/bank-mappings');
   expect(state.calls).toContain('PATCH /api/admin/bank-mappings/44444444-4444-4444-8444-444444444444');
   expect(state.calls).toContain('POST /api/admin/bank-mappings/bulk-status');
+  expect(state.calls).toContain('GET /api/admin/import-jobs');
+  expect(state.calls).toContain('POST /api/admin/import-jobs');
+  expect(state.calls.some((call) => call.endsWith('/errors'))).toBe(true);
   expect(runtimeErrors).toEqual([]);
 });
 

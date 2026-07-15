@@ -1559,25 +1559,36 @@ B9.21 实际落地：
 - Admin unit tests、stateful mock Admin API 和 Playwright smoke。
 - 继续不做最终视觉系统。
 
+B9.22 已完成 Admin Import Jobs dry-run/history UI，文档见 [`admin-import-jobs-dry-run-ui.md`](admin-import-jobs-dry-run-ui.md)。
+
+B9.22 实际落地：
+
+- `/admin/import-jobs` list/filter/page。
+- `/admin/import-jobs/create` dry-run 创建表单。
+- `/admin/import-jobs/:jobId` detail。
+- `/api/admin/import-jobs/:jobId/errors` error report panel。
+- import mode disabled / source forbidden / running conflict / reset blocked 错误提示。
+- Admin unit tests、stateful mock Admin API 和 Playwright smoke。
+- 继续不做 true import write/reset/cancel/retry、异步 queue/worker 和最终视觉系统。
+
 当前建议下一步执行：
 
-> **B9.22 Admin Import Jobs dry-run/history UI**，只做导入任务列表、创建 dry-run、详情和 error report，不做 true import write/reset/cancel/retry。
+> **B9.23 Admin Question Review preview UI**，只做 open flags 队列、flag add、resolve/ignore、excludedFromPractice，不做完整题目编辑器或 override 层。
 
-B9.22 建议范围：
+B9.23 建议范围：
 
-- Import Jobs list/filter/page。
-- Create dry-run form。
-- Detail summary/progress/errorSummary。
-- Error report panel。
-- import mode disabled / source forbidden / running conflict / reset blocked 状态提示。
+- Question Review list/filter/page。
+- Detail preview：contentPreview、answerPreview、optionCount、flags、excludedFromPractice。
+- add flag。
+- resolve / ignore flag。
+- toggle excludedFromPractice。
 - Admin unit tests + Playwright mock smoke。
 
-B9.22 不做：
+B9.23 不做：
 
-- 不做 true import write UI。
-- 不做 resetBeforeImport UI。
-- 不做 cancel/retry。
-- 不做异步 queue/worker。
+- 不做 full question detail/editor。
+- 不做手工修题 override 层。
+- 不做批量操作。
 - 不做最终视觉系统。
 ## 7. 阶段提交规则
 
@@ -1596,4 +1607,4 @@ B9.22 不做：
 
 > **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate、Question Review Flags、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺模块化、非客观题、推荐策略/完整长期档案、管理前端、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
 
-最合理的下一步是 B9.22 Admin Import Jobs dry-run/history UI：在已落地的 `apps/admin` 账号运营与题库整理入口基础上，继续补导入任务列表、dry-run 创建、详情和错误摘要；true import write/reset/cancel/retry 与完整 Question Review editor 继续后置，最终视觉仍后置。
+最合理的下一步是 B9.23 Admin Question Review preview UI：在已落地的 `apps/admin` 账号运营、题库整理和导入 dry-run/history 入口基础上，继续补题目质检 open flags 队列、flag add、resolve/ignore 和 excludedFromPractice；完整 Question Review editor、override 层和最终视觉仍后置。
