@@ -1,5 +1,21 @@
 # Roadmap
 
+## Planned B9.34 Current-HEAD staging re-baseline — 2026-07-16
+
+- [x] 全局复核 route helpers、Import realtime progress 与其他候选优先级。
+- [x] 通过 SSH 确认服务器仍是 commit `1686c6e`、migration `0011`、worktree clean。
+- [x] 确认本地功能实现基线 `e3f453b` 已领先服务器 22 个提交，并新增 migration `0012/0013`。
+- [x] 确认线上 `/` 与 `/admin` 返回相同旧 bundle，独立 Admin 尚未部署。
+- [x] 新增 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)，修正下一阶段排序。
+- [ ] 冻结并记录 B9.34 最终待部署 commit。
+- [ ] 部署前备份代码、env、Nginx、systemd 和 PostgreSQL。
+- [ ] 更新服务器代码并执行 migration `0012/0013`。
+- [ ] 构建并分别部署学生 Web 与独立 Admin app。
+- [ ] 验证 production gate、学生/Admin 主链路和 Import worker。
+- [ ] 完成 migration 后 backup/restore 与 staging load baseline。
+- [ ] 刷新 deployment evidence、status、testing 和部署日志。
+- [ ] 本阶段不做 route helper 重构、不做 realtime progress、不做最终视觉。
+
 ## Completed B9.33 Admin Bank Mappings backend modularization — 2026-07-16
 
 - [x] 新增 `docs/backend-modularization-b9.33-bank-mappings.md`。

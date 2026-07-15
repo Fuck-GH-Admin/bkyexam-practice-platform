@@ -15,7 +15,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 当前最准确的定位是：
 
-> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；真实服务器 staging 已验证过；但完整产品还缺最终前端体验、完整管理工作流、非客观题、实时导入进度、外部监控与正式生产发布验收。**
+> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；但真实服务器仍停留在 B9.14 commit，尚未验证最近 22 个提交、migration 0012/0013、独立 Admin 前端和 durable Import worker。当前首要任务是把 current HEAD 重新部署到 staging 并完成组合验收，而不是继续扩大功能面。**
 
 ## 2. 分层完成度
 
@@ -23,11 +23,11 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | --- | --- | ---: | --- |
 | 学生客观题核心闭环 | 内部可用 | **约 95%** | 登录、首页、多会话、题库、练习、草稿、提交、结果、历史、错题、错题再练已经可用；Learning 后端已具备概览/趋势/目标/长期复习标记；缺 Learning 前端与最终 UX。 |
 | 后端主功能 | 基本成型 | **约 88–89%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs、Question Review、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控、实时 progress、部分完整运营流。 |
-| 后端工程化/可验证性 | 稳定 | **约 93%** | `verify:docker`、PostgreSQL integration、Playwright、production gate、backup/restore drill、staging evidence 均已建立；缺持续性能压测、更多异常 fixture、外部告警。 |
+| 后端工程化/可验证性 | 本地稳定、目标环境证据待刷新 | **约 90–92%** | `verify:docker`、PostgreSQL integration、Playwright、production gate、backup/restore drill 已建立；但 staging evidence 只覆盖旧 commit `1686c6e`，未覆盖当前 HEAD、migration 0012/0013 与 Import worker。 |
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 公开生产就绪 | 接近但未最终发布 | **约 93–94%** | 真实服务器 staging、HTTPS smoke、production gate、旧账号迁移、正式 2 班账号初始化、healthcheck、restore drill、deployment evidence 已完成；缺外部监控告警、持续压测、PR human approval/merge、正式生产发布验收。 |
+| 当前 HEAD 公开生产就绪 | 代码接近、release evidence 过期 | **约 80–84%** | 旧 B9.14 staging、HTTPS smoke、production gate、账号初始化、healthcheck 和 restore drill 已完成；但服务器仍是 `1686c6e` / migration `0011`，当前 HEAD 尚未完成重新部署、Admin 静态路由、worker、migration 与完整 smoke。 |
 | 完整产品愿景 | 主体完成但未收口 | **约 90%** | 分母包含最终学生端、Learning 前端、管理平台完整工作流、全题型、运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
@@ -207,14 +207,23 @@ deployment evidence = ready=true
 
 按影响排序：
 
-### P0：Admin 后端继续模块化
+### P0：Current-HEAD staging re-baseline
 
-原因：现在后端功能越来越多，如果不继续拆，后续维护 Question Review、Student Manage、Bank Mappings 会越来越容易互相污染。
+真实服务器仍运行 B9.14 commit `1686c6e`，当前本地 HEAD 已领先 22 个提交并新增 migration `0012`、`0013`。独立 `apps/admin`、Question Review override、Import durable worker 等尚未在目标环境作为整体验证。
 
-优先拆：
+优先完成：
 
-1. route validation / error mapping helpers
-2. practice submit service / route boundary
+1. 冻结当前 release candidate。
+2. 备份并部署 current HEAD。
+3. 执行 migration `0012`、`0013`。
+4. 配置 `/admin` 独立静态应用路由。
+5. 验证学生端、Admin、Import worker、production gate、restore 和 load baseline。
+
+完整决策与验收范围见 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)。
+
+### P1：修复 staging 暴露的问题并完成人工验收
+
+先由真实环境决定下一项工程工作，避免继续扩大“本地绿、线上旧”的证据断层。
 
 ### P1：Question Review 完整运营流
 
@@ -287,34 +296,27 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 ## 7. 推荐下一阶段路线
 
-### 推荐 B9.34：route validation / error mapping helpers
+### 推荐 B9.34：Current-HEAD staging re-baseline
 
-目标：不改行为，抽取重复 route validation、schema parse、error mapping。
+目标：证明当前 HEAD、migration `0012/0013`、学生端、独立 Admin 和 durable Import worker 能在真实服务器上整体稳定运行。
 
-优先处理：
+核心验收：
 
-```text
-apps/api/src/routes/helpers/
-apps/api/src/routes/admin* shared parse/error helpers
-```
+- 服务器 commit 与计划部署 commit 一致。
+- migration 到 `0013`。
+- `/` 与 `/admin` 分别服务正确的应用。
+- production gate、学生/Admin 功能 smoke、worker restart/stuck recovery 通过。
+- migration 后 backup/restore 与 load baseline 通过。
+- 部署证据和状态文档刷新。
 
-验收：
+详细执行清单见 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)。
 
-- route response contract 保持不变。
-- route tests 不变或只做 helper import 调整。
-- `npm run verify:docker` 通过。
-- 文档更新。
+### B9.34 后的候选
 
-### 备选 B9.34：Import Jobs realtime progress
-
-如果当前最想提升管理端导入体验，可以先做：
-
-- progress event model
-- SSE endpoint
-- worker progress emit
-- admin UI 轮询改实时或半实时
-
-但它会比纯模块化更容易改行为，所以风险略高。
+1. 如果真实导入暴露出进度不可见问题，做 Import Jobs realtime progress。
+2. 如果真实验收暴露 route 错误不一致或维护压力，做 route validation/error mapping helpers。
+3. 如果底层稳定但运营流程不足，优先 Question Review diff/审批/回滚。
+4. 如果用户审查认为学生学习闭环更重要，进入 Learning 前端 IA/功能页。
 
 ### 不建议作为下一阶段
 
@@ -329,14 +331,17 @@ apps/api/src/routes/admin* shared parse/error helpers
 
 我们现在需要决定下一步走哪条：
 
-1. **稳健路线：继续 Admin 后端模块化。**
-   推荐，风险最低，有利于后续长期维护。
+1. **发布证据路线：部署并验证 current HEAD。**
+   当前唯一 P0。它能同时验证 migration、Admin 路由、worker、真实数据和运维配置。
 
 2. **体验路线：补 Import Jobs realtime progress。**
-   对管理端体验提升明显，但会引入新行为和新测试面。
+   保留为验收后的候选，不在 worker 尚未真实部署前叠加。
 
-3. **产品路线：开始 Learning 前端 IA / wireframe。**
-   可以做，但不要做最终视觉。
+3. **工程路线：收敛 route validation/error mapping。**
+   属于明确技术债，但先不要继续扩大待部署 diff。
+
+4. **产品路线：Question Review 完整流或 Learning 前端 IA。**
+   由真实管理员/学生试用反馈决定顺序，最终视觉仍后置。
 
 我的建议是：
-**B9.31 Admin Question Review、B9.32 Admin Students 与 B9.33 Bank Mappings 后端模块化已完成；下一步建议收敛 route validation/error mapping，或转入 Import realtime progress。**
+**不是继续 route helper 或 realtime progress。下一步应先做 B9.34 Current-HEAD staging re-baseline，把当前 22 个未部署提交、2 个新 migration、独立 Admin 和 Import worker 在真实服务器上完整证明。**

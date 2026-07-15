@@ -25,9 +25,10 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 完整管理平台最终视觉、Question Review diff/审批/回滚、Import Jobs 实时 progress 事件流、Admin dashboard/ops summary 等完整运营体验。
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
-- PR review / merge 决策、外部监控告警、性能压测、目标环境迁移执行证据和正式部署验收。
+- PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
+- **当前 HEAD 的真实环境重新验收：** 服务器仍运行 B9.14 commit `1686c6e` 和 migration `0011`，尚未部署最近 22 个提交、migration `0012/0013`、独立 Admin app 和 durable Import worker。
 
-当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
+当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，下一阶段决策见 [B9.34 优先级复核](docs/next-priority-review-b9.34.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
 ## Workspace
 
@@ -35,6 +36,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 apps/
   api/       Fastify API、PostgreSQL repository、导入任务
   web/       React/Vite 学生端
+  admin/     React/Vite 管理端
 packages/
   shared/    跨端共享 schema、versioned API contract 与类型
 docs/        当前架构、API、数据库、状态与路线图
