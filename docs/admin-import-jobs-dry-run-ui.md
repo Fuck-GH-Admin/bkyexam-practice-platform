@@ -1,8 +1,8 @@
-# B9.22 Admin Import Jobs dry-run/history UI
+﻿# B9.22 Admin Import Jobs dry-run/history UI
 
 状态日期：**2026-07-15**
 
-目标：按 B9.21 之后的轻量路线，在 `apps/admin` 里补 Import Jobs 的 dry-run、历史、详情和错误摘要 UI。这个阶段只验证真实 contract 和真实状态，不做 true import 写入控制，不做 reset/cancel/retry，也不做最终视觉打磨。
+目标：按 B9.21 之后的轻量路线，在 `apps/admin` 里补 Import Jobs 的 dry-run、历史、详情和错误摘要 UI。这个阶段只验证真实 contract 和真实状态；B9.27 已在后续补齐 true import/reset/cancel/retry 与最小控制 UI，本页保留为 B9.22 历史记录。
 
 ## 1. 本阶段结论
 
@@ -12,7 +12,7 @@ Import Jobs list/filter/page = implemented
 Create dry-run = implemented
 Import Job detail = implemented
 Error report = implemented
-true import write/reset/cancel/retry = deferred
+true import write/reset/cancel/retry = implemented later in B9.27
 visual polish = deferred
 ```
 

@@ -380,13 +380,17 @@ describe('admin import job routes', () => {
     });
   });
 
-  it('keeps resetBeforeImport disabled for enabled import mode', async () => {
+  it('allows resetBeforeImport for enabled import mode and super_admin', async () => {
+    const calls: Array<{ sourceDir: string; options: unknown }> = [];
     const app = buildApp({
       adminAuthRepository: await adminAuthRepository(['super_admin']),
       adminImportJobRepository: createMemoryAdminImportJobRepository(),
       adminImportAllowedRoots: [fixtureDir],
       adminImportModeEnabled: true,
-      adminImportRunner: async () => ({ questions: 0 }),
+      adminImportRunner: async (sourceDir, options) => {
+        calls.push({ sourceDir, options });
+        return { questions: 0 };
+      },
     });
     const cookie = await loginAdmin(app);
 
@@ -402,7 +406,95 @@ describe('admin import job routes', () => {
       },
     });
 
-    expect(response.statusCode).toBe(422);
-    expect(response.json()).toEqual({ error: 'resetBeforeImport is not enabled for import mode yet' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      job: {
+        mode: 'import',
+        status: 'succeeded',
+        options: { resetBeforeImport: true },
+      },
+    });
+    expect(calls).toEqual([{
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: true, generateMappings: true },
+    }]);
+  });
+
+  it('cancels running import jobs and retries cancelled jobs', async () => {
+    const auditLogRepository = createMemoryAuditLogRepository();
+    const runningJob: AdminImportJobV1 = {
+      id: '60000000-0000-4000-8000-000000000003',
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'running',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      progress: { phase: 'running', current: 0, total: 0 },
+      summary: {},
+      errorSummary: [],
+      createdBy: { id: adminId, displayName: 'Operator' },
+      createdAt: '2026-07-13T10:00:00.000Z',
+      startedAt: '2026-07-13T10:00:00.000Z',
+      finishedAt: null,
+    };
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: createMemoryAdminImportJobRepository([runningJob]),
+      adminImportAllowedRoots: [fixtureDir],
+      auditService: { record: (input) => auditLogRepository.append({
+        actorAdminId: input.actorAdminId ?? null,
+        action: input.action,
+        resourceType: input.resourceType,
+        resourceId: input.resourceId,
+        before: input.before ?? null,
+        after: input.after ?? null,
+        metadata: input.metadata ?? {},
+        result: input.result ?? 'success',
+        createdAt: new Date('2026-07-13T10:00:00.000Z'),
+      }) },
+    });
+    const cookie = await loginAdmin(app);
+
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/api/admin/import-jobs/${runningJob.id}/cancel`,
+      headers: { cookie },
+    });
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.json()).toMatchObject({
+      job: {
+        id: runningJob.id,
+        status: 'cancelled',
+        progress: { phase: 'cancelled' },
+      },
+    });
+    expect(auditLogRepository.entries.at(-1)).toMatchObject({
+      action: 'import_job.cancel',
+      resourceId: runningJob.id,
+      before: { status: 'running' },
+      after: { status: 'cancelled' },
+    });
+
+    const retried = await app.inject({
+      method: 'POST',
+      url: `/api/admin/import-jobs/${runningJob.id}/retry`,
+      headers: { cookie },
+    });
+    expect(retried.statusCode).toBe(200);
+    expect(retried.json()).toMatchObject({
+      job: {
+        mode: 'dry_run',
+        status: 'succeeded',
+        summary: { questions: 2, bankMappings: 1 },
+      },
+    });
+    expect(retried.json().job.id).not.toBe(runningJob.id);
+    expect(auditLogRepository.entries.at(-1)).toMatchObject({
+      action: 'import_job.retry',
+      metadata: {
+        sourceJobId: runningJob.id,
+        sourceStatus: 'cancelled',
+      },
+    });
   });
 });

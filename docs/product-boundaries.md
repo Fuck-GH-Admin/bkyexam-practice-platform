@@ -41,9 +41,9 @@ BKYExam 应明确分成三个产品面，而不是一个页面不断追加按钮
 - 抽查题干、选项、答案与解析的质量。
 - 处理异常数据和必要的学生支持。
 
-管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前已覆盖 Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs dry-run/history、Question Review preview/override、Audit Logs read-only 与 Admin Users management。
+管理端不应直接复用学生端页面并“多显示几个按钮”。它需要独立入口、权限、导航和任务流；B9.19 已创建独立 `apps/admin`，当前已覆盖 Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry、Question Review preview/override、Audit Logs read-only 与 Admin Users management。
 
-当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，B9.21 Bank Mappings P1 UI 见 [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，B9.22 Import Jobs dry-run/history UI 见 [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，B9.23 Question Review preview UI 见 [`admin-question-review-preview-ui.md`](./admin-question-review-preview-ui.md)，B9.24 Audit Logs read-only UI 见 [`admin-audit-logs-readonly-ui.md`](./admin-audit-logs-readonly-ui.md)，B9.25 Admin Users management UI 见 [`admin-users-management-ui.md`](./admin-users-management-ui.md)，B9.26 Question Review override layer 见 [`question-review-override-layer.md`](./question-review-override-layer.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/history、Question Review preview/override、Audit Logs read-only 和 Admin Users management 可运营；Import true write/reset/cancel/retry 与 override diff/审批/回滚继续后置。
+当前管理端信息架构闸门见 [`admin-console-ia.md`](./admin-console-ia.md)，管理端静态 wireframe 审查包见 [`admin-static-wireframe-review.md`](./admin-static-wireframe-review.md)，B9.19 运行版记录见 [`admin-operational-mvp.md`](./admin-operational-mvp.md)，B9.20 P1 工作流缺口审查见 [`admin-p1-workflow-gap-review.md`](./admin-p1-workflow-gap-review.md)，B9.21 Bank Mappings P1 UI 见 [`admin-bank-mappings-p1-ui.md`](./admin-bank-mappings-p1-ui.md)，B9.22 Import Jobs dry-run/history UI 见 [`admin-import-jobs-dry-run-ui.md`](./admin-import-jobs-dry-run-ui.md)，B9.23 Question Review preview UI 见 [`admin-question-review-preview-ui.md`](./admin-question-review-preview-ui.md)，B9.24 Audit Logs read-only UI 见 [`admin-audit-logs-readonly-ui.md`](./admin-audit-logs-readonly-ui.md)，B9.25 Admin Users management UI 见 [`admin-users-management-ui.md`](./admin-users-management-ui.md)，B9.26 Question Review override layer 见 [`question-review-override-layer.md`](./question-review-override-layer.md)，B9.27 Import Jobs control/modularization 见 [`import-jobs-control-and-backend-modularization.md`](./import-jobs-control-and-backend-modularization.md)，正式前端开工前审查包见 [`frontend-kickoff-review.md`](./frontend-kickoff-review.md)。Admin User manage 与 Admin Student Manage 后端已完成；`apps/admin` 已让 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry、Question Review preview/override、Audit Logs read-only 和 Admin Users management 可运营；durable import worker/heartbeat 与 override diff/审批/回滚继续后置。
 
 ### API / Data Platform
 
@@ -187,7 +187,7 @@ mastered -> active  # 再次答错时自动恢复
 4. 下载或查看错误摘要。
 5. 完成后运行数据健康检查。
 
-当前已有 job table、dry-run/error report API，以及受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import 写入 gate；仍没有正式管理 UI、reset 导入、异步队列、取消/重试和错误文件级下载。
+当前已有 job table、dry-run/error report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import 写入 gate、reset import、cancel/retry endpoint 和最小管理 UI；仍没有 durable worker/heartbeat、实时 progress、typed reset 二次确认和错误文件级下载。
 
 ### Question Review
 
@@ -319,7 +319,7 @@ Admin 通过 Catalog/Import/Identity 的 service 操作数据，不应该让 rou
 
 - Practice/Wrongbook/Learning 已建立 `contracts/v1`，API 输出和 Web 输入均执行 runtime parse。
 - `completedCount` 已固定为 answered/graded questions 语义。
-- Auth、Catalog、Learning Dashboard/Trends/Goals/Review Marks、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate、Admin Question Review detail/override、Admin Audit Log、通用 error 已迁入 shared v1；reset import、异步队列和正式 Admin UI 尚未实现。
+- Auth、Catalog、Learning Dashboard/Trends/Goals/Review Marks、Admin Auth、Admin User manage、Admin Bank Mapping read/write、Admin System Status、Admin Import Job dry-run/Error Report/true import gate/reset/cancel/retry、Admin Question Review detail/override、Admin Audit Log、通用 error 已迁入 shared v1；durable import worker/heartbeat/实时 progress 尚未实现。
 - 详细版本规则见 [contracts.md](contracts.md)。
 
 ## 6. Frontend Timing Decision

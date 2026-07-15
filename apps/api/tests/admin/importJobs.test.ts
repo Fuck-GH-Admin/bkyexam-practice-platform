@@ -8,6 +8,7 @@ import {
 } from '../../src/admin/importJobs';
 import type { AdminImportJobV1 } from '@bkyexam-practice/shared';
 import type { PgPool, QueryClient } from '../../src/db/client';
+import { throwIfImportCancelled } from '../../src/import/cancellation';
 import type { ImportedQuestionBankData } from '../../src/import/loadQuestionBankData';
 
 interface RecordedQuery {
@@ -157,11 +158,15 @@ describe('admin import job service', () => {
     }]);
   });
 
-  it('keeps resetBeforeImport disabled for enabled import mode', async () => {
+  it('allows resetBeforeImport in enabled import mode for super_admin only', async () => {
+    const calls: unknown[] = [];
     const service = createAdminImportJobService(createMemoryAdminImportJobRepository(), {
       allowedRoots: [allowedRoot],
       enableImportMode: true,
-      importRun: async () => ({ questions: 0 }),
+      importRun: async (_receivedSourceDir, receivedOptions) => {
+        calls.push(receivedOptions);
+        return { questions: 0 };
+      },
     });
 
     const request = {
@@ -174,12 +179,85 @@ describe('admin import job service', () => {
     await expect(service.createImportJob({
       request,
       actor: { id: adminId, displayName: 'Super Admin', roles: ['super_admin'] },
-    })).resolves.toEqual({ status: 'reset_import_not_enabled' });
+    })).resolves.toMatchObject({
+      status: 'created',
+      job: {
+        mode: 'import',
+        status: 'succeeded',
+        options: { resetBeforeImport: true },
+      },
+    });
+    expect(calls).toEqual([{ batchSize: 1000, resetBeforeImport: true, generateMappings: true }]);
 
     await expect(service.createImportJob({
       request,
       actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
     })).resolves.toEqual({ status: 'reset_requires_super_admin' });
+  });
+
+  it('cancels running jobs and retries cancelled jobs', async () => {
+    const repository = createMemoryAdminImportJobRepository([baseJob]);
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      dryRun: async () => ({ questions: 2 }),
+    });
+
+    await expect(service.cancelImportJob(jobId)).resolves.toMatchObject({
+      status: 'cancelled',
+      beforeStatus: 'running',
+      job: {
+        id: jobId,
+        status: 'cancelled',
+        progress: { phase: 'cancelled' },
+      },
+    });
+    await expect(service.cancelImportJob(jobId)).resolves.toMatchObject({
+      status: 'cancelled',
+      beforeStatus: 'cancelled',
+      job: { id: jobId, status: 'cancelled' },
+    });
+
+    await expect(service.retryImportJob({
+      jobId,
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    })).resolves.toMatchObject({
+      status: 'created',
+      sourceJob: { id: jobId, status: 'cancelled' },
+      job: {
+        status: 'succeeded',
+        summary: { questions: 2 },
+      },
+    });
+  });
+
+  it('returns a cancelled job when the runner observes cancellation', async () => {
+    const repository = createMemoryAdminImportJobRepository();
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      dryRun: async (_receivedSourceDir, _receivedOptions, context) => {
+        if (!context) throw new Error('Expected import job run context.');
+        await repository.cancelImportJob({ jobId: context.jobId });
+        await throwIfImportCancelled(context.shouldAbort);
+        return { questions: 99 };
+      },
+    });
+
+    await expect(service.createImportJob({
+      request: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    })).resolves.toMatchObject({
+      status: 'created',
+      job: {
+        status: 'cancelled',
+        progress: { phase: 'cancelled' },
+        summary: {},
+      },
+    });
   });
 
   it('records failed import runner errors on the created job', async () => {

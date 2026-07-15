@@ -168,9 +168,6 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       if (result.status === 'import_mode_not_enabled') {
         return reply.status(422).send(errorResponse('Import mode is not enabled yet'));
       }
-      if (result.status === 'reset_import_not_enabled') {
-        return reply.status(422).send(errorResponse('resetBeforeImport is not enabled for import mode yet'));
-      }
 
       await auditService.record({
         actorAdminId: required.session.admin.id,
@@ -190,6 +187,109 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       });
 
       return CreateAdminImportJobResponseV1Schema.parse({ job: result.job });
+    });
+
+    app.post('/api/admin/import-jobs/:jobId/cancel', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'import_job:create');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { jobId?: unknown };
+      const parsedJobId = CaseInsensitiveUuidV1Schema.safeParse(params.jobId);
+      if (!parsedJobId.success) {
+        return reply.status(400).send(errorResponse('Invalid import job id'));
+      }
+
+      const result = await service.cancelImportJob(parsedJobId.data.toLocaleLowerCase());
+      if (result.status === 'not_found') {
+        return reply.status(404).send(errorResponse('Import job not found'));
+      }
+      if (result.status === 'not_cancelable') {
+        return reply.status(409).send(errorResponse('Import job cannot be cancelled'));
+      }
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'import_job.cancel',
+        resourceType: 'import_job',
+        resourceId: result.job.id,
+        before: { status: result.beforeStatus },
+        after: {
+          kind: result.job.kind,
+          mode: result.job.mode,
+          status: result.job.status,
+          sourceDir: result.job.sourceDir,
+        },
+        metadata: {},
+        result: 'success',
+      });
+
+      return AdminImportJobDetailResponseV1Schema.parse({ job: result.job });
+    });
+
+    app.post('/api/admin/import-jobs/:jobId/retry', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'import_job:create');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { jobId?: unknown };
+      const parsedJobId = CaseInsensitiveUuidV1Schema.safeParse(params.jobId);
+      if (!parsedJobId.success) {
+        return reply.status(400).send(errorResponse('Invalid import job id'));
+      }
+
+      const result = await service.retryImportJob({
+        jobId: parsedJobId.data.toLocaleLowerCase(),
+        actor: {
+          id: required.session.admin.id,
+          displayName: required.session.admin.displayName,
+          roles: required.session.admin.roles,
+        },
+      });
+
+      if (result.status === 'not_found') {
+        return reply.status(404).send(errorResponse('Import job not found'));
+      }
+      if (result.status === 'not_retryable') {
+        return reply.status(409).send(errorResponse('Import job cannot be retried'));
+      }
+      if (result.status === 'running_conflict') {
+        return reply.status(409).send(errorResponse('Import job already running'));
+      }
+      if (result.status === 'source_dir_forbidden') {
+        return reply.status(403).send(errorResponse('Import source directory is not allowed'));
+      }
+      if (result.status === 'reset_requires_super_admin') {
+        return reply.status(403).send(errorResponse('resetBeforeImport requires super_admin'));
+      }
+      if (result.status === 'import_mode_not_enabled') {
+        return reply.status(422).send(errorResponse('Import mode is not enabled yet'));
+      }
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'import_job.retry',
+        resourceType: 'import_job',
+        resourceId: result.job.id,
+        after: {
+          kind: result.job.kind,
+          mode: result.job.mode,
+          status: result.job.status,
+          sourceDir: result.job.sourceDir,
+        },
+        metadata: {
+          sourceJobId: result.sourceJob.id,
+          sourceStatus: result.sourceJob.status,
+          options: result.job.options,
+        },
+        result: 'success',
+      });
+
+      return AdminImportJobDetailResponseV1Schema.parse({ job: result.job });
     });
   };
 }

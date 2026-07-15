@@ -9,10 +9,13 @@ import {
 } from './loadQuestionBankData.js';
 import { generateBankMappings } from '../mapping/generateBankMappings.js';
 import type { BankMapping } from '../mapping/bankMapping.js';
+import { throwIfImportCancelled } from './cancellation.js';
 
 export interface ImportQuestionBankOptions {
   batchSize: number;
   generateMappings?: boolean;
+  resetBeforeImport?: boolean;
+  shouldAbort?: () => boolean | Promise<boolean>;
 }
 
 export interface ImportQuestionBankCounts {
@@ -44,13 +47,20 @@ export async function importQuestionBank(
   const questionIds = new Set(data.questions.map((question) => question.id));
   const importableOptions = data.options.filter((option) => questionIds.has(option.questionId));
 
+  await throwIfImportCancelled(options.shouldAbort);
   await client.query('BEGIN');
 
   try {
-    await insertBatches(client, data.classifications, batchSize, classificationSql);
-    await insertBatches(client, data.questions, batchSize, questionSql);
-    await insertBatches(client, importableOptions, batchSize, optionSql);
-    await insertBatches(client, bankMappings, batchSize, bankMappingSql);
+    await throwIfImportCancelled(options.shouldAbort);
+    if (options.resetBeforeImport) {
+      await resetImportedCorpus(client);
+      await throwIfImportCancelled(options.shouldAbort);
+    }
+
+    await insertBatches(client, data.classifications, batchSize, classificationSql, options.shouldAbort);
+    await insertBatches(client, data.questions, batchSize, questionSql, options.shouldAbort);
+    await insertBatches(client, importableOptions, batchSize, optionSql, options.shouldAbort);
+    await insertBatches(client, bankMappings, batchSize, bankMappingSql, options.shouldAbort);
     await client.query('COMMIT');
 
     return {
@@ -71,15 +81,22 @@ async function insertBatches<T>(
   records: readonly T[],
   batchSize: number,
   buildSql: (records: readonly T[]) => { sql: string; params: readonly unknown[] },
+  shouldAbort?: () => boolean | Promise<boolean>,
 ): Promise<void> {
   for (let index = 0; index < records.length; index += batchSize) {
+    await throwIfImportCancelled(shouldAbort);
     const batch = records.slice(index, index + batchSize);
 
     if (batch.length > 0) {
       const { sql, params } = buildSql(batch);
       await client.query(sql, params);
+      await throwIfImportCancelled(shouldAbort);
     }
   }
+}
+
+async function resetImportedCorpus(client: QueryClient): Promise<void> {
+  await client.query('TRUNCATE classifications CASCADE');
 }
 
 function classificationSql(records: readonly ImportedClassification[]): { sql: string; params: readonly unknown[] } {

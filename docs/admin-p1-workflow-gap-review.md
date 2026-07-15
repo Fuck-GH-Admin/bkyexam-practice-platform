@@ -4,6 +4,8 @@
 
 本文是 B9.20 的阶段产物：在 B9.19 已运行的 `apps/admin` 骨架上，先审查 Bank Mappings、Import Jobs、Question Review 三条 P1 管理工作流是否可以直接进入 UI 实现，以及是否还存在必须先补的后端 command、字段或状态。
 
+2026-07-16 更新：本文保留 B9.20 当时的审查结论；其中 Import true write/reset/cancel/retry 已在 B9.27 补齐，当前剩余的是 durable worker/heartbeat/实时进度与更完整的导入可观测性。
+
 本阶段不做最终视觉，不新增业务代码，不改变 API contract；目标是避免再次出现“先做页面，做到一半才发现后端语义不够”的问题。
 
 ## 1. 结论
@@ -21,15 +23,15 @@
 
 3. **Import Jobs 可以做 dry-run/read-only 操作 UI。**
    - 现有 list/detail/create dry-run/error report 能支撑“导入前检查、看 summary、看错误摘要”。
-   - true import 写入由服务端 gate 控制，UI 可以显示 blocked/error 状态，但不应在这一阶段承诺 reset、cancel、retry 或后台队列。
+   - true import 写入由服务端 gate 控制，UI 可以显示 blocked/error 状态；B9.20 当时不承诺 reset、cancel、retry 或后台队列，B9.27 已补 reset/cancel/retry 最小控制闭环。
 
 ### 需要先补后端或先明确语义的部分
 
-1. **Import true write/reset/cancel/retry 不应先做完整 UI。**
-   - 当前 create job 在 request 内同步执行 runner，`running` 只是持久化状态，不是独立后台 worker 队列。
-   - `resetBeforeImport=true` 在 import mode 中仍被后端显式禁止。
-   - 没有 cancel/retry endpoint，也没有异步 job worker、heartbeat、阶段级进度事件。
-   - 因此 Import P1 UI 应先限定为 dry-run 和历史查看；真正写入导入控制建议拆成 B9.22 或单独后端阶段。
+1. **Import true write/reset/cancel/retry 在 B9.20 当时不应先做完整 UI。**
+   - B9.20 当时 create job 在 request 内同步执行 runner，`running` 只是持久化状态，不是独立后台 worker 队列。
+   - B9.20 当时 `resetBeforeImport=true` 在 import mode 中仍被后端显式禁止；B9.27 已改为仅 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许。
+   - B9.20 当时没有 cancel/retry endpoint，也没有异步 job worker、heartbeat、阶段级进度事件；B9.27 已补 cancel/retry endpoint，durable worker/heartbeat/实时进度仍后置。
+   - 因此 B9.20 的 Import P1 UI 先限定为 dry-run 和历史查看；真正写入导入控制已拆到 B9.27 完成最小闭环。
 
 2. **Question Review 完整审核器还缺 full question payload。**
    - 现有 detail 与 list 都是 `AdminQuestionReviewItemV1`，只返回 `contentPreview`、`answerPreview`、`optionCount`、flags 和 exclusion 状态。
@@ -224,7 +226,7 @@ GET /api/admin/ops/summary
 
 1. 后端字段与 command 最完整。
 2. 直接解决“题库整理”这个管理平台核心任务。
-3. 不依赖 import queue/reset/cancel/retry。
+3. B9.21 当时不依赖 import queue/reset/cancel/retry。
 4. 可以验证 `apps/admin` 的真实列表、详情、编辑、批量状态、权限和错误状态模式。
 5. 做完后再复用同一套 Admin UI 数据模式到 Question Review 和 Import Jobs。
 
@@ -240,7 +242,7 @@ B9.21 建议范围：
 
 B9.21 不做：
 
-- Import true write/reset/cancel/retry。
+- Import true write/reset/cancel/retry（B9.21 当时不做；B9.27 已补最小闭环）。
 - full question editor。
 - Audit diff polish。
 - 最终视觉系统。

@@ -5,6 +5,20 @@
 后端完成度、未达成目标与下一步执行计划详见
 [`backend-completeness-plan.md`](./backend-completeness-plan.md)。
 
+## Completed B9.27 Import Jobs control and backend modularization — 2026-07-16
+
+- [x] 新增 `docs/import-jobs-control-and-backend-modularization.md`。
+- [x] `mode=import` 下允许 `super_admin` 使用 `resetBeforeImport=true`。
+- [x] reset import 在同一事务中执行 `TRUNCATE classifications CASCADE` 后重导；失败或 cancel 会 rollback。
+- [x] 新增 `POST /api/admin/import-jobs/:jobId/cancel`，写入 `import_job.cancel` audit。
+- [x] 新增 `POST /api/admin/import-jobs/:jobId/retry`，复制原 job source/options/mode 创建新 job，并写入 `import_job.retry` audit。
+- [x] Import runner 新增 cancellation checkpoint；cancelled job 不会被 complete/fail 覆盖。
+- [x] `apps/admin` Import Jobs create form 支持 dry_run/import/reset，detail 支持 cancel/retry。
+- [x] 拆分 `apps/api/src/admin/importJobs.ts` 为 `admin/import-jobs/{types,repository,service,runner}.ts`，原路径保留 facade。
+- [x] 新增 `apps/api/src/import/cancellation.ts`，`importQuestionBank` 支持 `resetBeforeImport` 与 `shouldAbort`。
+- [x] 扩展 API service/route/PostgreSQL integration/Admin Playwright smoke。
+- [x] 不做 durable queue/worker、不做 heartbeat/stuck recovery、不做实时 progress 事件流、不做最终视觉。
+
 ## Completed B9.26 Question Review override layer — 2026-07-15
 
 - [x] 新增 `docs/question-review-override-layer.md`。
@@ -57,7 +71,7 @@
 - [x] 实现 `/admin/import-jobs/:jobId` detail，展示 progress、summary、questionTypes、options 和 lifecycle timestamps。
 - [x] 实现 error report panel，调用 `/api/admin/import-jobs/:jobId/errors` 并展示 `errorSummary`。
 - [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
-- [x] 不做 true import write UI，不做 reset/cancel/retry，不做异步 queue/worker，不做最终视觉。
+- [x] B9.22 本阶段不做 true import write UI、reset/cancel/retry、异步 queue/worker 和最终视觉；reset/cancel/retry 已在 B9.27 补齐。
 ## Completed Frontend B9.21 Admin Bank Mappings P1 UI — 2026-07-15
 
 - [x] 新增 `docs/admin-bank-mappings-p1-ui.md`。
@@ -68,13 +82,13 @@
 - [x] 保存使用 `expectedVersion`，处理 `409` version conflict 和无客观题发布风险提示。
 - [x] 实现 bulk status，渲染 `updated[]` / `failed[]` partial result。
 - [x] 扩展 Admin unit tests、mock Admin API 和 Playwright smoke。
-- [x] 不做最终视觉，不做 Import true write/reset/cancel/retry，不做完整 Question Review editor。
+- [x] B9.21 本阶段不做最终视觉、Import true write/reset/cancel/retry 和完整 Question Review editor；Import reset/cancel/retry 已在 B9.27 补齐。
 ## Completed Backend B9.20 Admin P1 Workflow UI Review / Backend Gap Check — 2026-07-15
 
 - [x] 新增 `docs/admin-p1-workflow-gap-review.md`。
 - [x] 对照 shared v1 Admin Bank Mapping contract，确认 list/detail/edit/bulk-status UI 字段和状态足够支撑 P1。
 - [x] 确认 Bank Mappings 是下一阶段最稳的管理端 P1 UI 候选；无阻塞性后端缺口。
-- [x] 对照 Import Jobs contract 和 service，确认 dry-run/history/error-report UI 可做，但 true import write/reset/cancel/retry 需要先补异步队列和控制后端。
+- [x] 对照 Import Jobs contract 和 service，确认 B9.20 当时 dry-run/history/error-report UI 可做，但 true import write/reset/cancel/retry 需要先补控制后端；该控制后端已在 B9.27 补齐，durable worker 仍后置。
 - [x] 对照 Question Review contract，确认可先做 preview-level flag/exclusion UI；完整审核器仍缺 full question detail/override 层。
 - [x] 明确 Admin dashboard summary 不应塞入 System Status；如需要账号运营统计，后续新增独立 ops summary API。
 - [x] 不实现最终视觉，不新增业务代码，不改变 API contract。
@@ -364,8 +378,8 @@
 - [x] `generateMappings=false` 时跳过 bank_mappings 写入。
 - [x] 重复 true import 保持 upsert 幂等。
 - [x] 失败 true import 记录 failed job/errorSummary，并回滚 corpus 写入。
-- [x] `resetBeforeImport=true` 在 import mode 中仍返回 `422`，不做清库重导。
-- [x] PostgreSQL integration 覆盖成功写入、幂等、失败回滚/error report 和 reset gate。
+- [x] B5.9 当时 `resetBeforeImport=true` 在 import mode 中仍返回 `422`，不做清库重导；B9.27 已允许 `super_admin` reset import。
+- [x] B5.9 PostgreSQL integration 覆盖成功写入、幂等、失败回滚/error report 和 reset gate；B9.27 已改为 reset success / destructive corpus reset 覆盖。
 - [x] 不创建正式 Admin 前端。
 
 ## Completed Backend B5.8 — 2026-07-14
@@ -622,8 +636,9 @@
 - [x] 初始 `super_admin` bootstrap。
 - [x] Audit Log read API。
 - [x] Admin User 管理。
-- [x] 真正执行写入的 import mode（受 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护；reset 仍未启用）。
-- [ ] import reset、cancel/retry 和异步 worker/队列。
+- [x] 真正执行写入的 import mode（受 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护）。
+- [x] import reset、cancel/retry。
+- [ ] 异步 durable worker/队列、heartbeat 和 stuck job recovery。
 
 ### Frontend
 

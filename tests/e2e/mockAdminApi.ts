@@ -499,20 +499,51 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
         mode: AdminImportJobV1['mode'];
         options: AdminImportJobV1['options'];
       }>(route);
-      if (body.mode !== 'dry_run') {
-        return fulfillJson(route, { error: 'Import mode is not enabled yet' }, 422);
-      }
       if (body.sourceDir.toLowerCase().includes('forbidden')) {
         return fulfillJson(route, { error: 'Import source directory is not allowed' }, 403);
       }
       const job = buildImportJob({
         id: nextImportJobId(state.importJobs.length + 1),
+        mode: body.mode,
         status: 'succeeded',
         sourceDir: body.sourceDir,
         options: body.options,
       });
       state.importJobs.unshift(job);
       return fulfillJson(route, { job });
+    }
+
+    const importJobCancelMatch = pathname.match(/^\/api\/admin\/import-jobs\/([^/]+)\/cancel$/);
+    if (method === 'POST' && importJobCancelMatch) {
+      const jobId = importJobCancelMatch[1];
+      const job = state.importJobs.find((item) => item.id === jobId);
+      if (!job) return fulfillJson(route, { error: 'Import job not found' }, 404);
+      if (job.status !== 'queued' && job.status !== 'running' && job.status !== 'cancelled') {
+        return fulfillJson(route, { error: 'Import job cannot be cancelled' }, 409);
+      }
+      job.status = 'cancelled';
+      job.progress = { ...job.progress, phase: 'cancelled' };
+      job.finishedAt = '2026-07-15T10:03:00.000Z';
+      return fulfillJson(route, { job });
+    }
+
+    const importJobRetryMatch = pathname.match(/^\/api\/admin\/import-jobs\/([^/]+)\/retry$/);
+    if (method === 'POST' && importJobRetryMatch) {
+      const jobId = importJobRetryMatch[1];
+      const job = state.importJobs.find((item) => item.id === jobId);
+      if (!job) return fulfillJson(route, { error: 'Import job not found' }, 404);
+      if (job.status !== 'failed' && job.status !== 'cancelled') {
+        return fulfillJson(route, { error: 'Import job cannot be retried' }, 409);
+      }
+      const retried = buildImportJob({
+        id: nextImportJobId(state.importJobs.length + 1),
+        mode: job.mode,
+        status: 'succeeded',
+        sourceDir: job.sourceDir,
+        options: job.options,
+      });
+      state.importJobs.unshift(retried);
+      return fulfillJson(route, { job: retried });
     }
 
     const importJobErrorsMatch = pathname.match(/^\/api\/admin\/import-jobs\/([^/]+)\/errors$/);
@@ -787,6 +818,7 @@ function buildStudentPreview(mapping: AdminBankMappingDetailV1) {
 
 function buildImportJob(input: {
   id: string;
+  mode?: AdminImportJobV1['mode'];
   status: AdminImportJobV1['status'];
   sourceDir: string;
   options?: AdminImportJobV1['options'];
@@ -797,7 +829,7 @@ function buildImportJob(input: {
   return {
     id: input.id,
     kind: 'full_corpus_import',
-    mode: 'dry_run',
+    mode: input.mode ?? 'dry_run',
     status: input.status,
     sourceDir: input.sourceDir,
     options: input.options ?? {
@@ -807,7 +839,9 @@ function buildImportJob(input: {
     },
     progress: input.status === 'failed'
       ? { phase: 'failed', current: 0, total: 0 }
-      : { phase: 'done', current: questions, total: questions },
+      : input.status === 'cancelled'
+        ? { phase: 'cancelled', current: 0, total: 0 }
+        : { phase: input.status === 'running' ? 'running' : 'done', current: questions, total: questions },
     summary: input.status === 'failed'
       ? {}
       : {

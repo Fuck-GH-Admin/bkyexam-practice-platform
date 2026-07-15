@@ -1480,20 +1480,6 @@ describe('PostgreSQL-backed API integration', () => {
       errorSummary: [expect.objectContaining({ message: expect.any(String) })],
     });
 
-    const importResetGate = await app.inject({
-      method: 'POST',
-      url: '/api/admin/import-jobs',
-      headers: { cookie: superAdminCookie },
-      payload: {
-        kind: 'full_corpus_import',
-        mode: 'import',
-        sourceDir: importUuidFixtureDir,
-        options: { batchSize: 1, resetBeforeImport: true, generateMappings: true },
-      },
-    });
-    expect(importResetGate.statusCode).toBe(422);
-    expect(importResetGate.json()).toEqual({ error: 'resetBeforeImport is not enabled for import mode yet' });
-
     const learningDashboard = await app.inject({
       method: 'GET',
       url: '/api/learning/dashboard?recentLimit=1',
@@ -1784,6 +1770,54 @@ describe('PostgreSQL-backed API integration', () => {
     expect(afterDeleteReviewMarks.json()).toEqual({
       reviewMarks: [],
       page: { limit: 20, offset: 0, hasMore: false },
+    });
+
+    const resetImport = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie: superAdminCookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: importUuidFixtureDir,
+        options: { batchSize: 1, resetBeforeImport: true, generateMappings: true },
+      },
+    });
+    expect(resetImport.statusCode).toBe(200);
+    expect(resetImport.json()).toMatchObject({
+      job: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        status: 'succeeded',
+        options: { resetBeforeImport: true },
+        progress: { phase: 'done', current: 2, total: 2 },
+        summary: { classifications: 1, questions: 2, options: 1, bankMappings: 1 },
+      },
+    });
+    const resetImportState = await pool.query<{
+      old_bank_count: string;
+      imported_bank_count: string;
+      imported_question_count: string;
+      practice_session_count: string;
+    }>(`
+      SELECT
+        (SELECT COUNT(*) FROM classifications WHERE id = $1) AS old_bank_count,
+        (SELECT COUNT(*) FROM classifications WHERE id = '11000000-0000-4000-8000-000000000001') AS imported_bank_count,
+        (
+          SELECT COUNT(*)
+          FROM questions
+          WHERE id IN (
+            '12000000-0000-4000-8000-000000000001',
+            '12000000-0000-4000-8000-000000000002'
+          )
+        ) AS imported_question_count,
+        (SELECT COUNT(*) FROM practice_sessions) AS practice_session_count
+    `, [fixtureIds.bank]);
+    expect(resetImportState.rows[0]).toEqual({
+      old_bank_count: '0',
+      imported_bank_count: '1',
+      imported_question_count: '2',
+      practice_session_count: '0',
     });
 
     const logout = await app.inject({

@@ -542,7 +542,7 @@ Rules：
 | `running` | 正在执行。 |
 | `succeeded` | 完成且无致命错误。 |
 | `failed` | 任务失败。 |
-| `cancelled` | 取消。第一版可不实现取消接口。 |
+| `cancelled` | 已取消；B9.27 已实现 cancel endpoint。 |
 
 第一版可以由 API process 同步执行，不必先引入 worker/queue。即使同步执行，也要以 job 记录表达状态和结果。
 
@@ -638,7 +638,7 @@ Rules：
 - `sourceDir` 第一版只允许服务端 allowlist 路径，不能任意读文件系统。
 - `resetBeforeImport=true` 是高风险操作，只允许 `super_admin`。
 - 当前实现中 `mode=import` 还必须显式配置 `ADMIN_IMPORT_ENABLE_WRITE=true`。
-- 当前实现中 `resetBeforeImport=true` 在 `mode=import` 里仍禁止，即使 `super_admin` 也返回 `422`。
+- 当前实现中 `resetBeforeImport=true` 在 `mode=import` 里会执行事务内 corpus reset：`TRUNCATE classifications CASCADE`，并清空依赖 corpus 的练习、错题、收藏、质检和 override 数据。
 - `mode=import` 成功时复用导入器事务和幂等 upsert；失败时记录 failed job/errorSummary，并回滚 corpus 写入。
 
 Audit action：
@@ -646,6 +646,28 @@ Audit action：
 ```text
 import_job.create
 ```
+
+### 6.3.1 `POST /api/admin/import-jobs/:id/cancel`
+
+Permission：`import_job:create`
+
+Rules：
+
+- 仅 `queued` / `running` / `cancelled` 可返回成功；`cancelled` 幂等返回。
+- `succeeded` / `failed` 返回 `409 Import job cannot be cancelled`。
+- 写 `import_job.cancel` audit log。
+- 取消为 checkpoint cooperative cancel；当前没有 durable worker/heartbeat。
+
+### 6.3.2 `POST /api/admin/import-jobs/:id/retry`
+
+Permission：`import_job:create`
+
+Rules：
+
+- 仅 `failed` / `cancelled` 可 retry。
+- 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id。
+- 原 job 若为 `resetBeforeImport=true`，当前 actor 仍必须是 `super_admin`。
+- 写 `import_job.retry` audit log。
 
 ### 6.4 `GET /api/admin/import-jobs/:id`
 
@@ -1266,9 +1288,23 @@ Rules：
 - `mode=import` 只有在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 import runner 存在时执行；否则继续返回 `422`。
 - 真实 import 复用 `loadQuestionBankData` 与 `importQuestionBank`，在单事务中 upsert classifications、questions、question_options 和 bank_mappings。
 - `generateMappings=false` 跳过 bank_mappings 写入。
-- `resetBeforeImport=true` 在 import mode 中继续禁止，返回 `422 resetBeforeImport is not enabled for import mode yet`。
+- `resetBeforeImport=true` 在 B9.27 起允许 `super_admin` 使用，并在导入事务内先执行 corpus reset。
 - 失败 import 标记 job 为 `failed`，写入 `errorSummary`，并验证 corpus 写入回滚。
-- PostgreSQL integration 覆盖 enabled import 成功、重复 import 幂等、失败回滚/error report、reset gate。
+- PostgreSQL integration 覆盖 enabled import 成功、重复 import 幂等、失败回滚/error report、reset success。
+
+### B9.27 Import Jobs Control + Backend Modularization
+
+状态：**已完成，2026-07-16。**
+
+交付：
+
+- `resetBeforeImport=true` 在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 `super_admin` 下启用。
+- 新增 `POST /api/admin/import-jobs/:jobId/cancel`。
+- 新增 `POST /api/admin/import-jobs/:jobId/retry`。
+- runner 通过 `AdminImportJobRunContext.shouldAbort` 做 cancellation checkpoint。
+- `completeImportJob` / `failImportJob` 只更新 `queued/running`，避免 cancel 被覆盖。
+- `apps/api/src/admin/importJobs.ts` 拆成 `admin/import-jobs/{types,repository,service,runner}.ts`。
+- `apps/api/src/import/cancellation.ts` 封装 cancellation error/helper。
 
 ## 13. Acceptance Criteria For B5
 
@@ -1281,7 +1317,8 @@ B5 完成时必须满足：
 - 管理员可以查看题库 mapping。
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
-- 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行非 reset 的 true import，并得到幂等/回滚保护。
+- 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行 true import；`super_admin` 可以执行 reset import，并得到幂等/回滚保护。
+- 管理员可以取消 running import job，并 retry failed/cancelled import job。
 - 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
 - 管理员可以通过 CLI 创建第一个 `super_admin`。
 - `super_admin` 可以查询 audit logs。

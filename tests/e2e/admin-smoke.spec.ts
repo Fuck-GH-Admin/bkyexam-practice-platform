@@ -81,11 +81,11 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await page.getByRole('button', { name: 'Import Jobs' }).click();
   await expect(page.getByRole('heading', { name: 'Import Jobs' })).toBeVisible();
   await expect(page.getByText(/questions: 89922/).first()).toBeVisible();
-  await page.getByRole('button', { name: '创建 dry-run' }).click();
-  await expect(page.getByRole('heading', { name: '创建 dry-run' })).toBeVisible();
+  await page.getByRole('button', { name: '创建导入任务' }).click();
+  await expect(page.getByRole('heading', { name: '创建导入任务' })).toBeVisible();
   await page.getByLabel('sourceDir').fill('C:\\Users\\Bot\\Bot\\BKYExam\\questionbank');
   await page.getByLabel('batchSize').fill('500');
-  await page.getByRole('button', { name: '提交 dry-run' }).click();
+  await page.getByRole('button', { name: '提交 dry_run' }).click();
   await expect(page.getByRole('heading', { name: 'full_corpus_import' })).toBeVisible();
   await expect(page.getByText(/questions: 89922/).first()).toBeVisible();
   await page.getByRole('button', { name: '查看 error report' }).click();

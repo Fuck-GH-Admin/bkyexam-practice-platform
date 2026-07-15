@@ -13,7 +13,7 @@ Bank Mapping detail/edit = implemented
 Publish controls = permission-gated
 Bulk status = implemented with partial result
 visual polish = deferred
-Import true write/reset/cancel/retry = deferred
+Import true write/reset/cancel/retry = deferred in B9.21; implemented in B9.27
 Question Review full editor = deferred
 ```
 
@@ -134,7 +134,7 @@ npm run test:e2e  PASS, 5 passed
 
 - 不做最终视觉设计系统。
 - 不重构 Admin app 大文件结构。
-- 不做 Import Jobs true write/reset/cancel/retry。
+- B9.21 本阶段不做 Import Jobs true write/reset/cancel/retry；该能力已在 B9.27 补齐最小闭环。
 - 不做 Import queue/worker。
 - 不做 Question Review full question detail/editor。
 - 不做 Audit Logs diff polish。
@@ -144,7 +144,7 @@ npm run test:e2e  PASS, 5 passed
 
 B9.21 之后有两个合理方向：
 
-1. **B9.22 Import Jobs dry-run/history UI**：只做 dry-run、历史、详情、错误摘要，不碰 true import reset/cancel/retry。
+1. **B9.22 Import Jobs dry-run/history UI**：只做 dry-run、历史、详情、错误摘要，不碰 true import reset/cancel/retry；reset/cancel/retry 后续已在 B9.27 补齐。
 2. **B9.22 Question Review preview UI**：只做 open flags 队列、add/resolve/ignore/exclude，不做完整题目编辑器。
 
 如果继续保持“少费事、先功能、后风格”的原则，建议先做 **Import Jobs dry-run/history UI**，因为它能验证题库导入结果和错误摘要，且不要求新增后端。

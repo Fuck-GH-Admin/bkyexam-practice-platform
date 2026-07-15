@@ -233,7 +233,7 @@ const adminNavigation: Array<{
     path: '/admin/import-jobs',
     permissions: ['import_job:read'],
     implemented: true,
-    description: '导入任务 dry-run、历史、详情和错误摘要；true import/reset/cancel/retry 后置。',
+    description: '导入任务 dry-run/true import、reset、cancel/retry、历史、详情和错误摘要。',
   },
   {
     key: 'question-review',
@@ -865,7 +865,7 @@ function SystemStatusContent({ status }: { status: AdminSystemStatusResponseV1 }
       <section className="admin-card muted-card">
         <h2>Operational notes</h2>
         <ul>
-          <li>true import write gate 仍只在后端环境变量中控制；B9.19 不提供 reset/cancel/retry。</li>
+          <li>true import write gate 由后端环境变量控制；reset/cancel/retry 已进入 Import Jobs 工作流。</li>
           <li>外部监控告警目标未在本页伪造；需要后续接入后再显示。</li>
           <li>学生待改密、锁定统计目前请在 Student Accounts 过滤查看。</li>
         </ul>
@@ -1421,10 +1421,10 @@ function ImportJobsPage({
       <PageHeader
         eyebrow="Import operations"
         title="Import Jobs"
-        description="B9.22 只做 dry-run、历史、详情和错误摘要；true import write/reset/cancel/retry 继续后置。"
+        description="导入任务支持 dry-run、受 gate 保护的 true import、resetBeforeImport、cancel/retry、历史、详情和错误摘要。"
         action={(
           <div className="button-row">
-            <button type="button" onClick={() => navigate('/admin/import-jobs/create')} disabled={!canCreate}>创建 dry-run</button>
+            <button type="button" onClick={() => navigate('/admin/import-jobs/create')} disabled={!canCreate}>创建导入任务</button>
             <button className="ghost" type="button" onClick={() => void loadJobs()} disabled={loading}>刷新列表</button>
           </div>
         )}
@@ -1457,7 +1457,7 @@ function ImportJobsPage({
           </div>
           {error ? <ErrorPanel message={error} onRetry={() => void loadJobs()} /> : null}
           {loading ? <p className="muted">正在加载导入任务…</p> : null}
-          {!loading && !error && jobs.length === 0 ? <InfoPanel title="没有匹配导入任务" detail="当前只开放 dry-run 与历史查看。" /> : null}
+          {!loading && !error && jobs.length === 0 ? <InfoPanel title="没有匹配导入任务" detail="创建 dry-run 或 import 任务后会出现在这里。" /> : null}
           {jobs.length > 0 ? <ImportJobTable jobs={jobs} navigate={navigate} /> : null}
           <div className="pager">
             <button className="ghost" type="button" disabled={offset === 0 || loading} onClick={() => setOffset(Math.max(0, offset - limit))}>上一页</button>
@@ -1470,9 +1470,13 @@ function ImportJobsPage({
           {route.panel === 'create' ? (
             <CreateImportJobPanel canCreate={canCreate} onCreated={refreshAfterCreate} onSessionExpired={onSessionExpired} />
           ) : route.jobId ? (
-            <ImportJobDetailPanel jobId={route.jobId} onSessionExpired={onSessionExpired} />
+            <ImportJobDetailPanel
+              jobId={route.jobId}
+              onSessionExpired={onSessionExpired}
+              onOpenJob={(nextJobId) => navigate(`/admin/import-jobs/${nextJobId}`)}
+            />
           ) : (
-            <InfoPanel title="选择一个导入任务" detail="从左侧列表查看 dry-run summary、progress 和 error report；写入导入控制暂不开放。" />
+            <InfoPanel title="选择一个导入任务" detail="从左侧列表查看 summary、progress、error report，并对 running/failed/cancelled 任务执行 cancel/retry。" />
           )}
         </aside>
       </div>
@@ -1541,8 +1545,10 @@ function CreateImportJobPanel({
   onSessionExpired: () => void;
 }) {
   const [sourceDir, setSourceDir] = useState(defaultImportSourceDir);
+  const [mode, setMode] = useState<AdminImportJobV1['mode']>('dry_run');
   const [batchSize, setBatchSize] = useState('1000');
   const [generateMappings, setGenerateMappings] = useState(true);
+  const [resetBeforeImport, setResetBeforeImport] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [createdJob, setCreatedJob] = useState<AdminImportJobV1 | null>(null);
@@ -1557,10 +1563,10 @@ function CreateImportJobPanel({
       const request = CreateAdminImportJobRequestV1Schema.parse({
         kind: 'full_corpus_import',
         sourceDir,
-        mode: 'dry_run',
+        mode,
         options: {
           batchSize: Number(batchSize),
-          resetBeforeImport: false,
+          resetBeforeImport,
           generateMappings,
         },
       });
@@ -1581,14 +1587,28 @@ function CreateImportJobPanel({
   return (
     <section className="student-detail">
       <p className="eyebrow">Create Import Job</p>
-      <h2>创建 dry-run</h2>
-      <p className="muted">此表单固定 `mode=dry_run` 和 `resetBeforeImport=false`；true import 写入、reset、cancel、retry 后续再设计。</p>
+      <h2>创建导入任务</h2>
+      <p className="muted">`mode=import` 仍由后端 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 控制；`resetBeforeImport=true` 是破坏性 corpus reset，需要 super_admin。</p>
       {!canCreate ? <ForbiddenInline /> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      {createdJob ? <p className="form-success" role="status">dry-run 已创建：{createdJob.status} / {createdJob.id}</p> : null}
+      {createdJob ? <p className="form-success" role="status">{createdJob.mode} 已创建：{createdJob.status} / {createdJob.id}</p> : null}
       <form className="stack-form" onSubmit={submit}>
         <label>sourceDir
           <input value={sourceDir} onChange={(event) => setSourceDir(event.target.value)} disabled={!canCreate || submitting} />
+        </label>
+        <label>mode
+          <select
+            value={mode}
+            onChange={(event) => {
+              const nextMode = event.target.value as AdminImportJobV1['mode'];
+              setMode(nextMode);
+              if (nextMode === 'dry_run') setResetBeforeImport(false);
+            }}
+            disabled={!canCreate || submitting}
+          >
+            <option value="dry_run">dry_run</option>
+            <option value="import">import</option>
+          </select>
         </label>
         <label>batchSize
           <input value={batchSize} onChange={(event) => setBatchSize(event.target.value)} inputMode="numeric" disabled={!canCreate || submitting} />
@@ -1597,7 +1617,16 @@ function CreateImportJobPanel({
           <input type="checkbox" checked={generateMappings} onChange={(event) => setGenerateMappings(event.target.checked)} disabled={!canCreate || submitting} />
           generateMappings
         </label>
-        <button type="submit" disabled={!canCreate || submitting}>{submitting ? '创建中…' : '提交 dry-run'}</button>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={resetBeforeImport}
+            onChange={(event) => setResetBeforeImport(event.target.checked)}
+            disabled={!canCreate || submitting || mode === 'dry_run'}
+          />
+          resetBeforeImport（import 专用）
+        </label>
+        <button type="submit" disabled={!canCreate || submitting}>{submitting ? '创建中…' : `提交 ${mode}`}</button>
       </form>
     </section>
   );
@@ -1606,15 +1635,19 @@ function CreateImportJobPanel({
 function ImportJobDetailPanel({
   jobId,
   onSessionExpired,
+  onOpenJob,
 }: {
   jobId: string;
   onSessionExpired: () => void;
+  onOpenJob: (jobId: string) => void;
 }) {
   const [job, setJob] = useState<AdminImportJobV1 | null>(null);
   const [errorReport, setErrorReport] = useState<AdminImportJobErrorSummaryV1 | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingErrors, setLoadingErrors] = useState(false);
+  const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1630,6 +1663,48 @@ function ImportJobDetailPanel({
       setLoading(false);
     }
   }, [jobId, onSessionExpired]);
+
+  async function cancelJob() {
+    if (!job || !['queued', 'running'].includes(job.status)) return;
+    setActing(true);
+    setError('');
+    setActionMessage('');
+    try {
+      const response = await requestJson(
+        `/api/admin/import-jobs/${encodeURIComponent(job.id)}/cancel`,
+        AdminImportJobDetailResponseV1Schema,
+        { method: 'POST' },
+      );
+      setJob(response.job);
+      setActionMessage(`任务已取消：${response.job.id}`);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapImportJobError(caught));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function retryJob() {
+    if (!job || !['failed', 'cancelled'].includes(job.status)) return;
+    setActing(true);
+    setError('');
+    setActionMessage('');
+    try {
+      const response = await requestJson(
+        `/api/admin/import-jobs/${encodeURIComponent(job.id)}/retry`,
+        AdminImportJobDetailResponseV1Schema,
+        { method: 'POST' },
+      );
+      setActionMessage(`已创建 retry job：${response.job.id}`);
+      onOpenJob(response.job.id);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapImportJobError(caught));
+    } finally {
+      setActing(false);
+    }
+  }
 
   const loadErrors = useCallback(async () => {
     setLoadingErrors(true);
@@ -1661,9 +1736,12 @@ function ImportJobDetailPanel({
         {buildImportJobStatusBadges(job).map((badge) => <Badge key={badge} tone={importJobBadgeTone(badge)}>{badge}</Badge>)}
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
+      {actionMessage ? <p className="form-success" role="status">{actionMessage}</p> : null}
       <div className="button-row">
         <button className="ghost" type="button" onClick={() => void load()}>刷新详情</button>
         <button className="ghost" type="button" onClick={() => void loadErrors()} disabled={loadingErrors}>{loadingErrors ? '读取中…' : '查看 error report'}</button>
+        <button className="ghost danger" type="button" onClick={() => void cancelJob()} disabled={acting || !['queued', 'running'].includes(job.status)}>取消任务</button>
+        <button className="ghost" type="button" onClick={() => void retryJob()} disabled={acting || !['failed', 'cancelled'].includes(job.status)}>重试任务</button>
       </div>
 
       <section className="detail-section">
@@ -1682,7 +1760,7 @@ function ImportJobDetailPanel({
         <dl className="key-values single">
           <div><dt>batchSize</dt><dd>{job.options.batchSize}</dd></div>
           <div><dt>generateMappings</dt><dd>{String(job.options.generateMappings)}</dd></div>
-          <div><dt>resetBeforeImport</dt><dd>{String(job.options.resetBeforeImport)}（UI 不开放 reset 写入）</dd></div>
+          <div><dt>resetBeforeImport</dt><dd>{String(job.options.resetBeforeImport)}</dd></div>
           <div><dt>createdBy</dt><dd>{job.createdBy?.displayName ?? '-'}</dd></div>
           <div><dt>createdAt</dt><dd>{formatAdminDate(job.createdAt)}</dd></div>
           <div><dt>startedAt</dt><dd>{formatAdminDate(job.startedAt)}</dd></div>
@@ -3812,7 +3890,7 @@ function mapBankMappingError(error: unknown): string {
 function mapImportJobError(error: unknown): string {
   if (error instanceof AdminApiError) {
     if (error.status === 403) return `导入任务被拒绝：${error.message}`;
-    if (error.status === 409) return '已有导入任务正在运行，请稍后刷新列表。';
+    if (error.status === 409) return `导入任务状态冲突：${error.message}`;
     if (error.status === 422) return `导入任务未开放：${error.message}`;
   }
   return getErrorMessage(error);
