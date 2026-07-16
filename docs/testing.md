@@ -247,6 +247,25 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 
 因此全量 import 是维护窗口操作，不能与在线负载测试叠加。详细证据见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
+### B9.35 Security And Operational Truth Evidence
+
+2026-07-16 真实 staging 验证：
+
+```text
+commit = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
+first migration run = applied 0001..0013 into ledger
+second migration run = skipped 0001..0013
+schema_migrations = 13 / current 0013 / checksum length 64
+production gate = ok, reset gate pass
+student activation service guard = PASS
+Admin System Status migration truth = PASS
+pre/post custom dump checksum = PASS
+after monitor = no saturation signals / readinessFailures 0
+GitHub Actions push + PR quality/postgres-integration = success
+```
+
+服务器证据保存在 `/srv/bkyexam-backups/b9.35-20260716T150029Z/`。
+
 该 profile 依赖未提交到 Git 的完整源题库，因此保持手动/定期运行，不进入每次 push 的 CI。源数据合法更新时，应先审查差异，再同步更新 `currentCorpusBaseline.ts` 与状态文档。
 
 完整真实题库的验证链包括：

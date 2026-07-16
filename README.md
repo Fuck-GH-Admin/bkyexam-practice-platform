@@ -29,7 +29,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
-- **当前 staging 已重新验收：** 2026-07-16 已部署功能 commit `c8b310e`；本轮文档审计开始时服务器仓库 HEAD 为 `5ddbead`。migration `0012/0013`、独立 Admin app 和 durable Import worker 均已落地。当前剩余的是正式发布审批、真实用户验收、外部告警和持续容量治理，不再是“尚未部署 current HEAD”。
+- **当前 staging 已重新验收：** 2026-07-16 已部署 B9.35 commit `848638e`。migration ledger 为 13 条、System Status 返回真实 `0013`、首次改密服务端门禁和 reset production gate 已实机通过。当前剩余的是正式发布审批、真实用户验收、外部告警和持续容量治理。
 
 文档阅读入口见 [文档索引与真相源](docs/README.md)。当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，真实 current-HEAD 部署与容量结论见 [B9.34 staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 

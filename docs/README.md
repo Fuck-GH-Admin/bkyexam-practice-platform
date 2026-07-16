@@ -87,13 +87,13 @@ npm run docs:audit
 截至 2026-07-16：
 
 ```text
-staging functional deployment commit = c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5
-pre-audit server repository/documentation HEAD = 5ddbeadb6e7b3d42f70c8fe92df62b9001a0cba2
+staging deployment commit = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
 database schema = migrations 0001..0013
+migration ledger = 13 rows, current 0013_import_job_worker.sql
 student entry = /
 admin entry = /admin/
 ADMIN_IMPORT_ENABLE_WRITE = false
 ADMIN_IMPORT_ENABLE_RESET = false
 ```
 
-功能部署 commit 与服务器仓库 HEAD 不同是因为后续提交仅刷新文档；判断运行时代码时看 `c8b310e`，判断当前仓库文档时以本文件所在的最新 Git HEAD 为准。`5ddbead` 是本轮审计开始时的服务器基线，不是永久固定的 current HEAD。
+B9.34 的 `c8b310e` 与审计开始时的 `5ddbead` 均为历史基线；B9.35 已把当前安全/运维收口代码部署到 `848638e`。

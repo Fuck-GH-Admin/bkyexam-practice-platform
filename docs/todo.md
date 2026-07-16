@@ -11,7 +11,7 @@
 - [x] 新增 Linux import maintenance before/during/after 资源监控脚本。
 - [x] Admin Import Jobs 移除开发机本地 sourceDir 默认值。
 - [x] 文档明确 Learning 是后端 MVP+，学生 Web 尚未交付。
-- [ ] 完整质量门、Git/CI 和真实服务器部署证据在本阶段结束时补录。
+- [x] 完整质量门、Git/CI 和真实服务器部署证据已补录；staging commit 为 `848638e`。
 
 详细说明见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 

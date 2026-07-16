@@ -10,7 +10,7 @@
 >
 > **文档一致性刷新：** 2026-07-16 已完成 route/config/migration/link 与真实 staging 的文档—代码审计，并新增可重复 `npm run docs:audit`。人工核查入口见 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 >
-> **B9.35 安全与运维真相收口：** 已补首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控，并移除 Admin 本地 sourceDir 默认值。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。部署证据完成后以 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md) 为准。
+> **B9.35 安全与运维真相收口：** commit `848638e` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 
 ## Executive Summary
 
@@ -29,7 +29,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练可用；Learning 仅后端 API 可用；首次改密已由前端和服务端双重门禁；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
-| 当前 HEAD 公开生产就绪度 | **约 88–91%** | current HEAD、migration `0012/0013`、独立 Admin、Question Review override、Import worker、Nginx/static routing、最终 restore 和 deployment evidence 已在真实 staging 通过；仍缺外部告警、持续容量验证、正式发布审批与真实用户验收 |
+| 当前 HEAD 公开生产就绪度 | **约 92–94%** | B9.35 current HEAD、migration ledger/checksum、独立 Admin、Question Review override、Import worker、Nginx/static routing、首次改密服务端门禁、reset gate、双份 checksum dump 和资源 monitor 已在真实 staging 通过；仍缺外部告警、持续容量验证、正式发布审批与真实用户验收 |
 | 完整产品愿景 | **约 90%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线、管理平台 IA 初稿、B9.16 前端开工前审查包、B9.17 学生账号启用最小 UI、B9.18 Admin 静态 wireframe 审查包、B9.19 Admin Operational MVP、B9.20 Admin P1 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI、B9.24 Audit Logs read-only UI、B9.25 Admin Users management UI、B9.26 Question Review override 最小闭环、B9.27 Import Jobs reset/cancel/retry、B9.28 durable worker/heartbeat、B9.29 Import Jobs repository split 和 B9.30 Learning repository split 已落地，但分母仍包含最终学生前端、Learning 前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
