@@ -173,7 +173,7 @@ Import Jobs realtime progress 建立在 durable worker 已正确部署的前提�
 
 管理侧：
 
-- Admin 登录与 `/api/admin/auth/me`；
+- Admin 登录与 `/api/admin/me`；
 - System Status；
 - Student Accounts list/detail/create/bulk-create/update/reset-password/revoke-sessions；
 - Bank Mappings list/detail/update/bulk-status；

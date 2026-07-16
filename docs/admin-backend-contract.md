@@ -2,7 +2,7 @@
 
 状态日期：**2026-07-15**
 阶段：**Phase B4 — Admin Backend Contract Design**
-状态：**设计完成；B5.1–B5.9 后端 API/migration 已落地，UI 未开始**
+状态：**设计完成；B5/B9 后端 API/migration 已落地，独立 Admin Operational MVP 已实现，最终视觉与完整审批流后置**
 
 本文定义 BKYExam 管理平台第一版后端 contract。它是下一阶段 **Phase B5 — Admin Backend MVP Implementation** 的实现依据。
 
@@ -10,7 +10,7 @@ B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route�
 
 > B5 更新：2026-07-14 已实现 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write APIs、System Status API、Import Jobs dry-run/Error Report/True Import Gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI。包括 `0005_admin_foundation.sql`、`0006_import_jobs.sql`、`0007_question_quality_flags.sql`、`/api/admin/auth/login`、`/api/admin/me`、`/api/admin/auth/logout`、独立 `bky_admin_session`、`GET /api/admin/bank-mappings`、`GET /api/admin/bank-mappings/:bankId`、`PATCH /api/admin/bank-mappings/:bankId`、`POST /api/admin/bank-mappings/bulk-status`、`GET /api/admin/system/status`、`GET /api/admin/import-jobs`、`POST /api/admin/import-jobs`、`GET /api/admin/import-jobs/:id`、`GET /api/admin/import-jobs/:id/errors`、`GET /api/admin/question-review`、`PATCH /api/admin/question-review/:questionId`、`GET /api/admin/audit-logs`、`GET/POST/PATCH /api/admin/users`、`npm run admin:bootstrap`、shared v1 Admin Auth/User/Bank Mapping/System Status/Import Job/Question Review/Audit Log schema、optimistic concurrency、audit log、import running lock、source allowlist、`ADMIN_IMPORT_ENABLE_WRITE` 写入门、import rollback/idempotency fixture、quality flag、practice exclusion rule 和 PostgreSQL integration 测试。正式 Admin UI 仍按后续阶段实现。
 
-> B9 更新：2026-07-15 已实现 Admin Student Manage API、旧学生账号密码迁移 CLI、管理员登录失败锁定和 `0011_admin_identity_security.sql`。正式 Admin UI 仍未开始。
+> B9 更新：2026-07-16 已实现 Admin Student Manage API、旧学生账号密码迁移 CLI、管理员登录失败锁定、Question Review detail/override、Import reset/cancel/retry、durable worker/heartbeat/stuck recovery、`0011`–`0013` migration，并已部署独立 `apps/admin` Operational MVP。最终视觉、Question Review 审批/回滚和 Import realtime progress 仍未完成。
 
 ## 1. 目标与非目标
 
@@ -640,6 +640,7 @@ Rules：
 - `sourceDir` 第一版只允许服务端 allowlist 路径，不能任意读文件系统。
 - `resetBeforeImport=true` 是高风险操作，只允许 `super_admin`。
 - 当前实现中 `mode=import` 还必须显式配置 `ADMIN_IMPORT_ENABLE_WRITE=true`。
+- 当前实现中 `resetBeforeImport=true` 还必须显式配置独立维护门禁 `ADMIN_IMPORT_ENABLE_RESET=true`；`super_admin` 身份不能绕过该门禁。
 - 当前实现中 `resetBeforeImport=true` 在 `mode=import` 里会执行事务内 corpus reset：`TRUNCATE classifications CASCADE`，并清空依赖 corpus 的练习、错题、收藏、质检和 override 数据。
 - `mode=import` 成功时复用导入器事务和幂等 upsert；失败时记录 failed job/errorSummary，并回滚 corpus 写入。
 
@@ -668,7 +669,7 @@ Rules：
 
 - 仅 `failed` / `cancelled` 可 retry。
 - 复制原 job 的 `kind/mode/sourceDir/options`，创建新的 job id；queued execution 下新 job 初始状态为 `queued`。
-- 原 job 若为 `resetBeforeImport=true`，当前 actor 仍必须是 `super_admin`。
+- 原 job 若为 `resetBeforeImport=true`，当前 actor 仍必须是 `super_admin`，运行环境也必须仍开启 `ADMIN_IMPORT_ENABLE_RESET=true`。
 - 写 `import_job.retry` audit log。
 
 ### 6.4 `GET /api/admin/import-jobs/:id`
@@ -1290,7 +1291,7 @@ Rules：
 - `mode=import` 只有在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 import runner 存在时执行；否则继续返回 `422`。
 - 真实 import 复用 `loadQuestionBankData` 与 `importQuestionBank`，在单事务中 upsert classifications、questions、question_options 和 bank_mappings。
 - `generateMappings=false` 跳过 bank_mappings 写入。
-- `resetBeforeImport=true` 在 B9.27 起允许 `super_admin` 使用，并在导入事务内先执行 corpus reset。
+- `resetBeforeImport=true` 在 B9.27 起允许 `super_admin` 使用，并在导入事务内先执行 corpus reset；B9.34 起再受独立 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁保护。
 - 失败 import 标记 job 为 `failed`，写入 `errorSummary`，并验证 corpus 写入回滚。
 - PostgreSQL integration 覆盖 enabled import 成功、重复 import 幂等、失败回滚/error report、reset success。
 
@@ -1300,7 +1301,7 @@ Rules：
 
 交付：
 
-- `resetBeforeImport=true` 在 `ADMIN_IMPORT_ENABLE_WRITE=true` 且 `super_admin` 下启用。
+- `resetBeforeImport=true` 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true`、`ADMIN_IMPORT_ENABLE_RESET=true` 且操作者为 `super_admin` 时启用。
 - 新增 `POST /api/admin/import-jobs/:jobId/cancel`。
 - 新增 `POST /api/admin/import-jobs/:jobId/retry`。
 - runner 通过 `AdminImportJobRunContext.shouldAbort` 做 cancellation checkpoint。
@@ -1332,7 +1333,7 @@ B5 完成时必须满足：
 - 管理员可以查看题库 mapping。
 - 管理员可以编辑并发布/隐藏题库。
 - 管理员可以创建 dry-run import job、查看导入任务列表和详情。
-- 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行 true import；`super_admin` 可以执行 reset import，并得到幂等/回滚保护。
+- 管理员可以在 `ADMIN_IMPORT_ENABLE_WRITE=true` 的受控环境中执行 true import；`super_admin` 只有在独立 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁也开启时才能执行 reset import，并得到事务回滚保护。reset 会级联删除学习数据，不能作为日常导入模式。
 - 管理员可以取消 queued/running import job，并 retry failed/cancelled import job。
 - Import Jobs 在生产数据库模式下由后台 worker claim queued job，维护 heartbeat，并恢复 stale running job。
 - 管理员可以添加/处理题目质量 flag，并用 `excludedFromPractice=true` 排除新练习选题。
@@ -1353,7 +1354,7 @@ B5.1 到 B5.9 已实现；进入正式 Admin UI 前仍需要确认：
 2. `sourceDir` allowlist 放在哪里？
    - 已采用环境变量 `ADMIN_IMPORT_ALLOWED_ROOTS`。
 3. `mode=import` 是否默认打开？
-   - 否。已采用 `ADMIN_IMPORT_ENABLE_WRITE=true` 显式开启；`resetBeforeImport` 仅 `super_admin` 可用。
+   - 否。已采用 `ADMIN_IMPORT_ENABLE_WRITE=true` 显式开启；`resetBeforeImport` 还要求 `super_admin` 与独立 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁。
 4. question quality flag 是否立即影响学生选题？
    - 已固定为 `excludedFromPractice=true` 才影响新建普通练习选题。
 5. bank mapping `status=review` 是否应该是导入后的默认状态？
@@ -1363,8 +1364,4 @@ B5.1 到 B5.9 已实现；进入正式 Admin UI 前仍需要确认：
 
 ## 15. One-line Decision
 
-当前仍不应先做正式 Admin UI。Admin identity/RBAC/audit、bank mapping read/write、system status、import jobs dry-run/error report/true import gate、question review flags、audit log read、Admin User manage 与 super_admin bootstrap 已完成；学生 Learning Dashboard/Trends/Goals/Review Marks 后端也已完成。下一步应补生产安全/运维前置项：
-
-> **Production Backend Readiness**
-
-这会把最小可运营闭环从“后端 command/query、导入写入与学生学习数据可用”继续推进到“可部署、可监控、可恢复”，同时保持正式前端最后设计。
+独立 Admin Operational MVP 与 production-readiness 前置项已经落地并在真实 staging 验证。当前不应立即做最终视觉；下一步先由 owner 人工审核学生端与管理端完整工作流，再根据真实缺口决定 Import realtime progress、Question Review 审批/回滚、容量治理或前端信息架构调整。

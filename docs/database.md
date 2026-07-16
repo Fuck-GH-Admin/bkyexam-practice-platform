@@ -361,6 +361,8 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 
 `apps/api/src/db/migrations/0012_question_review_overrides.sql` adds the question-review override layer. It creates `question_overrides` and `question_option_overrides` so content editors can revise effective content without mutating imported raw question rows. These tables stay separate from the import upsert path and are read by Practice/Wrongbook/Learning as effective overrides.
 
+`apps/api/src/db/migrations/0013_import_job_worker.sql` adds durable Import Job worker state. It adds nullable `worker_id` and `heartbeat_at`, creates the worker scan index, and replaces the running-only lock with a partial unique index that allows only one queued/running job per kind.
+
 B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
 B9.7 Password Login Enforcement now updates `failed_login_count`, `failed_login_window_started_at`, `locked_until`, and `last_login_at` during student login, and clears `password_reset_required` plus failure/lockout state on successful `POST /api/auth/password/change`.
@@ -384,7 +386,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations, including Admin foundation, Import Jobs, Question Review flags, Student Learning Goals, Question Bookmarks, Student Identity Security, and Admin Identity Security, were applied from an empty database by the Docker PostgreSQL 16 integration profile.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all thirteen migrations, including Question Review overrides and durable Import Job worker state, passed the same empty-database integration profile and were verified on staging.
 
 ## Isolated Integration Profile
 

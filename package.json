@@ -10,6 +10,7 @@
   "scripts": {
     "build:shared": "npm run build -w @bkyexam-practice/shared",
     "prepare": "npm run build:shared",
+    "docs:audit": "node scripts/audit-docs-consistency.mjs",
     "dev": "npm run build:shared && npm run dev -w @bkyexam-practice/api",
     "dev:web": "npm run build:shared && npm run dev -w @bkyexam-practice/web",
     "build": "npm run build:shared && npm run build -w @bkyexam-practice/api && npm run build -w @bkyexam-practice/web && npm run build -w @bkyexam-practice/admin",
@@ -26,7 +27,7 @@
     "test:e2e:install:ci": "playwright install --with-deps chromium",
     "typecheck": "npm run build:shared && npm run typecheck --workspaces && npm run typecheck:e2e",
     "typecheck:e2e": "tsc -p tests/e2e/tsconfig.json --noEmit",
-    "verify": "npm run test && npm run typecheck && npm run build && npm run test:e2e",
+    "verify": "npm run docs:audit && npm run test && npm run typecheck && npm run build && npm run test:e2e",
     "verify:db": "npm run verify && npm run test:integration:db",
     "verify:docker": "npm run verify && npm run test:integration:db:docker",
     "ops:production-gate": "npm run ops:production-gate -w @bkyexam-practice/api --",

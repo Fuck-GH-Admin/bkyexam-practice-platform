@@ -1,6 +1,6 @@
 # Production Deployment Evidence Runbook
 
-状态：**B9.14 已完成真实服务器 staging deployment evidence，PR #2 仍待 review/merge，2026-07-15。**
+状态：**B9.14 初次 staging evidence 与 B9.34 current-HEAD re-baseline 均已记录；PR #2 仍待 review/merge，更新于 2026-07-16。**
 
 本文把“能不能公开生产发布”的最后一层证据固定成可执行命令和可审计 JSON。它不代表当前已经可公开发布；它用于阻止缺少远端 CI、branch protection、目标环境 production gate、rollback、deployment smoke 或性能验证证据的发布。
 

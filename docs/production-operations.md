@@ -1,6 +1,6 @@
 # Production Operations Runbook
 
-状态日期：**2026-07-15**
+状态日期：**2026-07-16**
 
 本文记录 B9.2 的生产运维演练边界。它不是最终 SRE 手册；目标是在进入正式前端前，先把备份、恢复、迁移、部署验收和 CI 保护的最小可执行流程固定下来。
 
@@ -49,6 +49,8 @@ npm run ops:production-gate
 ```
 
 该命令检查生产 env、连接 `DATABASE_URL`，并汇总学生正式身份迁移状态。完整说明见 [`production-gate-runbook.md`](production-gate-runbook.md)。
+
+当前 CLI 会提示 `ADMIN_IMPORT_ENABLE_WRITE=true`，但尚未独立检查 `ADMIN_IMPORT_ENABLE_RESET`。每次发布和巡检都必须人工确认 write/reset 两个 gate 均为 `false`；只有已验证备份的破坏性 reset 维护窗口才允许临时开启 reset gate。
 
 发布前至少保存一次完整 JSON report；仅审查 env 时可先用：
 

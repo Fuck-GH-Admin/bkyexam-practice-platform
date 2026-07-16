@@ -1,6 +1,6 @@
 # Production Gate And Student Identity Migration Runbook
 
-状态日期：**2026-07-15**
+状态日期：**2026-07-16**
 
 本文是 B9.8 的生产发布门槛与旧学生账号迁移 runbook。它不替代真实部署审批；它把“能否公开生产发布”的最低后端证据变成可重复命令和可审计记录。
 
@@ -59,6 +59,7 @@ npm run ops:production-gate -- --sample-limit=50 *> artifacts\production-gate\pr
 | `CSRF_ORIGIN_CHECK_ENABLED` + `CSRF_ALLOWED_ORIGINS` | yes | 必须开启，并且 allowlist 使用 HTTPS 生产域名，不能是 localhost。 |
 | `ADMIN_BOOTSTRAP_*` | no | runtime env 中仍存在会 warning；bootstrap 后应删除。 |
 | `ADMIN_IMPORT_ENABLE_WRITE` | no | 如果为 `true` 会 warning；只应在受控导入窗口开启。 |
+| `ADMIN_IMPORT_ENABLE_RESET` | manual | 当前 production-gate CLI 尚未单独检查该变量；发布/巡检时必须人工确认保持 `false`。只有已验证备份的破坏性 reset 维护窗口才可临时开启。 |
 | `STUDENT_MIGRATION_TEMP_PASSWORD` | no | 如果仍在 runtime env 中会 warning；只应在受控迁移 CLI 调用时临时存在。 |
 
 ## 3. Student Identity Migration Gate

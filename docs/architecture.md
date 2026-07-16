@@ -69,7 +69,7 @@ repository
   -> feature state
 ```
 
-Admin 后端 contract 已在 [`admin-backend-contract.md`](admin-backend-contract.md) 中完成设计，其中 Admin Auth/RBAC/Audit foundation、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/True Import Gate、Question Review Flags API、Audit Log read API、Admin User manage API 与 super_admin bootstrap CLI 已实现；正式 Admin UI 仍未实现。详细规则见 [contracts.md](contracts.md)，管理端信息架构闸门见 [admin-console-ia.md](admin-console-ia.md)。
+Admin 后端 contract 已在 [`admin-backend-contract.md`](admin-backend-contract.md) 中完成设计，其中 Admin Auth/RBAC/Audit、Bank Mapping、System Status、Import Jobs、Question Review detail/override、Audit Log、Admin User/Student manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` Operational MVP 已部署到 `/admin/`。尚未完成的是最终视觉、完整审批/回滚和 realtime progress。详细规则见 [contracts.md](contracts.md)，管理端信息架构闸门见 [admin-console-ia.md](admin-console-ia.md)。
 
 ### PostgreSQL
 

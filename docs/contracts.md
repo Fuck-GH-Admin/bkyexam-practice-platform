@@ -1,6 +1,6 @@
 # Versioned API Contracts
 
-状态日期：**2026-07-15**
+状态日期：**2026-07-16**
 
 本页描述跨 API、学生端和 repository 使用的稳定数据边界。当前版本号是代码命名空间中的 `v1`，不会额外写入每个 HTTP response。
 
@@ -205,4 +205,4 @@ npm run build:shared
 - `lastAnswer` 尚未改为 typed answer。
 - 旧逐题 submit 与整卷 submit 同时存在。
 - Web 当前直接把 Zod 打进主 bundle；引入 URL router 与 feature splitting 时应评估按页面拆包。
-- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、Admin Auth、Admin User manage、Admin Student Manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review 与 Audit Log read shared Zod schema/route 已实现；student self password change / force-change flow、实时 progress 事件流、正式告警 payload 和最终 Admin UI 尚未实现。
+- Learning Dashboard/Trends/Goals/Review Marks、Readiness/DB health、Metrics smoke、Student identity fields、学生 self password change/首次改密强制流、Admin Auth、Admin User manage、Admin Student Manage、Bank Mapping read/write、System Status、Import Job dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review 与 Audit Log read shared Zod schema/route 已实现；实时 progress 事件流、正式告警 payload、Question Review 审批/回滚和最终 Admin 视觉尚未实现。

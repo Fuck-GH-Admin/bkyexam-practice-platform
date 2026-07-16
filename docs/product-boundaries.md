@@ -187,7 +187,7 @@ mastered -> active  # 再次答错时自动恢复
 4. 下载或查看错误摘要。
 5. 完成后运行数据健康检查。
 
-当前已有 job table、dry-run/error report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import 写入 gate、reset import、cancel/retry endpoint、worker heartbeat/stuck recovery 和最小管理 UI；仍没有实时 progress 事件流、typed reset 二次确认和错误文件级下载。
+当前已有 job table、dry-run/error report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import 写入 gate、受 `ADMIN_IMPORT_ENABLE_RESET=true` 与 `super_admin` 双重保护的 reset import、cancel/retry endpoint、worker heartbeat/stuck recovery 和最小管理 UI；仍没有实时 progress 事件流、typed reset 二次确认和错误文件级下载。reset 会级联删除依赖 corpus 的学习数据，因此只允许备份验证后的维护窗口使用。
 
 ### Question Review
 

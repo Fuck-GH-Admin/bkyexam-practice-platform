@@ -238,8 +238,8 @@ final isolated restore = pass
 已完成质量门：
 
 - `npm run verify:docker`
-- 513 Vitest
-- 443 API tests
+- 515 Vitest
+- 445 API tests
 - 33 Web tests
 - 11 Admin tests
 - 26 Shared tests
@@ -288,7 +288,7 @@ final isolated restore = pass
 - Bank Mapping list/detail/update/bulk-status APIs
 - System Status API
 - Import Jobs dry-run/Error Report/reset/cancel/retry/worker heartbeat APIs
-- True Import Mode Gate（`ADMIN_IMPORT_ENABLE_WRITE=true` 才允许写入；reset 仅 `super_admin` 可用）
+- True Import Mode Gate（`ADMIN_IMPORT_ENABLE_WRITE=true` 才允许写入；reset 还要求 `super_admin` 与 `ADMIN_IMPORT_ENABLE_RESET=true`）
 - Question Review flag/exclusion APIs
 - Audit Log read API
 - Admin User manage API
@@ -770,7 +770,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
 7. question review flags — **已完成**
 8. admin bootstrap / audit log read / admin IA gate — **已完成**
 9. admin user manage — **已完成**
-10. import error report / true import mode gate / reset/cancel/retry/worker heartbeat — **已完成；true import 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下启用，reset 仅 `super_admin` 可用**
+10. import error report / true import mode gate / reset/cancel/retry/worker heartbeat — **已完成；true import 仅在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下启用，reset 还要求 `super_admin` 与 `ADMIN_IMPORT_ENABLE_RESET=true`**
 
 验收：
 
@@ -918,7 +918,7 @@ bank_mappings.version / updated_at / updated_by_admin_id
   - 成功创建写 `import_job.create` audit log。
   - PostgreSQL integration 覆盖 migration、创建、列表、详情、audit、System Status latest import job。
 
-B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2/B7.3/B7.4 已在下一节落地；当前下一步：**B9 Production Backend Readiness**。
+B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2/B7.3/B7.4 已在下一节落地；当时的下一步是 **B9 Production Backend Readiness**。截至 2026-07-16，B9.34 staging re-baseline 已完成，本段只保留为阶段历史。
 
 ### Phase B5.6 — Question Review Flags
 
@@ -1012,7 +1012,7 @@ B5.6/B5.7/B5.8/B5.9 和 B7.1/B7.2/B7.3/B7.4 已在下一节落地；当前下一
 - `mode=import` 只有在服务端启用 `ADMIN_IMPORT_ENABLE_WRITE=true` 且配置 PostgreSQL import runner 时才运行；默认仍返回 `422`。
 - `mode=import` 复用 `loadQuestionBankData` + `importQuestionBank` 真实事务写入 classifications、questions、question_options 和 bank_mappings。
 - `generateMappings=false` 时跳过 bank_mappings 生成。
-- B9.11 当时 `resetBeforeImport=true` 仍显式禁止；B9.27 已改为仅 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许，并在同一事务内 reset 后导入。
+- B9.11 当时 `resetBeforeImport=true` 仍显式禁止；B9.27 改为 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许，并在同一事务内 reset 后导入；B9.34 又增加独立 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁。
 - 导入失败会把 job 标为 `failed`，写入 `errorSummary`，并由 import transaction 回滚已写入的 corpus 行。
 - PostgreSQL integration 覆盖：
   - enabled `mode=import` 成功写入。

@@ -17,6 +17,8 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 > **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；B9.34 已把 current HEAD、migration 0012/0013、独立 Admin 和 durable Import worker 部署到真实 staging，并完成 reset 风险回滚、最终 restore 和容量诊断。当前首要任务从“证明能部署”转为“固化导入维护窗口、人工审核系统、再按真实反馈选择下一产品切片”。**
 
+文档阅读顺序与本轮代码一致性结果见 [`README.md`](README.md) 和 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
+
 ## 2. 分层完成度
 
 | 层级 | 当前判断 | 估算完成度 | 说明 |

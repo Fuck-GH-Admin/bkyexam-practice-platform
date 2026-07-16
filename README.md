@@ -26,9 +26,9 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
-- **当前 HEAD 的真实环境重新验收：** 服务器仍运行 B9.14 commit `1686c6e` 和 migration `0011`，尚未部署最近 22 个提交、migration `0012/0013`、独立 Admin app 和 durable Import worker。
+- **当前 staging 已重新验收：** 2026-07-16 已部署功能 commit `c8b310e`；本轮文档审计开始时服务器仓库 HEAD 为 `5ddbead`。migration `0012/0013`、独立 Admin app 和 durable Import worker 均已落地。当前剩余的是正式发布审批、真实用户验收、外部告警和持续容量治理，不再是“尚未部署 current HEAD”。
 
-当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，真实 current-HEAD 部署与容量结论见 [B9.34 staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
+文档阅读入口见 [文档索引与真相源](docs/README.md)。当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，真实 current-HEAD 部署与容量结论见 [B9.34 staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
 ## Workspace
 
@@ -57,6 +57,7 @@ docs/        当前架构、API、数据库、状态与路线图
 
 ```sh
 npm ci
+npm run docs:audit
 npm run test
 npm run typecheck
 npm run build
@@ -119,6 +120,7 @@ docker compose up -d postgres
 配置环境变量。`.env.example` 只是模板，应用目前不会自动读取 `.env`：
 
 ```text
+NODE_ENV=development
 DATABASE_URL=postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice
 USE_DATABASE=true
 COOKIE_SECRET=replace-with-a-long-random-secret
@@ -127,6 +129,7 @@ SESSION_TTL_DAYS=30
 ADMIN_SESSION_TTL_HOURS=8
 ADMIN_IMPORT_ALLOWED_ROOTS=C:\path\to\questionbank
 ADMIN_IMPORT_ENABLE_WRITE=false
+ADMIN_IMPORT_ENABLE_RESET=false
 RATE_LIMIT_ENABLED=false
 RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=600
@@ -142,7 +145,8 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 $env:USE_DATABASE="true"
 $env:COOKIE_SECRET="local-development-secret"
 $env:ADMIN_IMPORT_ALLOWED_ROOTS="C:\path\to\questionbank"
-$env:ADMIN_IMPORT_ENABLE_WRITE="false" # 改为 true 后允许 /api/admin/import-jobs mode=import 写入；resetBeforeImport 仍关闭
+$env:ADMIN_IMPORT_ENABLE_WRITE="false" # 改为 true 后允许 /api/admin/import-jobs mode=import 写入
+$env:ADMIN_IMPORT_ENABLE_RESET="false" # 破坏性 reset 的独立维护门禁；日常导入不得开启
 $env:RATE_LIMIT_ENABLED="false" # 改为 true 后启用内存级最小 rate limit
 $env:CSRF_ORIGIN_CHECK_ENABLED="false" # 改为 true 后校验 Cookie unsafe request 的 Origin/Referer
 ```

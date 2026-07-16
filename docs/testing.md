@@ -1,6 +1,6 @@
 # Testing Strategy
 
-状态日期：**2026-07-15**
+状态日期：**2026-07-16**
 
 测试按失败定位和外部依赖分层。任何一层通过都不能替代其他层。
 
@@ -9,8 +9,11 @@
 安装依赖后执行：
 
 ```sh
+npm run docs:audit
 npm run verify
 ```
+
+`docs:audit` 在不启动服务的情况下检查本地 Markdown 链接、`.env.example` 与 runtime config、Fastify route 与 `docs/api.md` heading、SQL migration 与 `docs/database.md`。它是文档结构一致性门，不替代 Vitest、Playwright、PostgreSQL integration 或真实 staging smoke。
 
 该命令依次运行：
 

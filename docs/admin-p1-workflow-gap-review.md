@@ -29,7 +29,7 @@
 
 1. **Import true write/reset/cancel/retry 在 B9.20 当时不应先做完整 UI。**
    - B9.20 当时 create job 在 request 内同步执行 runner，`running` 只是持久化状态，不是独立后台 worker 队列。
-   - B9.20 当时 `resetBeforeImport=true` 在 import mode 中仍被后端显式禁止；B9.27 已改为仅 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许。
+- B9.20 当时 `resetBeforeImport=true` 在 import mode 中仍被后端显式禁止；B9.27 改为 `super_admin` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时允许，B9.34 再增加独立 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁。
    - B9.20 当时没有 cancel/retry endpoint，也没有异步 job worker、heartbeat、阶段级进度事件；B9.27 已补 cancel/retry endpoint，B9.28 已补 durable worker/heartbeat/stuck recovery，实时 progress 事件流仍后置。
    - 因此 B9.20 的 Import P1 UI 先限定为 dry-run 和历史查看；真正写入导入控制已拆到 B9.27 完成最小闭环。
 

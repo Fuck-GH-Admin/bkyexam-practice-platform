@@ -7,6 +7,8 @@
 如果需要从产品/后端/前端/生产四个维度快速审视当前进度，先读 [`project-progress-overview.md`](project-progress-overview.md)。
 
 > **B9.34 证据刷新：** 2026-07-16 已把 current release candidate `c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5` 部署到真实服务器，migration 更新到 `0013`，`/` 与 `/admin/` 分别服务学生端和独立 Admin。production gate、学生/Admin smoke、Import worker、reset 二次门禁、非 reset true import、最终隔离 backup/restore、轻量 load baseline 和 deployment evidence 均通过。完整记录见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
+>
+> **文档一致性刷新：** 2026-07-16 已完成 route/config/migration/link 与真实 staging 的文档—代码审计，并新增可重复 `npm run docs:audit`。人工核查入口见 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 
 ## Executive Summary
 

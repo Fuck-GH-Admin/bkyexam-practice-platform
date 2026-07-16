@@ -1,5 +1,7 @@
 # API
 
+状态日期：**2026-07-16**
+
 Base path：`/api`
 
 除 health、login 和当前的 bank list 外，学生业务路由均依赖 `bky_session` Cookie；管理端路由依赖独立的 `bky_admin_session` Cookie。
@@ -861,7 +863,7 @@ Rules：
 
 Admin Import Jobs 是 B5.5/B5.8/B5.9/B9.27/B9.28 已实现的导入任务后端。B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode；B9.27 增加 reset/cancel/retry 与 import job 模块拆分；B9.28 增加 queued execution、worker heartbeat 和 stuck job recovery。
 
-运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。`mode=import` 只有在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时才启用；否则返回 `422`。开启 true import 后，`resetBeforeImport=true` 只允许 `super_admin` 使用，并会在同一导入事务内先执行 `TRUNCATE classifications CASCADE` 再重导，因此会清空 corpus 及所有依赖 corpus FK 的练习/错题/收藏/质检/override 数据。
+运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。`mode=import` 只有在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时才启用；否则返回 `422`。开启 true import 后，`resetBeforeImport=true` 还要求操作者为 `super_admin` 且运行时显式设置独立维护门禁 `ADMIN_IMPORT_ENABLE_RESET=true`。reset 会在同一导入事务内先执行 `TRUNCATE classifications CASCADE` 再重导，因此会清空 corpus 及所有依赖 corpus FK 的练习/错题/收藏/质检/override 数据，不能用于日常导入。
 
 生产 `index.ts` 在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_WORKER_ENABLED=true` 时使用 queued execution：create/retry 先返回 `queued` job，再由后台 worker claim 为 `running`。内存测试模式和显式关闭 worker 时仍可使用 inline execution。
 
@@ -942,6 +944,7 @@ Rules：
 - `sourceDir` 必须在 `ADMIN_IMPORT_ALLOWED_ROOTS` 内；否则返回 `403`。
 - `resetBeforeImport=true` 必须由 `super_admin` 执行；否则返回 `403`。
 - `mode=import` 默认关闭；只有 `ADMIN_IMPORT_ENABLE_WRITE=true` 且服务端连接 PostgreSQL 时才写入。
+- `resetBeforeImport=true` 还必须显式设置 `ADMIN_IMPORT_ENABLE_RESET=true`；否则返回 `422 Import reset mode is not enabled`。
 - `mode=import` 复用导入器事务，写入 classifications/questions/question_options/bank_mappings，并保持幂等 upsert；`generateMappings=false` 时跳过 bank_mappings 生成。
 - `mode=import` 中 `resetBeforeImport=true` 会在同一事务中先 reset corpus；导入失败或 cancel 会 rollback。
 - 成功创建后写 `import_job.create` audit log；queued execution 会先返回 `queued`，worker 完成后更新为 `succeeded` / `failed` / `cancelled`。dry-run 或 import 过程中解析/写入失败会把 job 标为 `failed` 并保存失败摘要，写入失败由导入事务回滚。
@@ -1042,7 +1045,7 @@ Errors：
 - `403`：缺少 `import_job:read/create`、sourceDir 不在 allowlist，或非 super_admin 使用 `resetBeforeImport`。
 - `404`：job 不存在。
 - `409`：同类 job 已 queued/running，或 cancel/retry 的 job 状态不允许该操作。
-- `422`：请求 `mode=import` 但 `ADMIN_IMPORT_ENABLE_WRITE` 未开启。
+- `422`：请求 `mode=import` 但 `ADMIN_IMPORT_ENABLE_WRITE` 未开启，或请求 reset 但 `ADMIN_IMPORT_ENABLE_RESET` 未开启。
 
 ## Admin Question Review
 
@@ -1097,6 +1100,84 @@ Response：
   "page": { "limit": 20, "offset": 0, "hasMore": false }
 }
 ```
+
+### `GET /api/admin/question-review/:questionId`
+
+Permission：`question_review:read`
+
+返回单题完整 effective 详情。`content`、`answerRaw`、`analyzeRaw` 和每个 option 的 `effectiveContent` 已合并原始导入值与 override；同时保留 `overrideContent`、`override`、`overrideVersion`，供管理端展示和乐观并发更新。
+
+Response 主体：
+
+```json
+{
+  "question": {
+    "questionId": "question-uuid",
+    "bankId": "bank-uuid",
+    "bankName": "数据库集成测试题库",
+    "questionType": "single_choice",
+    "content": "PostgreSQL 中哪个命令用于提交当前事务？",
+    "answerRaw": "A",
+    "analyzeRaw": "COMMIT 提交当前事务。",
+    "options": [
+      {
+        "id": "option-uuid",
+        "sort": 1,
+        "content": "COMMIT",
+        "overrideContent": null,
+        "effectiveContent": "COMMIT"
+      }
+    ],
+    "override": null,
+    "overrideVersion": 0,
+    "flags": [],
+    "excludedFromPractice": false
+  }
+}
+```
+
+Errors：
+
+- `400`：question id 不是 UUID。
+- `401/403`：未登录或缺少 `question_review:read`。
+- `404`：question 不存在。
+
+### `PATCH /api/admin/question-review/:questionId/override`
+
+Permission：`question_review:write`
+
+Request：
+
+```json
+{
+  "expectedVersion": 0,
+  "content": "修订后的题干",
+  "answerRaw": "A",
+  "analyzeRaw": "修订后的解析",
+  "optionContentOverrides": [
+    {
+      "optionId": "option-uuid",
+      "content": "修订后的选项"
+    }
+  ],
+  "note": "人工复核修订"
+}
+```
+
+Rules：
+
+- `expectedVersion` 必填，用于 optimistic concurrency；版本冲突返回 `409`。
+- 题干、答案、解析、选项或 note 至少有一项变更。
+- `optionContentOverrides` 最多 100 项，同一 option id 不得重复，且 option 必须属于该 question。
+- 成功写入 `question_review.override_update` audit log。
+- Response 与 `GET /api/admin/question-review/:questionId` 使用同一 `question` detail contract。
+
+Errors：
+
+- `400`：question id 或 request 无效。
+- `401/403`：未登录或缺少 `question_review:write`。
+- `404`：question 或 option 不存在。
+- `409`：`expectedVersion` 与当前 override version 冲突。
 
 ### `PATCH /api/admin/question-review/:questionId`
 
@@ -2190,7 +2271,7 @@ Response：
 
 ## Current Contract Debt
 
-- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness/metrics DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，reset import、cancel/retry 已在 B9.27 补齐，durable import worker/heartbeat/stuck recovery 已在 B9.28 补齐；实时 progress 事件流仍未实现。
+- Practice/Wrongbook/Learning/Auth/Catalog/Admin Auth/Admin User manage/Admin Bank Mapping read/write/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log/通用 error/health/readiness/metrics DTO 已来自 shared v1；Learning 已覆盖 dashboard/trends/goals/review-marks；`mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下写入，reset 另受 `ADMIN_IMPORT_ENABLE_RESET=true` 与 `super_admin` 双重保护，cancel/retry 与 durable import worker/heartbeat/stuck recovery 已补齐；实时 progress 事件流仍未实现。
 - Fastify request parser 尚未统一使用共享 schema。
 - `lastAnswer` 仍是序列化字符串，未来宜改为 typed answer。
 - `completedCount` 已版本化固定为 answered/graded count，但字段名仍容易误解。

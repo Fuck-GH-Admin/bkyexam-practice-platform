@@ -99,6 +99,7 @@ bkyexam-healthcheck.timer = active/enabled
 - `RATE_LIMIT_ENABLED=true`
 - `CSRF_ORIGIN_CHECK_ENABLED=true`
 - `ADMIN_IMPORT_ENABLE_WRITE=false`
+- `ADMIN_IMPORT_ENABLE_RESET=false`（B9.34 新增的独立破坏性 reset 维护门禁）
 
 敏感值：`DATABASE_URL`、`COOKIE_SECRET`、账号密码只存在服务器受限文件，不写入 Git。
 

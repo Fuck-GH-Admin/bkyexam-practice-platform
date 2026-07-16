@@ -1,6 +1,6 @@
 # Admin Console IA Gate
 
-状态日期：**2026-07-15**
+状态日期：**2026-07-16**
 
 本文件是管理端正式前端前的信息架构闸门。它不是视觉设计稿，也不是 `apps/admin` 实现计划；目的是先固定页面、权限、数据和状态，避免再次出现 UI 设计途中反向改后端语义。
 
@@ -122,7 +122,8 @@ Admin Console
 - Current mode：
   - `dry_run` always available when `sourceDir` passes allowlist
   - `mode=import` requires server-side `ADMIN_IMPORT_ENABLE_WRITE=true`
-  - `resetBeforeImport=true` in import mode still returns `422`
+  - `resetBeforeImport=true` additionally requires `super_admin` and the maintenance-only `ADMIN_IMPORT_ENABLE_RESET=true`; otherwise it returns `403` or `422`
+  - routine imports must use `resetBeforeImport=false` because reset cascades into dependent learning data
 - Must show：
   - status/progress
   - sourceDir
