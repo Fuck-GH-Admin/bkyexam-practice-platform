@@ -44,6 +44,7 @@ describe('PostgreSQL-backed API integration', () => {
     adminImportJobRepository: createPgAdminImportJobRepository(pool),
     adminImportAllowedRoots: [importFixtureDir, importUuidFixtureDir, importBadFixtureDir],
     adminImportModeEnabled: true,
+    adminImportResetEnabled: true,
     adminImportRunner: createPgQuestionBankImportRunner(pool),
     adminQuestionReviewRepository: createPgAdminQuestionReviewRepository(pool),
     adminStudentRepository: createPgAdminStudentRepository(pool),

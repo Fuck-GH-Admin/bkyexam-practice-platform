@@ -40,6 +40,7 @@ interface AdminImportJobRoutesOptions {
   auditService?: AuditService;
   allowedRoots?: readonly string[];
   importModeEnabled?: boolean;
+  resetModeEnabled?: boolean;
   importRunner?: AdminImportJobRunner;
   executionMode?: AdminImportJobExecutionMode;
 }
@@ -68,6 +69,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
   const service = options.service ?? createAdminImportJobService(repository, {
     allowedRoots: options.allowedRoots ?? [],
     enableImportMode: options.importModeEnabled ?? false,
+    enableResetMode: options.resetModeEnabled ?? false,
     importRun: options.importRunner,
     executionMode: options.executionMode,
   });
@@ -171,6 +173,9 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       if (result.status === 'import_mode_not_enabled') {
         return reply.status(422).send(errorResponse('Import mode is not enabled yet'));
       }
+      if (result.status === 'reset_mode_not_enabled') {
+        return reply.status(422).send(errorResponse('Import reset mode is not enabled'));
+      }
 
       await auditService.record({
         actorAdminId: required.session.admin.id,
@@ -271,6 +276,9 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       }
       if (result.status === 'import_mode_not_enabled') {
         return reply.status(422).send(errorResponse('Import mode is not enabled yet'));
+      }
+      if (result.status === 'reset_mode_not_enabled') {
+        return reply.status(422).send(errorResponse('Import reset mode is not enabled'));
       }
 
       await auditService.record({

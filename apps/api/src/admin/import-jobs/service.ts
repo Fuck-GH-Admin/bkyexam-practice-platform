@@ -21,6 +21,7 @@ export function createAdminImportJobService(
   const dryRun = options.dryRun ?? dryRunQuestionBankImport;
   const importRun = options.importRun;
   const enableImportMode = options.enableImportMode ?? false;
+  const enableResetMode = options.enableResetMode ?? false;
   const executionMode = options.executionMode ?? 'inline';
 
   async function createImportJob({
@@ -36,6 +37,9 @@ export function createAdminImportJobService(
 
     if (request.options.resetBeforeImport && !actor.roles.includes('super_admin')) {
       return { status: 'reset_requires_super_admin' as const };
+    }
+    if (request.options.resetBeforeImport && !enableResetMode) {
+      return { status: 'reset_mode_not_enabled' as const };
     }
 
     const sourceDir = resolve(request.sourceDir);

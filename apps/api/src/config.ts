@@ -15,6 +15,7 @@ const configSchema = z.object({
   ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
   ADMIN_IMPORT_ALLOWED_ROOTS: z.string().optional().transform(parsePathList),
   ADMIN_IMPORT_ENABLE_WRITE: z.string().optional().transform((value) => value === 'true'),
+  ADMIN_IMPORT_ENABLE_RESET: z.string().optional().transform((value) => value === 'true'),
   ADMIN_IMPORT_WORKER_ENABLED: z.string().optional().transform((value) => value !== 'false'),
   ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 2_000)),
   ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 5_000)),

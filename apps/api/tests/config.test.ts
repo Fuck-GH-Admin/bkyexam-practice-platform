@@ -26,6 +26,7 @@ describe('loadConfig', () => {
     expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(15);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(8);
     expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(false);
+    expect(config.ADMIN_IMPORT_ENABLE_RESET).toBe(false);
     expect(config.RATE_LIMIT_ENABLED).toBe(false);
     expect(config.RATE_LIMIT_WINDOW_MS).toBe(60_000);
     expect(config.RATE_LIMIT_MAX).toBe(600);
@@ -44,6 +45,7 @@ describe('loadConfig', () => {
       STUDENT_LOGIN_LOCK_MINUTES: '20',
       ADMIN_SESSION_TTL_HOURS: '6',
       ADMIN_IMPORT_ENABLE_WRITE: 'true',
+      ADMIN_IMPORT_ENABLE_RESET: 'true',
       RATE_LIMIT_ENABLED: 'true',
       RATE_LIMIT_WINDOW_MS: '5000',
       RATE_LIMIT_MAX: '20',
@@ -60,6 +62,7 @@ describe('loadConfig', () => {
     expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(20);
     expect(config.ADMIN_SESSION_TTL_HOURS).toBe(6);
     expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(true);
+    expect(config.ADMIN_IMPORT_ENABLE_RESET).toBe(true);
     expect(config.RATE_LIMIT_ENABLED).toBe(true);
     expect(config.RATE_LIMIT_WINDOW_MS).toBe(5000);
     expect(config.RATE_LIMIT_MAX).toBe(20);

@@ -164,6 +164,7 @@ describe('admin import job service', () => {
     const service = createAdminImportJobService(createMemoryAdminImportJobRepository(), {
       allowedRoots: [allowedRoot],
       enableImportMode: true,
+      enableResetMode: true,
       importRun: async (_receivedSourceDir, receivedOptions) => {
         calls.push(receivedOptions);
         return { questions: 0 };
@@ -194,6 +195,24 @@ describe('admin import job service', () => {
       request,
       actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
     })).resolves.toEqual({ status: 'reset_requires_super_admin' });
+  });
+
+  it('keeps destructive reset disabled behind a separate maintenance gate', async () => {
+    const service = createAdminImportJobService(createMemoryAdminImportJobRepository(), {
+      allowedRoots: [allowedRoot],
+      enableImportMode: true,
+      importRun: async () => ({ questions: 0 }),
+    });
+
+    await expect(service.createImportJob({
+      request: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir,
+        options: { batchSize: 1000, resetBeforeImport: true, generateMappings: true },
+      },
+      actor: { id: adminId, displayName: 'Super Admin', roles: ['super_admin'] },
+    })).resolves.toEqual({ status: 'reset_mode_not_enabled' });
   });
 
   it('cancels running jobs and retries cancelled jobs', async () => {

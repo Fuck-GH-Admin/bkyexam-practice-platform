@@ -1588,7 +1588,7 @@ function CreateImportJobPanel({
     <section className="student-detail">
       <p className="eyebrow">Create Import Job</p>
       <h2>创建导入任务</h2>
-      <p className="muted">`mode=import` 仍由后端 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 控制；`resetBeforeImport=true` 是破坏性 corpus reset，需要 super_admin。</p>
+      <p className="muted">`mode=import` 由 `ADMIN_IMPORT_ENABLE_WRITE=true` 控制；`resetBeforeImport=true` 会删除现有 corpus 及其级联学习数据，需要 super_admin，并额外要求维护窗口显式启用 `ADMIN_IMPORT_ENABLE_RESET=true`。</p>
       {!canCreate ? <ForbiddenInline /> : null}
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {createdJob ? <p className="form-success" role="status">{createdJob.mode} 已创建：{createdJob.status} / {createdJob.id}</p> : null}

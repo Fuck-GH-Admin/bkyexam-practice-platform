@@ -62,6 +62,7 @@ interface BuildAppOptions {
   adminImportJobRepository?: AdminImportJobRepository;
   adminImportAllowedRoots?: readonly string[];
   adminImportModeEnabled?: boolean;
+  adminImportResetEnabled?: boolean;
   adminImportRunner?: AdminImportJobRunner;
   adminImportExecutionMode?: AdminImportJobExecutionMode;
   adminQuestionReviewRepository?: AdminQuestionReviewRepository;
@@ -159,6 +160,7 @@ export function buildApp(options: BuildAppOptions = {}) {
     auditService,
     allowedRoots: options.adminImportAllowedRoots,
     importModeEnabled: options.adminImportModeEnabled ?? false,
+    resetModeEnabled: options.adminImportResetEnabled ?? false,
     importRunner: options.adminImportRunner,
     executionMode: options.adminImportExecutionMode,
   }));

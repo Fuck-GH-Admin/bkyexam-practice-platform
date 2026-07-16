@@ -50,6 +50,7 @@ export type RetryImportJobResult =
   | { status: 'running_conflict'; sourceJob: AdminImportJobV1 }
   | { status: 'source_dir_forbidden'; sourceJob: AdminImportJobV1 }
   | { status: 'import_mode_not_enabled'; sourceJob: AdminImportJobV1 }
+  | { status: 'reset_mode_not_enabled'; sourceJob: AdminImportJobV1 }
   | { status: 'reset_requires_super_admin'; sourceJob: AdminImportJobV1 }
   | { status: 'not_found' }
   | { status: 'not_retryable'; job: AdminImportJobV1 };
@@ -82,6 +83,7 @@ export interface AdminImportJobService {
     | { status: 'running_conflict' }
     | { status: 'source_dir_forbidden' }
     | { status: 'import_mode_not_enabled' }
+    | { status: 'reset_mode_not_enabled' }
     | { status: 'reset_requires_super_admin' }
   >;
   cancelImportJob(jobId: string): Promise<CancelImportJobResult>;
@@ -107,6 +109,7 @@ export interface AdminImportJobServiceOptions {
   dryRun?: AdminImportJobRunner;
   importRun?: AdminImportJobRunner;
   enableImportMode?: boolean;
+  enableResetMode?: boolean;
   executionMode?: AdminImportJobExecutionMode;
 }
 

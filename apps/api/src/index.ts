@@ -43,6 +43,7 @@ const app = buildApp({
   adminImportJobRepository,
   adminImportAllowedRoots: config.ADMIN_IMPORT_ALLOWED_ROOTS,
   adminImportModeEnabled: config.ADMIN_IMPORT_ENABLE_WRITE,
+  adminImportResetEnabled: config.ADMIN_IMPORT_ENABLE_RESET,
   adminImportRunner,
   adminImportExecutionMode: adminImportWorker ? 'queued' : 'inline',
   adminQuestionReviewRepository: pool ? createPgAdminQuestionReviewRepository(pool) : undefined,

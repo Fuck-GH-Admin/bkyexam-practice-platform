@@ -419,6 +419,7 @@ describe('admin import job routes', () => {
       adminImportJobRepository: createMemoryAdminImportJobRepository(),
       adminImportAllowedRoots: [fixtureDir],
       adminImportModeEnabled: true,
+      adminImportResetEnabled: true,
       adminImportRunner: async (sourceDir, options) => {
         calls.push({ sourceDir, options });
         return { questions: 0 };
@@ -450,6 +451,32 @@ describe('admin import job routes', () => {
       sourceDir: fixtureDir,
       options: { batchSize: 1000, resetBeforeImport: true, generateMappings: true },
     }]);
+  });
+
+  it('returns 422 for resetBeforeImport until the separate maintenance gate is enabled', async () => {
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['super_admin']),
+      adminImportJobRepository: createMemoryAdminImportJobRepository(),
+      adminImportAllowedRoots: [fixtureDir],
+      adminImportModeEnabled: true,
+      adminImportRunner: async () => ({ questions: 0 }),
+    });
+    const cookie = await loginAdmin(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/admin/import-jobs',
+      headers: { cookie },
+      payload: {
+        kind: 'full_corpus_import',
+        mode: 'import',
+        sourceDir: fixtureDir,
+        options: { batchSize: 1000, resetBeforeImport: true, generateMappings: true },
+      },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({ error: 'Import reset mode is not enabled' });
   });
 
   it('cancels running import jobs and retries cancelled jobs', async () => {
