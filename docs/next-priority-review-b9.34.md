@@ -2,6 +2,8 @@
 
 状态日期：**2026-07-16**
 
+执行状态：**已完成。** 本文保留为 B9.34 启动时的优先级决策记录；实际部署、reset 数据风险、I/O 饱和诊断、最终 restore 和发布结论见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
+
 ## 1. 决策结论
 
 经过对当前代码、测试、文档和真实服务器的重新核对，原先的两个候选：

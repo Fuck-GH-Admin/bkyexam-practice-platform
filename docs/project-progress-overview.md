@@ -15,7 +15,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 当前最准确的定位是：
 
-> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；但真实服务器仍停留在 B9.14 commit，尚未验证最近 22 个提交、migration 0012/0013、独立 Admin 前端和 durable Import worker。当前首要任务是把 current HEAD 重新部署到 staging 并完成组合验收，而不是继续扩大功能面。**
+> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；B9.34 已把 current HEAD、migration 0012/0013、独立 Admin 和 durable Import worker 部署到真实 staging，并完成 reset 风险回滚、最终 restore 和容量诊断。当前首要任务从“证明能部署”转为“固化导入维护窗口、人工审核系统、再按真实反馈选择下一产品切片”。**
 
 ## 2. 分层完成度
 
@@ -23,11 +23,11 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | --- | --- | ---: | --- |
 | 学生客观题核心闭环 | 内部可用 | **约 95%** | 登录、首页、多会话、题库、练习、草稿、提交、结果、历史、错题、错题再练已经可用；Learning 后端已具备概览/趋势/目标/长期复习标记；缺 Learning 前端与最终 UX。 |
 | 后端主功能 | 基本成型 | **约 88–89%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs、Question Review、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控、实时 progress、部分完整运营流。 |
-| 后端工程化/可验证性 | 本地稳定、目标环境证据待刷新 | **约 90–92%** | `verify:docker`、PostgreSQL integration、Playwright、production gate、backup/restore drill 已建立；但 staging evidence 只覆盖旧 commit `1686c6e`，未覆盖当前 HEAD、migration 0012/0013 与 Import worker。 |
+| 后端工程化/可验证性 | 本地与 current-HEAD staging 已验证 | **约 94%** | `verify:docker`、完整题库 Docker 双次导入、PostgreSQL integration、Playwright、production gate、真实 worker、最终 backup/restore 和 deployment evidence 已通过；容量边界已通过 SAR/journal 定位。 |
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 当前 HEAD 公开生产就绪 | 代码接近、release evidence 过期 | **约 80–84%** | 旧 B9.14 staging、HTTPS smoke、production gate、账号初始化、healthcheck 和 restore drill 已完成；但服务器仍是 `1686c6e` / migration `0011`，当前 HEAD 尚未完成重新部署、Admin 静态路由、worker、migration 与完整 smoke。 |
+| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 88–91%** | current HEAD、migration `0013`、独立 Admin、worker、reset safety、最终 restore、远端 CI 和 deployment evidence 已通过；仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。 |
 | 完整产品愿景 | 主体完成但未收口 | **约 90%** | 分母包含最终学生端、Learning 前端、管理平台完整工作流、全题型、运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
@@ -124,7 +124,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 - bank mappings 自动生成。
 - dry-run summary。
 - true import 写入 gate。
-- reset import 事务策略。
+- reset import 事务策略与独立 `ADMIN_IMPORT_ENABLE_RESET` 维护门禁。
 - cancel/retry。
 - durable queued worker。
 - heartbeat/stuck recovery。
@@ -154,6 +154,9 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 - 服务器 staging 部署与 HTTPS smoke。
 - synthetic healthcheck timer。
 - staging load baseline。
+- current-HEAD staging re-baseline。
+- 全量 import 后 I/O 饱和诊断。
+- 最终 target dump 隔离恢复与 deployment evidence。
 
 仍未完成：
 
@@ -176,10 +179,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 58 | 443 |
+| `apps/api` | 58 | 445 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **63** | **513** |
+| **Total** | **63** | **515** |
 
 Playwright smoke：
 
@@ -207,19 +210,22 @@ deployment evidence = ready=true
 
 按影响排序：
 
-### P0：Current-HEAD staging re-baseline
+### P0：导入运维安全与容量边界
 
-真实服务器仍运行 B9.14 commit `1686c6e`，当前本地 HEAD 已领先 22 个提交并新增 migration `0012`、`0013`。独立 `apps/admin`、Question Review override、Import durable worker 等尚未在目标环境作为整体验证。
+B9.34 已完成 current-HEAD staging re-baseline。真实验收确认：
 
-优先完成：
+- routine true import 使用 `resetBeforeImport=false` 可保留学习数据；
+- reset 会级联删除 practice/attempt/wrongbook，现已由第二层维护门禁默认关闭；
+- 连续全量 upsert 后立即加载认证流量会把当前 2 vCPU 云主机磁盘打满。
 
-1. 冻结当前 release candidate。
-2. 备份并部署 current HEAD。
-3. 执行 migration `0012`、`0013`。
-4. 配置 `/admin` 独立静态应用路由。
-5. 验证学生端、Admin、Import worker、production gate、restore 和 load baseline。
+优先固化：
 
-完整决策与验收范围见 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)。
+1. write/reset gate 默认关闭。
+2. 全量导入维护窗口与操作后健康检查。
+3. importer 避免无变化 `DO UPDATE`、批次/WAL/索引优化。
+4. 如要支持在线导入，升级磁盘与主机规格并重新做容量测试。
+
+完整证据见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
 ### P1：修复 staging 暴露的问题并完成人工验收
 
@@ -296,21 +302,6 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 ## 7. 推荐下一阶段路线
 
-### 推荐 B9.34：Current-HEAD staging re-baseline
-
-目标：证明当前 HEAD、migration `0012/0013`、学生端、独立 Admin 和 durable Import worker 能在真实服务器上整体稳定运行。
-
-核心验收：
-
-- 服务器 commit 与计划部署 commit 一致。
-- migration 到 `0013`。
-- `/` 与 `/admin` 分别服务正确的应用。
-- production gate、学生/Admin 功能 smoke、worker restart/stuck recovery 通过。
-- migration 后 backup/restore 与 load baseline 通过。
-- 部署证据和状态文档刷新。
-
-详细执行清单见 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)。
-
 ### B9.34 后的候选
 
 1. 如果真实导入暴露出进度不可见问题，做 Import Jobs realtime progress。
@@ -344,4 +335,4 @@ Learning 后端已具备，但学生端还没有完整学习中心。
    由真实管理员/学生试用反馈决定顺序，最终视觉仍后置。
 
 我的建议是：
-**不是继续 route helper 或 realtime progress。下一步应先做 B9.34 Current-HEAD staging re-baseline，把当前 22 个未部署提交、2 个新 migration、独立 Admin 和 Import worker 在真实服务器上完整证明。**
+**先停止继续扩大底层能力，保留当前 staging 作为可审核基线。下一步先由用户人工审查学生端和 Admin 工作流；代码侧优先补 importer 的运维安全/性能，再根据审核反馈选择 Question Review 完整流或 Learning 前端 IA。**

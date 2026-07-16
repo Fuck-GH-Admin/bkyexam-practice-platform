@@ -71,7 +71,7 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 513 个 Vitest 测试覆盖：
+当前 515 个 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
@@ -84,7 +84,7 @@ npm run test:e2e
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 443 项、Web 33 项、Admin 11 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 445 项、Web 33 项、Admin 11 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
@@ -207,12 +207,40 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 6. 确认第二次导入计数与数据库行数均未变化。
 7. 自动删除临时数据库容器。
 
-2026-07-10 本地 Docker profile 实测：
+2026-07-16 本地 Docker profile 最新实测：
 
 - 解析：2941 classifications、89922 questions、180323 raw options。
 - 入库：154899 options，跳过 25424 orphan options，生成 2662 bank mappings。
 - 两次导入后数据库计数完全一致。
-- 解析约 7.1 秒，第一次导入约 91.4 秒，第二次导入约 42.7 秒，总计约 142.1 秒。
+- 解析约 1.34 秒，第一次导入约 21.62 秒，第二次导入约 14.86 秒，总计约 38.20 秒。
+
+本地 Docker 当时可用约 12 CPU / 15.6 GiB memory，Windows host 为 12 logical CPU / 31.9 GiB memory / NVMe SSD。该结果证明完整数据正确性、事务和幂等性，不代表 2 vCPU / 1.6 GiB / 共享云盘 staging 的连续导入容量。
+
+### B9.34 Current-HEAD Staging Evidence
+
+2026-07-16 真实服务器验证：
+
+- commit `c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5`；
+- migration `0012/0013`；
+- `/` 学生端与 `/admin/` 独立 Admin；
+- production gate `ok=true`；
+- reset maintenance gate 返回 422 且表计数不变；
+- 非 reset true import 成功且保留 practice/attempt/wrongbook；
+- worker heartbeat、cancel/retry、stale recovery；
+- 最终 31 MiB dump 隔离恢复，所有跟踪表计数一致；
+- deployment evidence `ready=true / 14 pass / 0 warn / 0 fail`；
+- 重启后轻量 baseline 4 checks / 0 failures。
+
+连续全量 import 后的失败诊断：
+
+- 无 OOM；
+- 公网网卡约 1 KiB/s，不是网络跑满；
+- 2 vCPU 主机 load average 96.28；
+- 20 个 blocked tasks；
+- CPU iowait 60.44%；
+- 磁盘读约 111597 KiB/s，queue depth 92.64。
+
+因此全量 import 是维护窗口操作，不能与在线负载测试叠加。详细证据见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
 该 profile 依赖未提交到 Git 的完整源题库，因此保持手动/定期运行，不进入每次 push 的 CI。源数据合法更新时，应先审查差异，再同步更新 `currentCorpusBaseline.ts` 与状态文档。
 

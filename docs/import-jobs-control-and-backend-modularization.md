@@ -12,10 +12,14 @@
 
 `mode=import` 仍受后端 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护；未开启时继续返回 `422 Import mode is not enabled yet`。
 
+从 B9.34 起，`resetBeforeImport=true` 另受 `ADMIN_IMPORT_ENABLE_RESET=true` 维护门禁保护。即使操作者是 `super_admin`，未显式开启该门禁时也返回 `422 Import reset mode is not enabled`。
+
 已新增：
 
-- `resetBeforeImport=true` 在 `mode=import` 中不再被统一禁止。
+- `resetBeforeImport=true` 在 `mode=import` 中不再被统一禁止，但只用于受控维护窗口。
 - 只有 `super_admin` 可提交 reset import；非 super_admin 仍返回 `403 resetBeforeImport requires super_admin`。
+- 还必须显式设置 `ADMIN_IMPORT_ENABLE_RESET=true`；默认值为 `false`。
+- B9.34 真实题库验收确认：当前 corpus reset 会通过外键级联删除既有 practice sessions、attempts 与 wrongbook 数据。因此 routine true import 必须使用 `resetBeforeImport=false`；reset 模式在完成数据保留/版本化设计前不得作为日常运营操作。
 - reset 在真实导入事务中执行，导入失败或 cancel 会整体 rollback。
 - reset SQL 为 `TRUNCATE classifications CASCADE`，随后重新写入 classifications/questions/options/bank_mappings。
 
@@ -60,7 +64,7 @@ POST /api/admin/import-jobs/:jobId/retry
 - 需要 `import_job:create` 权限。
 - 仅 `failed` / `cancelled` job 可重试。
 - retry 会复制原 job 的 `kind/mode/sourceDir/options`，创建一个新的 import job id，然后执行同一 runner。
-- 如果原 job 是 reset import，retry 仍保留 `resetBeforeImport=true`，因此当前操作者必须是 `super_admin`。
+- 如果原 job 是 reset import，retry 仍保留 `resetBeforeImport=true`，因此当前操作者必须是 `super_admin`，且运行环境必须仍显式开启 `ADMIN_IMPORT_ENABLE_RESET=true`。
 - 写入 audit action：`import_job.retry`，metadata 包含 `sourceJobId` / `sourceStatus` / `options`。
 
 ### 1.4 Admin UI 最小控制入口

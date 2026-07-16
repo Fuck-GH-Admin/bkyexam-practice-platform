@@ -11,19 +11,19 @@
 
 ## 1. 总体判断
 
-后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.14 曾在真实服务器完成 staging production gate / deployment smoke / deployment evidence 验收，但该证据只覆盖 commit `1686c6e` 和 migration `0011`。
+后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收，当前 staging 基线为 commit `c8b310e` 和 migration `0013`。
 
-2026-07-16 重新核对发现，功能实现基线 `e3f453b` 已领先服务器 22 个提交，并新增 migration `0012`、`0013`、独立 Admin 前端、Question Review override 和 durable Import worker；后续规划文档提交不改变这一功能差异。因此当前最重要的后端缺口不是再增加 helper 或事件流，而是完成 current-HEAD staging re-baseline。
+真实验收还发现并关闭了一个重要风险：`resetBeforeImport=true` 会通过 corpus 外键级联删除 practice/attempt/wrongbook 数据。当前已新增独立 `ADMIN_IMPORT_ENABLE_RESET=false` 维护门禁，routine true import 只允许 non-reset。连续全量 upsert 后的主机挂起经 SAR/journal 确认为磁盘 I/O 饱和，而不是 OOM 或公网网络。
 
 后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围 Admin 模块化边界和实时 progress/外部可观测性。
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 90–92%** | 单元、路由、PostgreSQL integration、Playwright、完整导入 smoke、production gate、迁移和证据工具已建立；但真实服务器证据只覆盖旧 commit，当前 HEAD、migration `0012/0013`、Admin app 与 Import worker 仍待目标环境组合验证。 |
+| 后端工程可验证性 | **约 94%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、production gate、真实 current-HEAD staging、worker、最终隔离 restore 和 deployment evidence 已通过；剩余主要是持续容量测试与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
 | 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 当前 HEAD 公开生产后端就绪 | **约 80–84%** | 代码与本地验证接近生产候选，但服务器仍运行 `1686c6e` / migration `0011`。当前 HEAD 尚未验证 `0012/0013`、Question Review override、Import worker、Admin app、systemd/Nginx 配置与真实数据组合；这些是下一阶段 P0。 |
+| 当前 HEAD 公开生产后端就绪 | **约 88–91%** | commit `c8b310e`、migration `0013`、Question Review override、Import worker、独立 Admin、systemd/Nginx、真实数据恢复和 deployment evidence 已通过；仍缺外部告警、持续容量测试、发布审批与真实用户验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -49,18 +49,19 @@ credential delivery runbook = completed
 admin IA review draft = completed
 ```
 
-当前证据断层：
+当前 B9.34 staging 基线：
 
 ```text
-audited implementation baseline = e3f453b
-server HEAD = 1686c6e
-ahead = 22 commits
-local latest migration = 0013_import_job_worker.sql
-server latest migration = 0011_admin_identity_security.sql
-/ and /admin = same old web bundle
+server HEAD = c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5
+latest migration = 0013_import_job_worker.sql
+/ = student web
+/admin/ = independent admin app
+production gate = ok
+deployment evidence = ready, 14 pass / 0 warn / 0 fail
+final isolated restore = pass
 ```
 
-因此上述 B9.14/B9.15 证据仍然有效，但只能作为旧 release baseline，不能继续用于声明 current HEAD 已通过 staging。
+详细记录见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
 ## 2. 已完成且被验证的后端能力
 
@@ -68,7 +69,7 @@ server latest migration = 0011_admin_identity_security.sql
 
 已完成：
 
-- PostgreSQL schema 与十一份 ordered SQL migration。
+- PostgreSQL schema 与十三份 ordered SQL migration。
 - 原始题库解析：
   - classifications
   - questions
@@ -83,7 +84,7 @@ server latest migration = 0011_admin_identity_security.sql
 - Import Jobs dry-run API 可复用现有题库解析和 mapping 生成逻辑产出 summary。
 - `mode=import` 已可在 `ADMIN_IMPORT_ENABLE_WRITE=true` 下复用真实导入事务写入 PostgreSQL。
 - true import 已覆盖幂等 upsert、`generateMappings=false` 跳过 mapping、失败回滚和 errorSummary。
-- `resetBeforeImport=true` 已在 import mode 中允许 `super_admin` 执行；它会在同一事务内先 `TRUNCATE classifications CASCADE`，再写入新 corpus。
+- `resetBeforeImport=true` 只在 `super_admin` 且 `ADMIN_IMPORT_ENABLE_RESET=true` 的维护窗口允许执行；默认返回 422。真实 staging 已确认它会级联删除学生学习数据，因此 routine import 必须使用 `resetBeforeImport=false`。
 - 管理端 `question_quality_flags` 质检表。
 - 学生端 `student_learning_goals` 与 `question_bookmarks` 长期学习表。
 - `excludedFromPractice=true` 的 open quality flag 会从新的 Practice bank session 自动选题中排除对应题目。
@@ -1644,7 +1645,7 @@ B9.27 实际落地：
 
 - `POST /api/admin/import-jobs/:jobId/cancel`。
 - `POST /api/admin/import-jobs/:jobId/retry`。
-- `mode=import` + `resetBeforeImport=true` 在 `super_admin` 下启用，并在单事务内 reset/reimport。
+- `mode=import` + `resetBeforeImport=true` 在 `super_admin` 与独立 reset maintenance gate 同时满足时启用，并在单事务内 reset/reimport。
 - cancel checkpoint 与 cancel-safe complete/fail，避免已取消 job 被覆盖。
 - `apps/admin` Import Jobs create form 支持 dry_run/import/reset，detail 支持 cancel/retry。
 - `apps/api/src/admin/importJobs.ts` 拆成 `admin/import-jobs/{types,repository,service,runner}.ts`，保留兼容 facade。
@@ -1722,8 +1723,6 @@ B9.33 实际落地：
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin 后端 contract 已设计，Auth/RBAC/Audit、题库整理 read/write、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags、Question Review Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap 已落地；`apps/admin` 已具备 Student Accounts、System Status、Bank Mappings、Import Jobs dry-run/import/reset/cancel/retry/worker heartbeat、Question Review preview/override、Audit Logs read-only 和 Admin Users management UI；readiness、request id、基础安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、旧账号迁移写入 CLI/runbook、部署证据校验 CLI、当前分支远端 CI、PR、branch protection/required checks 与管理员登录失败锁定已落地；正式身份策略、学生身份安全数据模型和密码登录 enforcement 已落地；完整平台后端还缺 route validation/error helper 收敛、非客观题、推荐策略/完整长期档案、实时 progress 事件流、PR review/merge、外部监控告警、系统性性能压测和正式生产发布验收。**
+> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin Auth/RBAC/Audit、题库整理、System Status、Import Jobs dry-run/true import/reset maintenance gate/cancel/retry/worker heartbeat、Question Review Detail/Override、Audit Log、Admin User/Student Manage 与独立 Admin app 已落地；current HEAD、migration `0013`、最终 restore 和 deployment evidence 已在真实 staging 通过。完整平台后端还缺非客观题、推荐策略/完整长期档案、Question Review 完整审批流、实时 progress、外部监控告警、持续容量优化和正式生产发布验收。**
 
-最合理的下一步不是继续扩大代码 diff，而是执行 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md) 定义的 **B9.34 Current-HEAD staging re-baseline**：部署当前 release candidate，执行 migration `0012/0013`，正确发布独立 Admin app，并验证学生/Admin 主链路、Import worker、production gate、backup/restore 和 load baseline。
-
-完成真实环境验收后，再根据暴露的问题选择 route validation/error helper、Import Jobs realtime progress、Question Review 完整运营流或 Learning 前端 IA；MFA/SSO、邀请通知、复杂安全策略 UI 和最终视觉仍后置。
+下一步先固化 importer 维护窗口、避免无变化 upsert、增加超时/节流和导入后健康检查，再由用户人工审核学生端/Admin 后选择 Question Review 完整运营流或 Learning 前端 IA。route validation/error helper 继续分批收敛；realtime progress 不应先于容量优化。

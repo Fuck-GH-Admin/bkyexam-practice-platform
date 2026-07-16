@@ -14,7 +14,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 学习概览、趋势、目标与长期复习标记 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat API、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset maintenance gate/cancel/retry/worker heartbeat API、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
 - 独立 `apps/admin` Operational MVP：Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 均已有功能性页面或最小操作闭环。
 - 生产 gate 与旧账号迁移工具：`npm run ops:production-gate`、`npm run ops:legacy-student-password-migration`。
 - 生产部署证据校验、PR CI 与 `main` branch protection / required checks：`npm run ops:deployment-evidence`，GitHub Actions `Quality` 已在 PR #2 上跑绿。
@@ -28,7 +28,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
 - **当前 HEAD 的真实环境重新验收：** 服务器仍运行 B9.14 commit `1686c6e` 和 migration `0011`，尚未部署最近 22 个提交、migration `0012/0013`、独立 Admin app 和 durable Import worker。
 
-当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，下一阶段决策见 [B9.34 优先级复核](docs/next-priority-review-b9.34.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
+当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，真实 current-HEAD 部署与容量结论见 [B9.34 staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
 ## Workspace
 
@@ -205,6 +205,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 当前有效文档：
 
 - [系统状态与完整度](docs/status.md)
+- [B9.34 current-HEAD staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)
 - [产品与模块边界](docs/product-boundaries.md)
 - [学生信息架构 v1](docs/student-information-architecture.md)
 - [架构](docs/architecture.md)

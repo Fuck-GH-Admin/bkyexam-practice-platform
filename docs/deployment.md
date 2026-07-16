@@ -142,7 +142,8 @@ The API currently reads configuration from environment variables through `apps/a
 - `STUDENT_LOGIN_LOCK_MINUTES`: temporary lock duration after threshold, default `15`.
 - `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
 - `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
-- `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. When enabled, `resetBeforeImport=true` is allowed only for `super_admin` and performs destructive corpus reset in the import transaction.
+- `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. Keep it disabled outside a controlled import window.
+- `ADMIN_IMPORT_ENABLE_RESET`: separate maintenance-only gate for `resetBeforeImport=true`; default `false`. Reset also requires `super_admin`. The current reset transaction deletes the existing corpus before reimport, and PostgreSQL foreign-key cascades also delete dependent practice/attempt/wrongbook learning data. Do not enable this gate for routine imports; take and verify a database backup first.
 - `ADMIN_IMPORT_WORKER_ENABLED`: defaults to `true`; when `USE_DATABASE=true`, production API creates queued import jobs and runs the in-process worker to claim them.
 - `ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS`: worker poll interval; default `2000`.
 - `ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS`: running job heartbeat interval; default `5000`.

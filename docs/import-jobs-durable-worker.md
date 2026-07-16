@@ -23,7 +23,7 @@ external durable queue service = deferred
 
 `POST /api/admin/import-jobs` 在生产 `USE_DATABASE=true` 且 `ADMIN_IMPORT_WORKER_ENABLED=true` 时不再在 request 内同步跑导入，而是：
 
-1. 校验 RBAC、source allowlist、`ADMIN_IMPORT_ENABLE_WRITE` 与 `resetBeforeImport` 权限。
+1. 校验 RBAC、source allowlist、`ADMIN_IMPORT_ENABLE_WRITE`、`ADMIN_IMPORT_ENABLE_RESET` 与 `resetBeforeImport` 权限。
 2. 创建 `status=queued` 的 `import_jobs` 行。
 3. 立即返回 job detail。
 4. 后台 worker 轮询并 claim queued job。
@@ -99,6 +99,7 @@ ADMIN_IMPORT_WORKER_STALE_AFTER_MS=300000
 - `ADMIN_IMPORT_WORKER_ENABLED=false` 时，生产 `buildApp` 会回退 inline execution。
 - `ADMIN_IMPORT_WORKER_STALE_AFTER_MS` 默认 5 分钟。
 - `ADMIN_IMPORT_ENABLE_WRITE` 仍只控制 `mode=import` 是否允许创建；dry-run 不受该 gate 限制。
+- `ADMIN_IMPORT_ENABLE_RESET` 独立控制破坏性 reset import，默认关闭；super_admin 身份不能绕过该维护门禁。
 
 ## 4. 数据库变更
 

@@ -169,3 +169,39 @@ postgres-integration = success
 4. 复核凭据交付与首次改密流程，避免 admin/student 初始密码散落。
 5. 审核管理平台信息架构和账号运营流程，再决定是否进入管理前端设计。
 6. 学生正式前端视觉仍放最后，等后端运维基线、性能边界和管理端 IA 稳定后再做。
+
+## 7. B9.34 Current-HEAD Evidence Snapshot
+
+2026-07-16 完成 current-HEAD staging re-baseline：
+
+```text
+commit = c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5
+migrations = 0001..0013
+target = https://exam.acgbot.cc.cd
+production gate = ok
+deployment evidence = ready=true, 14 pass / 0 warn / 0 fail
+remote CI run = 29488810116
+quality = pass
+postgres-integration = pass
+```
+
+新增发布证据：
+
+- `/` 与 `/admin/` 分别服务学生 Web 和独立 Admin；
+- reset import 受 `ADMIN_IMPORT_ENABLE_RESET=false` 独立门禁保护；
+- reset gate 关闭时返回 422，数据库计数不变；
+- 非 reset true import 成功并保留学生学习数据；
+- 最终 31 MiB target dump 已隔离恢复，全部跟踪表计数一致；
+- write/reset gate 在验收后均恢复为 `false`；
+- 目标 2 vCPU 主机连续全量 import 后出现磁盘 I/O 饱和，已明确限制为维护窗口操作。
+
+服务器 evidence：
+
+```text
+/srv/bkyexam-backups/b9.34-20260716165318/evidence/deployment-evidence-input-final.json
+/srv/bkyexam-backups/b9.34-20260716165318/evidence/deployment-evidence-report-final.json
+/srv/bkyexam-backups/b9.34-20260716165318/evidence/final-restore-drill-report.json
+/srv/bkyexam-backups/b9.34-20260716165318/evidence/final-post-deploy-audit.txt
+```
+
+完整说明见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。

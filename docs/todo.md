@@ -1,20 +1,27 @@
 # Roadmap
 
-## Planned B9.34 Current-HEAD staging re-baseline — 2026-07-16
+## Completed B9.34 Current-HEAD staging re-baseline — 2026-07-16
 
 - [x] 全局复核 route helpers、Import realtime progress 与其他候选优先级。
 - [x] 通过 SSH 确认服务器仍是 commit `1686c6e`、migration `0011`、worktree clean。
 - [x] 确认本地功能实现基线 `e3f453b` 已领先服务器 22 个提交，并新增 migration `0012/0013`。
 - [x] 确认线上 `/` 与 `/admin` 返回相同旧 bundle，独立 Admin 尚未部署。
 - [x] 新增 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)，修正下一阶段排序。
-- [ ] 冻结并记录 B9.34 最终待部署 commit。
-- [ ] 部署前备份代码、env、Nginx、systemd 和 PostgreSQL。
-- [ ] 更新服务器代码并执行 migration `0012/0013`。
-- [ ] 构建并分别部署学生 Web 与独立 Admin app。
-- [ ] 验证 production gate、学生/Admin 主链路和 Import worker。
-- [ ] 完成 migration 后 backup/restore 与 staging load baseline。
-- [ ] 刷新 deployment evidence、status、testing 和部署日志。
-- [ ] 本阶段不做 route helper 重构、不做 realtime progress、不做最终视觉。
+- [x] 冻结并部署 commit `c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5`。
+- [x] 部署前备份代码、env、Nginx、systemd 和 PostgreSQL。
+- [x] 更新服务器代码并执行 migration `0012/0013`。
+- [x] 构建并分别部署学生 Web 与独立 Admin app。
+- [x] 验证 production gate、学生/Admin 主链路和 Import worker。
+- [x] 执行 reset true import，发现 corpus reset 级联删除学习数据后立即从部署前 dump 恢复。
+- [x] 新增 `ADMIN_IMPORT_ENABLE_RESET=false` 独立维护门禁，并验证 reset 422 不改变数据。
+- [x] 验证非 reset true import 成功且保留 practice/attempt/wrongbook 数据。
+- [x] 完成最终隔离 backup/restore、轻量 load baseline、日志和 deployment evidence。
+- [x] 确认连续全量 import 后的挂起主因是 2 vCPU 主机块设备 I/O 饱和，不是公网网络或 OOM。
+- [x] 本地完整题库 Docker 双次幂等导入通过。
+- [x] 刷新 deployment evidence、status、testing 和部署日志。
+- [x] 本阶段未做 route helper 重构、realtime progress 或最终视觉。
+
+详细证据见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
 ## Completed B9.33 Admin Bank Mappings backend modularization — 2026-07-16
 

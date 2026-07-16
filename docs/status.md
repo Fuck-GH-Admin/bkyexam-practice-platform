@@ -6,7 +6,7 @@
 
 如果需要从产品/后端/前端/生产四个维度快速审视当前进度，先读 [`project-progress-overview.md`](project-progress-overview.md)。
 
-> **证据时效修正：** 2026-07-16 通过 SSH 确认真实服务器仍运行 commit `1686c6e`，最新 migration 为 `0011`；本地功能实现基线 `e3f453b` 已领先 22 个提交并包含 migration `0012/0013`，后续 docs-only commit 不改变功能差异。因此 B9.14/B9.15 的 staging 证据仍是有效历史基线，但不能证明当前 release candidate 已在目标环境通过。下一阶段见 [`next-priority-review-b9.34.md`](next-priority-review-b9.34.md)。
+> **B9.34 证据刷新：** 2026-07-16 已把 current release candidate `c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5` 部署到真实服务器，migration 更新到 `0013`，`/` 与 `/admin/` 分别服务学生端和独立 Admin。production gate、学生/Admin smoke、Import worker、reset 二次门禁、非 reset true import、最终隔离 backup/restore、轻量 load baseline 和 deployment evidence 均通过。完整记录见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 
 ## Executive Summary
 
@@ -16,8 +16,8 @@
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
-- **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、Import Jobs reset/cancel/retry API、Question Review Flags API、Question Review detail/override API、Audit Log read API、Admin User manage API、Admin Student Manage API 与 super_admin bootstrap CLI 已实现；B9.19 已创建独立 `apps/admin`，完成 Admin Login、System Status 与 Student Accounts Operational MVP；B9.20 已完成 Admin P1 工作流缺口审查；B9.21 已实现 Bank Mappings P1 UI；B9.22 已实现 Import Jobs dry-run/history UI；B9.23 已实现 Question Review preview UI；B9.24 已实现 Audit Logs read-only UI；B9.25 已实现 Admin Users management UI；B9.26 已实现 Question Review override 最小编辑闭环；B9.27 已实现 Import Jobs reset/cancel/retry 与后端模块化；B9.28 已实现 Import Jobs durable worker/heartbeat/stuck recovery；B9.29 已继续拆分 Import Jobs repository memory/pg/mapper；B9.30 已拆分 Learning repository facade/types/memory/pg/utils；B9.31 已拆分 Admin Question Review facade/types/memory/pg/mappers；B9.32 已拆分 Admin Students facade/types/service/memory/pg/mappers/utils；B9.33 已拆分 Admin Bank Mappings facade/types/memory/pg/mappers/rules；override diff/审批/回滚、实时 progress 事件流和最终视觉后置。**
-- **生产就绪前置：本地代码、自动化验证、production gate、备份恢复、部署证据工具和 B9.14/B9.15 旧 release baseline 已建立；但服务器尚未更新 B9.17–B9.33，当前 `/admin` 仍返回旧学生端资源，migration `0012/0013`、独立 Admin、Question Review override 和 Import worker 尚未在真实环境验证。B9.34 必须先完成 current-HEAD staging re-baseline。**
+- **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、受 `ADMIN_IMPORT_ENABLE_RESET=true` 独立维护门禁保护的 reset、cancel/retry、durable worker/heartbeat/stuck recovery、Question Review Flags/Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；override diff/审批/回滚、实时 progress 事件流和最终视觉后置。**
+- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline、migration `0012/0013`、独立 Admin、Import worker、真实数据恢复、最终 backup/restore 与 deployment evidence。全量导入已被明确限制为维护窗口操作；公开生产仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -25,7 +25,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；B9.14 已在 staging 完成学生登录和创建练习 smoke；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
-| 当前 HEAD 公开生产就绪度 | **约 80–84%** | 代码和本地验证接近 release candidate；但真实服务器仅验证旧 commit `1686c6e` / migration `0011`。当前 HEAD 的两个新 migration、独立 Admin、Question Review override、Import worker、Nginx/static routing 和组合 smoke 尚未完成 |
+| 当前 HEAD 公开生产就绪度 | **约 88–91%** | current HEAD、migration `0012/0013`、独立 Admin、Question Review override、Import worker、Nginx/static routing、最终 restore 和 deployment evidence 已在真实 staging 通过；仍缺外部告警、持续容量验证、正式发布审批与真实用户验收 |
 | 完整产品愿景 | **约 90%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线、管理平台 IA 初稿、B9.16 前端开工前审查包、B9.17 学生账号启用最小 UI、B9.18 Admin 静态 wireframe 审查包、B9.19 Admin Operational MVP、B9.20 Admin P1 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI、B9.24 Audit Logs read-only UI、B9.25 Admin Users management UI、B9.26 Question Review override 最小闭环、B9.27 Import Jobs reset/cancel/retry、B9.28 durable worker/heartbeat、B9.29 Import Jobs repository split 和 B9.30 Learning repository split 已落地，但分母仍包含最终学生前端、Learning 前端、全题型、运营与生产能力 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
@@ -43,10 +43,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 58 | 443 |
+| `apps/api` | 58 | 445 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **63** | **513** |
+| **Total** | **63** | **515** |
 
 仓库内 Playwright smoke：
 
@@ -531,21 +531,21 @@ PracticeSessionService
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Learning analytics | 后端 MVP+ | 68% | 学习概览 API、最近题库、题型正确率、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏/长期复习标记、v1 runtime contract | 前端展示、推荐策略、完整长期学习档案 |
 | Student product shell | 功能性 | 80% | 密码登录、首次改密、账号身份显示、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
-| Admin console | P1 运营 UI 基本可用，完整工作流 UI 未完成 | 88% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、管理员登录失败锁定、`/api/admin/auth/*`、Admin User manage API、Admin Student Manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit、管理平台 IA/account ops 审查稿、B9.18 静态 wireframe 审查包、独立 `apps/admin`、Admin Login、System Status dashboard、Student Accounts list/detail/create/bulk-create/update/reset-password/revoke-sessions、Bank Mappings list/filter/detail/edit/bulk-status、Import Jobs list/create dry-run/import/reset/detail/error-report/cancel/retry/worker heartbeat、Question Review list/filter/detail preview/add flag/resolve/ignore/exclude/override editor、Audit Logs list/filter/detail preview、Admin Users list/filter/detail/create/update/password/status/roles、admin Playwright smoke | override diff/审批/回滚、实时 progress 事件流、正式视觉与可用性验收 |
+| Admin console | P1 运营 UI 基本可用，完整工作流 UI 未完成 | 90% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、管理员登录失败锁定、`/api/admin/auth/*`、Admin User manage API、Admin Student Manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset maintenance gate/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit、独立 `apps/admin` 及真实 `/admin/` 部署、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 功能页与 Playwright/真实 staging smoke | override diff/审批/回滚、实时 progress 事件流、正式视觉与可用性验收 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
-| Operations | 可重复验证 | 90% | 配置、migration、全量幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、PR CI、`main` branch protection / required checks、部署文档、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、legacy password migration CLI、production operations runbook、旧账号迁移 runbook、CI evidence 模板、真实 staging 部署、server-side synthetic healthcheck timer、实机 restore drill、staging load baseline、凭据交付 runbook | PR human approval/merge、第三方告警通知接入、持续性能压测、正式生产发布验收 |
+| Operations | 可重复验证，容量边界已识别 | 93% | 配置、migration、完整题库双次幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、PR CI、`main` branch protection / required checks、部署文档、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、legacy password migration CLI、production operations runbook、真实 current-HEAD staging、独立 Admin、server-side synthetic healthcheck timer、最终实机 restore drill、deployment evidence、负载基线与 I/O 饱和诊断 | PR human approval/merge、第三方告警通知接入、持续容量压测、全量 importer 性能优化/节流、正式生产发布验收 |
 
 ## Known Product And Technical Risks
 
 ### P0 Before Public Production
 
-- 先完成 B9.34 Current-HEAD staging re-baseline；在此之前，不再把旧 B9.14 staging evidence 当作当前 HEAD 的生产就绪证据。
-- 服务器需从 `1686c6e` 更新到本阶段最终 commit，migration 从 `0011` 更新到 `0013`，并验证 `/` 与 `/admin` 分别服务正确应用。
-- 必须真实验证 Import worker claim/heartbeat/restart/stuck recovery，以及 migration 后 backup/restore。
+- B9.34 Current-HEAD staging re-baseline 已完成；后续以 commit `c8b310e`、migration `0013` 和 B9.34 evidence 为当前 staging 真相源。
+- `ADMIN_IMPORT_ENABLE_WRITE=false` 与 `ADMIN_IMPORT_ENABLE_RESET=false` 必须保持默认关闭；全量 import 仅允许在维护窗口临时开启 write gate，reset gate 在数据保留/版本化设计完成前不得日常启用。
+- 当前 2 vCPU / 1.6 GiB 主机在连续全量 upsert 后出现 60% iowait、load average 96 和 20 个 blocked tasks；公开生产前必须接受“导入维护窗口”限制，或升级磁盘/主机并优化 importer。
 - 学生密码登录 enforcement、旧账号迁移审计 gate、旧账号迁移写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks、B9.14 目标环境迁移执行证据与 B9.16 前端开工前审查包已落地；公开生产前仍需正式改密前端入口、PR human approval/merge、第三方告警通知接入和最终发布参数验收。
 - 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap 与管理平台 IA/account ops 审查稿，Bank Mappings、Import Jobs dry-run/history、Question Review preview+override、Audit Logs read-only 与 Admin Users management 功能性 UI 已落地；仍缺 override diff/审批/回滚、实时 progress 事件流和完整审核流程。
 - 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、隔离 backup/restore drill、结构化 request log、metrics smoke endpoint、服务器侧 synthetic healthcheck timer、实机 restore drill 和最低限度 staging load baseline；仍没有第三方告警通知目标、长期性能压测和正式生产数据量级恢复策略。
-- 已对 `https://exam.acgbot.cc.cd` 的 B9.14 commit 做 staging smoke、load baseline 与 restore drill；当前 HEAD 尚待重新部署和刷新证据，仍未声明正式公开生产发布完成。
+- 已对 `https://exam.acgbot.cc.cd` 的 current HEAD 做 staging smoke、production gate、worker recovery、reset safety、轻量 load baseline、最终 restore drill 和 deployment evidence；仍未声明正式公开生产发布完成。
 
 ### P1 Before Large Feature Expansion
 
