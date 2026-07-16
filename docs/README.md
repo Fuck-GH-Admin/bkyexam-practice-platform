@@ -87,7 +87,7 @@ npm run docs:audit
 截至 2026-07-16：
 
 ```text
-staging deployment commit = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
+staging runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
 database schema = migrations 0001..0013
 migration ledger = 13 rows, current 0013_import_job_worker.sql
 student entry = /
@@ -96,4 +96,4 @@ ADMIN_IMPORT_ENABLE_WRITE = false
 ADMIN_IMPORT_ENABLE_RESET = false
 ```
 
-B9.34 的 `c8b310e` 与审计开始时的 `5ddbead` 均为历史基线；B9.35 已把当前安全/运维收口代码部署到 `848638e`。
+B9.34 的 `c8b310e` 与审计开始时的 `5ddbead` 均为历史基线；B9.35 已把当前安全/运维收口代码部署到 runtime commit `2fbaec1`。

@@ -29,7 +29,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 92–94%** | B9.35 commit `848638e`、migration ledger/checksum、独立 Admin、worker、首次改密服务端门禁、reset safety、pre/post checksum dump、资源 monitor 和远端 CI 已通过；仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。 |
+| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 92–94%** | B9.35 runtime commit `2fbaec1`、migration ledger/checksum、独立 Admin、worker、首次改密服务端门禁、reset safety、pre/post checksum dump、资源 monitor 和远端 CI 已通过；仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。 |
 | 完整产品愿景 | 主体完成但未收口 | **约 90%** | 分母包含最终学生端、Learning 前端、管理平台完整工作流、全题型、运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
@@ -207,7 +207,7 @@ PostgreSQL docker integration：
 
 ```text
 target = https://exam.acgbot.cc.cd
-commit = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
+runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
 production gate = ok=true
 legacyPasswordlessStudents = 0
 HTTP smoke = PASS

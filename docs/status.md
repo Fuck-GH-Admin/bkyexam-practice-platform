@@ -10,7 +10,7 @@
 >
 > **文档一致性刷新：** 2026-07-16 已完成 route/config/migration/link 与真实 staging 的文档—代码审计，并新增可重复 `npm run docs:audit`。人工核查入口见 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 >
-> **B9.35 安全与运维真相收口：** commit `848638e` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
+> **B9.35 安全与运维真相收口：** runtime commit `2fbaec1` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 
 ## Executive Summary
 

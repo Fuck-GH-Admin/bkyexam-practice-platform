@@ -252,7 +252,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 2026-07-16 真实 staging 验证：
 
 ```text
-commit = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
+runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
 first migration run = applied 0001..0013 into ledger
 second migration run = skipped 0001..0013
 schema_migrations = 13 / current 0013 / checksum length 64
@@ -262,6 +262,7 @@ Admin System Status migration truth = PASS
 pre/post custom dump checksum = PASS
 after monitor = no saturation signals / readinessFailures 0
 GitHub Actions push + PR quality/postgres-integration = success
+production gate connected-client pg deprecation warning = fixed
 ```
 
 服务器证据保存在 `/srv/bkyexam-backups/b9.35-20260716T150029Z/`。

@@ -23,7 +23,7 @@
 | 后端工程可验证性 | **约 96%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是持续容量测试与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
 | 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 当前 HEAD 公开生产后端就绪 | **约 92–94%** | commit `848638e`、migration ledger/checksum、Question Review override、Import worker、独立 Admin、首次改密服务端门禁、reset gate、systemd/Nginx、pre/post checksum dump 和资源 monitor 已通过；仍缺外部告警、持续容量测试、发布审批与真实用户验收。 |
+| 当前 HEAD 公开生产后端就绪 | **约 92–94%** | runtime commit `2fbaec1`、migration ledger/checksum、Question Review override、Import worker、独立 Admin、首次改密服务端门禁、reset gate、systemd/Nginx、pre/post checksum dump 和资源 monitor 已通过；仍缺外部告警、持续容量测试、发布审批与真实用户验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -66,7 +66,7 @@ final isolated restore = pass
 当前 B9.35 staging 基线：
 
 ```text
-server HEAD = 848638e7977ed1aaae5c4a76baaaf0663a07ad55
+runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
 schema_migrations = 13, current 0013_import_job_worker.sql
 second migration run = all skipped
 production gate = ok
