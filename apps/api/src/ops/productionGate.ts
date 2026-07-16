@@ -303,11 +303,26 @@ export function createPgStudentIdentityMigrationRepository(client: QueryClient):
       );
       const row = firstRow<SummaryRow>(summaryResult);
 
-      const [legacyPasswordless, passwordResetRequired, locked] = await Promise.all([
-        selectStudentSamples(client, 'password_hash IS NULL', [], sampleLimit),
-        selectStudentSamples(client, 'password_reset_required = true', [], sampleLimit),
-        selectStudentSamples(client, 'locked_until IS NOT NULL AND locked_until > $1', [now], sampleLimit),
-      ]);
+      // A connected pg Client executes one query at a time. Keep these reads
+      // sequential so the production CLI remains compatible with pg 9.
+      const legacyPasswordless = await selectStudentSamples(
+        client,
+        'password_hash IS NULL',
+        [],
+        sampleLimit,
+      );
+      const passwordResetRequired = await selectStudentSamples(
+        client,
+        'password_reset_required = true',
+        [],
+        sampleLimit,
+      );
+      const locked = await selectStudentSamples(
+        client,
+        'locked_until IS NOT NULL AND locked_until > $1',
+        [now],
+        sampleLimit,
+      );
 
       return {
         generatedAt: now.toISOString(),
