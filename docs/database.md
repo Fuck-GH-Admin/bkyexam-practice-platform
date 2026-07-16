@@ -337,6 +337,21 @@ Review mark list screens join `questions` and `bank_mappings` to return question
 
 ## Migrations
 
+### Runner-managed `schema_migrations`
+
+`schema_migrations` 是 migration runner 管理的系统表，不对应新的编号 SQL 文件：
+
+- `filename`: migration 文件名，主键。
+- `checksum`: SQL 文件内容的 SHA-256。
+- `applied_at`: 成功执行并写入 ledger 的时间。
+
+runner 在单一 transaction 中创建/锁定 ledger、核对 release 文件和 checksum、跳过已应用 migration，并在新 migration 成功后记录历史。以下情况会 fail closed：
+
+- 已应用 migration 的 SQL 内容发生变化。
+- 数据库 ledger 中存在 migration，但当前 release 缺少对应文件。
+
+因此已发布的 migration 不得原地修改；修复必须新增 forward migration。
+
 `apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the initial Drizzle schema. It creates imported content, mapping, student, attempt, and wrong-question tables.
 
 `apps/api/src/db/migrations/0002_practice_sessions.sql` adds cookie session storage and practice session tables. It creates `student_sessions`, `practice_sessions`, and `practice_session_questions`, plus indexes for student lookup, session expiry, bank/status filtering, and locked session question lookup. It includes check constraints for valid practice modes, positive question limits, nonnegative counters, active/completed status, positive session question order, token hash uniqueness, and uniqueness for each session's question membership and sort order.
@@ -377,7 +392,9 @@ Run API migrations with:
 DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:migrate -w @bkyexam-practice/api
 ```
 
-The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, applies them in filename order inside a single transaction, and prints the applied file names. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
+The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, calculates SHA-256, and handles them in filename order inside a single transaction. It prints the complete file list, newly applied files, and skipped files. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
+
+旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十三份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十三份全部 skipped。
 
 On PowerShell, set `DATABASE_URL` before running migration commands:
 

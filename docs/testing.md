@@ -74,12 +74,13 @@ npm run test:e2e
 
 ### Unit And In-Process Route Tests
 
-当前 515 个 Vitest 测试覆盖：
+当前 Vitest 测试覆盖：
 
 - shared schema 与类型约束。
 - 题库解析、映射、导入辅助逻辑。
 - identity、student identity security model、password login enforcement、catalog、practice、wrongbook、learning dashboard/trends/goals/review-marks 的 repository 行为；B9.30 已把 Learning repository 拆成 facade/types/memory/pg/utils，测试计数不变。
 - Fastify route 的输入、输出和错误映射。
+- 临时密码 session 对 Practice/Wrongbook/Learning 的服务端 `PASSWORD_CHANGE_REQUIRED` 门禁，以及 Auth/Catalog 允许访问边界。
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint、production gate CLI/env/student migration summary、legacy student password migration CLI、管理员登录失败锁定。
 - Web 练习 model 与关键状态转换。
 - Admin route、RBAC nav、student query、bulk-create parser、Bank Mapping query/status badge、Import Job query/status badge、Question Review query/status badge、Question Review override contract、Audit Log query/status badge、Admin User query/badge 与状态 helper。
@@ -87,7 +88,7 @@ npm run test:e2e
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 445 项、Web 33 项、Admin 11 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 453 项、Web 33 项、Admin 11 项，共 523 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
@@ -182,13 +183,14 @@ npm run test:integration:db
 npm run ops:backup-restore:docker
 ```
 
-该命令会启动同一个 `postgres-test` service，执行全部 migration，写入覆盖核心业务表的最小 fixture，使用容器内 `pg_dump` 导出 backup，再恢复到 `bkyexam_restore_test` 并比较关键表计数。
+该命令会启动同一个 `postgres-test` service，执行全部 migration，写入覆盖核心业务表的最小 fixture，使用容器内 `pg_dump --format=custom` 导出 backup，生成并验证 SHA-256 sidecar，再用 `pg_restore` 恢复到 `bkyexam_restore_test` 并比较关键表计数。
 
 当前演练覆盖：
 
 - schema 可被 `pg_dump` 导出并恢复。
+- persisted dump 的 SHA-256 与 sidecar 一致，并生成 `report.json`。
 - 题库、学生、题目、选项、attempt、wrongbook、learning goals、question bookmarks 的最小数据可恢复。
-- 恢复库关键表计数与源库一致。
+- 恢复库关键表及 `schema_migrations` 计数与源库一致。
 
 backup 文件写入 `artifacts/ops/backup-restore-drill/`，该目录不提交 Git。
 

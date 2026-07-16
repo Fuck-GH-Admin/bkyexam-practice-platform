@@ -11,12 +11,15 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 服务端草稿、断点续答、当前位置、标记存疑。
 - 提交前检查、整卷提交、服务端判分和只读结果回看。
 - 错题自动归集、错题详情、标记掌握和错题再练。
-- 学习概览、趋势、目标与长期复习标记 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。
+- 学习概览、趋势、目标与长期复习标记后端 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。学生 Web 尚无 Learning 路由和页面。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
 - Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset maintenance gate/cancel/retry/worker heartbeat API、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
 - 独立 `apps/admin` Operational MVP：Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 均已有功能性页面或最小操作闭环。
 - 生产 gate 与旧账号迁移工具：`npm run ops:production-gate`、`npm run ops:legacy-student-password-migration`。
+- 服务端首次改密门禁：临时密码学生在完成改密前不能直接调用 Practice/Wrongbook/Learning API。
+- migration ledger 与 checksum drift 检测；Admin System Status 读取数据库真实 migration history。
+- custom-format backup/restore drill、SHA-256 sidecar/report，以及 Linux 导入维护窗口资源采样工具。
 - 生产部署证据校验、PR CI 与 `main` branch protection / required checks：`npm run ops:deployment-evidence`，GitHub Actions `Quality` 已在 PR #2 上跑绿。
 - 桌面与移动端的基础响应式练习体验。
 
@@ -85,6 +88,17 @@ npm run verify
 
 ```sh
 npm run ops:backup-restore:docker
+```
+
+Linux 导入维护窗口资源采样：
+
+```sh
+npm run ops:import-maintenance-monitor -- \
+  --phase=during \
+  --duration-seconds=300 \
+  --interval-seconds=5 \
+  --service=bkyexam-practice-api.service \
+  --output=/srv/bkyexam-backups/<window>/import-monitor-during.json
 ```
 
 生产 gate 与旧无密码学生迁移 dry-run：
@@ -210,6 +224,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 
 - [系统状态与完整度](docs/status.md)
 - [B9.34 current-HEAD staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)
+- [B9.35 安全与运维真相收口](docs/b9.35-security-operational-truth-closure.md)
 - [产品与模块边界](docs/product-boundaries.md)
 - [学生信息架构 v1](docs/student-information-architecture.md)
 - [架构](docs/architecture.md)

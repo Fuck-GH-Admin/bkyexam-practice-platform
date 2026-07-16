@@ -1,5 +1,20 @@
 # Roadmap
 
+## Completed B9.35 Security and operational truth closure — 2026-07-16
+
+- [x] 首次改密从前端跳转升级为 Practice/Wrongbook/Learning 服务端门禁。
+- [x] shared error contract 增加 `PASSWORD_CHANGE_REQUIRED`。
+- [x] production gate 把 `ADMIN_IMPORT_ENABLE_RESET=true` 作为 blocking failure。
+- [x] migration runner 增加 `schema_migrations` ledger、SHA-256 drift 与 missing-file detection。
+- [x] Admin System Status 改为读取数据库真实 migration count/current。
+- [x] backup/restore drill 统一为 custom dump、SHA-256 sidecar、`pg_restore` 和 `report.json`。
+- [x] 新增 Linux import maintenance before/during/after 资源监控脚本。
+- [x] Admin Import Jobs 移除开发机本地 sourceDir 默认值。
+- [x] 文档明确 Learning 是后端 MVP+，学生 Web 尚未交付。
+- [ ] 完整质量门、Git/CI 和真实服务器部署证据在本阶段结束时补录。
+
+详细说明见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
+
 ## Completed B9.34 Current-HEAD staging re-baseline — 2026-07-16
 
 - [x] 全局复核 route helpers、Import realtime progress 与其他候选优先级。

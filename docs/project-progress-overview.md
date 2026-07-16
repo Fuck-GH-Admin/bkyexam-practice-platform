@@ -15,7 +15,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 当前最准确的定位是：
 
-> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；B9.34 已把 current HEAD、migration 0012/0013、独立 Admin 和 durable Import worker 部署到真实 staging，并完成 reset 风险回滚、最终 restore 和容量诊断。当前首要任务从“证明能部署”转为“固化导入维护窗口、人工审核系统、再按真实反馈选择下一产品切片”。**
+> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；B9.34 已完成真实 staging re-baseline，B9.35 又补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset production gate、可校验恢复演练和导入维护窗口资源采样。Learning 仍是后端能力，学生前端尚未交付。**
 
 文档阅读顺序与本轮代码一致性结果见 [`README.md`](README.md) 和 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 
@@ -25,7 +25,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | --- | --- | ---: | --- |
 | 学生客观题核心闭环 | 内部可用 | **约 95%** | 登录、首页、多会话、题库、练习、草稿、提交、结果、历史、错题、错题再练已经可用；Learning 后端已具备概览/趋势/目标/长期复习标记；缺 Learning 前端与最终 UX。 |
 | 后端主功能 | 基本成型 | **约 88–89%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs、Question Review、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控、实时 progress、部分完整运营流。 |
-| 后端工程化/可验证性 | 本地与 current-HEAD staging 已验证 | **约 94%** | `verify:docker`、完整题库 Docker 双次导入、PostgreSQL integration、Playwright、production gate、真实 worker、最终 backup/restore 和 deployment evidence 已通过；容量边界已通过 SAR/journal 定位。 |
+| 后端工程化/可验证性 | 本地与 current-HEAD staging 已验证 | **约 96%** | 在既有质量门和 staging evidence 上，B9.35 新增 migration ledger/checksum、真实 migration status、custom backup checksum/report、reset blocking gate 与资源 monitor；仍缺外部告警和持续容量验证。 |
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
@@ -41,7 +41,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 已完成：
 
 - 学生登录、会话 cookie、退出。
-- 临时密码账号强制改密最小 UI。
+- 临时密码账号强制改密最小 UI，以及 Practice/Wrongbook/Learning 服务端强制门禁。
 - 题库列表与搜索/筛选基础字段。
 - 多 active practice session。
 - 练习 session 创建、草稿保存、断点续答。
@@ -106,6 +106,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
   - audit
 - Audit Logs read-only UI。
 - System Status UI。
+- System Status 的 database migration 摘要读取真实 `schema_migrations` ledger。
 
 仍未完成：
 
@@ -153,6 +154,10 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 - deployment evidence CLI。
 - legacy student password migration CLI/runbook。
 - backup/restore drill。
+- custom dump SHA-256 sidecar/report。
+- migration ledger 与 checksum/missing-file drift detection。
+- production gate 对 reset gate 的 blocking check。
+- 导入维护窗口 before/during/after 资源采样脚本。
 - 服务器 staging 部署与 HTTPS smoke。
 - synthetic healthcheck timer。
 - staging load baseline。
@@ -181,10 +186,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 58 | 445 |
+| `apps/api` | 59 | 453 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **63** | **515** |
+| **Total** | **64** | **523** |
 
 Playwright smoke：
 

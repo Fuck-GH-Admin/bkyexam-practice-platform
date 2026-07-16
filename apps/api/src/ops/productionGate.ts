@@ -192,6 +192,16 @@ export function evaluateProductionEnvironment(env: NodeJS.ProcessEnv): Productio
   ));
 
   checks.push(check(
+    'admin_import_reset_disabled',
+    'Destructive Admin import reset is disabled',
+    env.ADMIN_IMPORT_ENABLE_RESET === 'true' ? 'fail' : 'pass',
+    env.ADMIN_IMPORT_ENABLE_RESET === 'true'
+      ? 'ADMIN_IMPORT_ENABLE_RESET=true; destructive corpus reset is enabled.'
+      : 'ADMIN_IMPORT_ENABLE_RESET is disabled by default.',
+    'Keep ADMIN_IMPORT_ENABLE_RESET=false outside an explicitly approved restore-capable maintenance window.',
+  ));
+
+  checks.push(check(
     'student_migration_temp_password_cleared',
     'Legacy migration temporary password cleared from runtime env',
     hasText(env.STUDENT_MIGRATION_TEMP_PASSWORD) ? 'warn' : 'pass',

@@ -22,6 +22,7 @@ const productionEnv = {
   CSRF_ORIGIN_CHECK_ENABLED: 'true',
   CSRF_ALLOWED_ORIGINS: 'https://student.example.com;https://admin.example.com',
   ADMIN_IMPORT_ENABLE_WRITE: 'false',
+  ADMIN_IMPORT_ENABLE_RESET: 'false',
 };
 
 class FakeQueryClient implements QueryClient {
@@ -96,7 +97,7 @@ describe('evaluateProductionEnvironment', () => {
   it('passes production-critical environment checks', () => {
     const checks = evaluateProductionEnvironment(productionEnv);
 
-    expect(checks).toHaveLength(11);
+    expect(checks).toHaveLength(12);
     expect(checks.every((check) => check.status === 'pass')).toBe(true);
   });
 
@@ -113,6 +114,7 @@ describe('evaluateProductionEnvironment', () => {
       CSRF_ALLOWED_ORIGINS: 'http://localhost:5173',
       ADMIN_BOOTSTRAP_PASSWORD: 'secret123',
       ADMIN_IMPORT_ENABLE_WRITE: 'true',
+      ADMIN_IMPORT_ENABLE_RESET: 'true',
       STUDENT_MIGRATION_TEMP_PASSWORD: 'temporary123',
     });
 
@@ -124,6 +126,7 @@ describe('evaluateProductionEnvironment', () => {
       'legacy_passwordless_disabled',
       'rate_limit_enabled',
       'csrf_origin_check_enabled',
+      'admin_import_reset_disabled',
     ]);
     expect(checks.filter((check) => check.status === 'warn').map((check) => check.id)).toEqual([
       'node_env_production',

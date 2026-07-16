@@ -28,16 +28,18 @@ type SubmittedAnswer = string[] | boolean | string;
 ```json
 {
   "error": "Human-readable message",
+  "code": "optional-machine-readable-code",
   "requestId": "optional-request-id"
 }
 ```
 
-手写业务错误目前通常只返回 `error`。未捕获异常和平台 guardrail 错误会额外返回 `requestId`，并且所有响应都会带 `x-request-id` header；客户端传入合法 `x-request-id` 时会复用该值，否则由 Fastify 生成。
+手写业务错误目前通常只返回 `error`。需要稳定客户端分支时可返回共享枚举 `code`；当前已使用 `PASSWORD_CHANGE_REQUIRED`。未捕获异常和平台 guardrail 错误会额外返回 `requestId`，并且所有响应都会带 `x-request-id` header；客户端传入合法 `x-request-id` 时会复用该值，否则由 Fastify 生成。
 
 常见状态：
 
 - `400`：参数或 body 无效。
 - `401`：未登录、session 过期或已撤销。
+- `403` + `code=PASSWORD_CHANGE_REQUIRED`：学生 session 有效，但必须先完成首次改密。
 - `423`：账号或资源被临时锁定。
 - `404`：资源不存在、不属于当前学生，或题目不在该 session。
 - `409`：尝试修改已经 completed 的 practice session。
@@ -221,6 +223,7 @@ Response：
 - `className/groupName` 是 B9.5 新增的轻量组织字段；未知时为 `null` 或省略。
 - `202502040201`–`202502040230` 当前默认归入 `2班`。
 - `passwordResetRequired=true` 表示管理员重置或临时密码登录后应先调用 `POST /api/auth/password/change` 修改密码。
+- B9.35 起该要求同时由服务端执行：改密完成前 `/api/practice/*`、`/api/wrong-questions/*`、`/api/learning/*` 返回 `403` 和 `PASSWORD_CHANGE_REQUIRED`。`/api/auth/*` 与题库目录仍允许访问，以便恢复身份和完成改密。
 
 Cookie：
 
@@ -1320,7 +1323,7 @@ Rules：
 
 Permission：`system_status:read`
 
-这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、当前 migration 文件摘要、语料规模、学生可见题库数量、Import Job 简要状态和 Question Review 质量摘要。
+这是管理端内部状态接口，不替代公开 `/api/health`。它会暴露 PostgreSQL readiness、`schema_migrations` 中的真实 migration count/current、语料规模、学生可见题库数量、Import Job 简要状态和 Question Review 质量摘要。ledger 不存在时 `database.ok=false`，不会用本地 migration 文件数量代替数据库事实。
 
 Response：
 
@@ -1752,7 +1755,7 @@ Response：
 
 ## Learning
 
-所有 Learning 路由需要认证。概览/趋势/目标进度直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合；长期复习标记使用 `question_bookmarks` 持久化。它们共同作为学生首页/档案页后续可用的数据 contract。
+所有 Learning 路由需要认证，并受首次改密服务端门禁保护。概览/趋势/目标进度直接从 `practice_sessions`、`practice_attempts`、`wrong_questions`、`questions` 和 `bank_mappings` 聚合；长期复习标记使用 `question_bookmarks` 持久化。它们共同作为学生首页/档案页后续可用的数据 contract。当前 `apps/web` 尚无 Learning 路由、页面或 API 调用，因此这是后端已就绪能力，不是学生前端已交付功能。
 
 ### `GET /api/learning/dashboard`
 

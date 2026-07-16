@@ -34,6 +34,7 @@
     "ops:legacy-student-password-migration": "npm run ops:legacy-student-password-migration -w @bkyexam-practice/api --",
     "ops:deployment-evidence": "npm run ops:deployment-evidence -w @bkyexam-practice/api --",
     "ops:staging-load-baseline": "node scripts/run-staging-load-baseline.mjs",
+    "ops:import-maintenance-monitor": "node scripts/run-import-maintenance-monitor.mjs",
     "dev:admin": "npm run build:shared && npm run dev -w @bkyexam-practice/admin"
   },
   "engines": {

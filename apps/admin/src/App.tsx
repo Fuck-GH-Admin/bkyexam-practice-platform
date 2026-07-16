@@ -189,7 +189,7 @@ const defaultAdminUserFilters: AdminUserFilters = {
 
 const adminRoleOptions = ['super_admin', 'operator', 'content_editor'] as const satisfies readonly AdminRoleV1[];
 
-const defaultImportSourceDir = 'C:\\Users\\Bot\\Bot\\BKYExam\\questionbank';
+const defaultImportSourceDir = '';
 
 const defaultBulkText = `loginName,displayName,className,groupName
 202502040201,202502040201,2班,
@@ -1594,7 +1594,13 @@ function CreateImportJobPanel({
       {createdJob ? <p className="form-success" role="status">{createdJob.mode} 已创建：{createdJob.status} / {createdJob.id}</p> : null}
       <form className="stack-form" onSubmit={submit}>
         <label>sourceDir
-          <input value={sourceDir} onChange={(event) => setSourceDir(event.target.value)} disabled={!canCreate || submitting} />
+          <input
+            value={sourceDir}
+            onChange={(event) => setSourceDir(event.target.value)}
+            placeholder="输入服务器 ADMIN_IMPORT_ALLOWED_ROOTS 下的题库目录"
+            required
+            disabled={!canCreate || submitting}
+          />
         </label>
         <label>mode
           <select

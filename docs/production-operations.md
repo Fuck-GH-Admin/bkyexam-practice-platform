@@ -26,16 +26,20 @@ npm run ops:backup-restore:docker
    - wrong_questions
    - student_learning_goals
    - question_bookmarks
-4. 使用容器内 `pg_dump` 导出 plain SQL backup。
-5. 创建 `bkyexam_restore_test`。
-6. 将 backup restore 到 `bkyexam_restore_test`。
-7. 比较源库和恢复库关键表行数。
-8. 清理恢复库和临时容器。
+4. 使用容器内 `pg_dump --format=custom` 导出 binary custom backup。
+5. 写入 `.dump.sha256`，从持久化文件重新读取并验证 SHA-256。
+6. 创建 `bkyexam_restore_test`。
+7. 使用 `pg_restore` 将 backup restore 到 `bkyexam_restore_test`。
+8. 比较源库和恢复库关键表及 `schema_migrations` 行数。
+9. 写入 `report.json` 后清理恢复库和临时容器。
 
 演练产物写入：
 
 ```text
-artifacts/ops/backup-restore-drill/<timestamp>/bkyexam_test.sql
+artifacts/ops/backup-restore-drill/<timestamp>/
+  bkyexam_test.dump
+  bkyexam_test.dump.sha256
+  report.json
 ```
 
 `artifacts/` 不提交 Git。该演练只验证 schema + 最小数据的可备份/可恢复能力，不替代生产数据量级恢复演练。
@@ -50,7 +54,7 @@ npm run ops:production-gate
 
 该命令检查生产 env、连接 `DATABASE_URL`，并汇总学生正式身份迁移状态。完整说明见 [`production-gate-runbook.md`](production-gate-runbook.md)。
 
-当前 CLI 会提示 `ADMIN_IMPORT_ENABLE_WRITE=true`，但尚未独立检查 `ADMIN_IMPORT_ENABLE_RESET`。每次发布和巡检都必须人工确认 write/reset 两个 gate 均为 `false`；只有已验证备份的破坏性 reset 维护窗口才允许临时开启 reset gate。
+当前 CLI 会提示 `ADMIN_IMPORT_ENABLE_WRITE=true`，并把 `ADMIN_IMPORT_ENABLE_RESET=true` 作为 blocking failure。每次发布和巡检都必须确认 write/reset 两个 gate 均为 `false`；只有已验证备份的破坏性 reset 维护窗口才允许临时开启 reset gate，并且恢复服务前必须重新关闭。
 
 发布前至少保存一次完整 JSON report；仅审查 env 时可先用：
 
@@ -94,6 +98,35 @@ npm run ops:staging-load-baseline -- `
 ```
 
 该脚本输出脱敏 JSON，不打印密码。完整凭据模式覆盖 health/readiness/metrics/banks/student login/auth me/practice create/admin login/admin me；`--no-auth` 模式只跑公开 health/readiness/metrics/banks。
+
+## 1.5 Import Maintenance Resource Monitor
+
+B9.35 新增 Linux `/proc` 维护窗口采样：
+
+```bash
+npm run ops:import-maintenance-monitor -- \
+  --phase=before \
+  --duration-seconds=30 \
+  --interval-seconds=5 \
+  --service=bkyexam-practice-api.service \
+  --output=/srv/bkyexam-backups/<window>/import-monitor-before.json
+
+npm run ops:import-maintenance-monitor -- \
+  --phase=during \
+  --duration-seconds=300 \
+  --interval-seconds=5 \
+  --service=bkyexam-practice-api.service \
+  --output=/srv/bkyexam-backups/<window>/import-monitor-during.json
+
+npm run ops:import-maintenance-monitor -- \
+  --phase=after \
+  --duration-seconds=30 \
+  --interval-seconds=5 \
+  --service=bkyexam-practice-api.service \
+  --output=/srv/bkyexam-backups/<window>/import-monitor-after.json
+```
+
+报告覆盖 load、CPU iowait、memory/swap、aggregate block read/write/utilization/queue depth、network rate、API process RSS/threads/CPU counters 与 health/readiness latency。生产导入证据应至少保存 `before/during/after` 三份 JSON；它不替代外部 metrics store。
 
 ## 2. Production Backup Procedure
 
@@ -180,6 +213,8 @@ curl -fsS http://127.0.0.1:3000/api/health/readiness
 2. **迁移已成功但应用失败**：优先 forward-fix 新 migration 或回滚应用代码到兼容版本。
 3. **迁移破坏数据且无法 forward-fix**：停止写入，使用最近 backup restore 到新库，切换连接。
 
+runner 会在 `schema_migrations` 中记录 `filename/checksum/applied_at`。已记录 migration 的 SHA-256 发生变化或 release 缺少已记录文件时，migration 必须失败；禁止修改已发布 SQL。
+
 每次生产 migration 前：
 
 - 执行 `npm run verify:docker`。
@@ -187,6 +222,7 @@ curl -fsS http://127.0.0.1:3000/api/health/readiness
 - 记录当前 Git commit。
 - 记录当前最新 migration 文件。
 - 在 staging/restore-drill DB 上先跑 `npm run db:migrate -w @bkyexam-practice/api`。
+- 对旧数据库首次启用 ledger 时，必须预期十三份幂等 SQL 被重放并写入 ledger；应停写并先完成 custom dump + checksum。
 
 每次生产 migration 后：
 
@@ -194,6 +230,7 @@ curl -fsS http://127.0.0.1:3000/api/health/readiness
 - 执行 `npm run db:smoke -w @bkyexam-practice/api`。
 - 抽查登录、题库列表、创建练习或只读核心 API。
 - 记录实际执行时间和结果。
+- 立即再运行一次 migration，确认所有已记录文件均为 skipped。
 
 ## 5. Deployment Checklist Validation
 

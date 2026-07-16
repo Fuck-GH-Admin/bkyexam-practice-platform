@@ -720,6 +720,13 @@ describe('v1 auth/catalog/error/health contracts', () => {
   it('parses common error and health responses', () => {
     expect(ApiErrorResponseV1Schema.parse({ error: 'Unauthenticated' })).toEqual({ error: 'Unauthenticated' });
     expect(ApiErrorResponseV1Schema.parse({
+      error: 'Password change required',
+      code: 'PASSWORD_CHANGE_REQUIRED',
+    })).toEqual({
+      error: 'Password change required',
+      code: 'PASSWORD_CHANGE_REQUIRED',
+    });
+    expect(ApiErrorResponseV1Schema.parse({
       error: 'Unexpected error',
       requestId: 'req-123',
     })).toEqual({ error: 'Unexpected error', requestId: 'req-123' });

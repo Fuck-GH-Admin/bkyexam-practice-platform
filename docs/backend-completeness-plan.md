@@ -11,7 +11,7 @@
 
 ## 1. 总体判断
 
-后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收，当前 staging 基线为 commit `c8b310e` 和 migration `0013`。
+后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收；B9.35 已在代码侧补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset blocking gate、custom backup evidence 和导入资源 monitor。
 
 真实验收还发现并关闭了一个重要风险：`resetBeforeImport=true` 会通过 corpus 外键级联删除 practice/attempt/wrongbook 数据。当前已新增独立 `ADMIN_IMPORT_ENABLE_RESET=false` 维护门禁，routine true import 只允许 non-reset。连续全量 upsert 后的主机挂起经 SAR/journal 确认为磁盘 I/O 饱和，而不是 OOM 或公网网络。
 
@@ -20,7 +20,7 @@
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 94%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、production gate、真实 current-HEAD staging、worker、最终隔离 restore 和 deployment evidence 已通过；剩余主要是持续容量测试与外部告警。 |
+| 后端工程可验证性 | **约 96%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是持续容量测试与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
 | 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
 | 当前 HEAD 公开生产后端就绪 | **约 88–91%** | commit `c8b310e`、migration `0013`、Question Review override、Import worker、独立 Admin、systemd/Nginx、真实数据恢复和 deployment evidence 已通过；仍缺外部告警、持续容量测试、发布审批与真实用户验收。 |
@@ -70,6 +70,7 @@ final isolated restore = pass
 已完成：
 
 - PostgreSQL schema 与十三份 ordered SQL migration。
+- runner-managed `schema_migrations` ledger、SHA-256 drift 和 missing-file detection。
 - 原始题库解析：
   - classifications
   - questions
@@ -117,6 +118,8 @@ final isolated restore = pass
 - 登录后学生 ownership boundary
 
 当前定位：**MVP 身份系统**。
+
+B9.35 起，`password_reset_required=true` 不再只依赖学生 Web 跳转。服务端会拒绝该 session 访问 Practice/Wrongbook/Learning API，直到学生成功调用改密接口。
 
 ### 2.3 Catalog / Bank List
 
@@ -238,8 +241,8 @@ final isolated restore = pass
 已完成质量门：
 
 - `npm run verify:docker`
-- 515 Vitest
-- 445 API tests
+- 523 Vitest
+- 453 API tests
 - 33 Web tests
 - 11 Admin tests
 - 26 Shared tests

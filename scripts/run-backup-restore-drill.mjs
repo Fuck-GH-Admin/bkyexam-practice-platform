@@ -1,7 +1,9 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   captureCommand,
+  captureCommandBuffer,
   repositoryRoot,
   runCommand,
   runCommandWithInput,
@@ -24,23 +26,43 @@ try {
   await runPsql('bkyexam_test', seedSql());
 
   const sourceCounts = await readCounts('bkyexam_test');
-  const backupSql = await pgDump('bkyexam_test');
+  const backup = await pgDump('bkyexam_test');
   const artifactDir = join(repositoryRoot, 'artifacts', 'ops', 'backup-restore-drill', timestampSlug());
-  const backupPath = join(artifactDir, 'bkyexam_test.sql');
+  const backupPath = join(artifactDir, 'bkyexam_test.dump');
+  const checksumPath = `${backupPath}.sha256`;
+  const reportPath = join(artifactDir, 'report.json');
   await mkdir(artifactDir, { recursive: true });
-  await writeFile(backupPath, backupSql, 'utf8');
+  await writeFile(backupPath, backup);
+  const backupSha256 = sha256(backup);
+  await writeFile(checksumPath, `${backupSha256}  bkyexam_test.dump\n`, 'utf8');
+
+  const persistedBackup = await readFile(backupPath);
+  if (sha256(persistedBackup) !== backupSha256) {
+    throw new Error('Persisted backup checksum differs from the captured pg_dump payload.');
+  }
 
   await dropDatabase(restoreDatabase);
   await createDatabase(restoreDatabase);
-  await restorePlainSql(restoreDatabase, backupSql);
+  await restoreCustomDump(restoreDatabase, persistedBackup);
   const restoredCounts = await readCounts(restoreDatabase);
 
   if (JSON.stringify(restoredCounts) !== JSON.stringify(sourceCounts)) {
     throw new Error(`Restored counts differ. source=${JSON.stringify(sourceCounts)} restored=${JSON.stringify(restoredCounts)}`);
   }
 
-  console.log(`Backup/restore drill passed. backup=${backupPath}`);
-  console.log(JSON.stringify({ sourceCounts, restoredCounts }, null, 2));
+  const report = {
+    ok: true,
+    format: 'custom',
+    backupPath,
+    checksumPath,
+    backupSha256,
+    sourceCounts,
+    restoredCounts,
+  };
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, 'utf8');
+
+  console.log(`Backup/restore drill passed. backup=${backupPath} sha256=${backupSha256}`);
+  console.log(JSON.stringify({ ...report, reportPath }, null, 2));
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   exitCode = 1;
@@ -81,13 +103,13 @@ function runPsql(database, sql) {
 }
 
 function pgDump(database) {
-  return captureCommand('docker', dockerComposeExec([
+  return captureCommandBuffer('docker', dockerComposeExec([
     'pg_dump',
     '-U',
     'bkyexam',
     '-d',
     database,
-    '--format=plain',
+    '--format=custom',
     '--clean',
     '--if-exists',
     '--no-owner',
@@ -95,8 +117,19 @@ function pgDump(database) {
   ]));
 }
 
-function restorePlainSql(database, sql) {
-  return runPsql(database, sql);
+function restoreCustomDump(database, backup) {
+  return runCommandWithInput('docker', dockerComposeExec([
+    'pg_restore',
+    '-v',
+    '-U',
+    'bkyexam',
+    '-d',
+    database,
+    '--clean',
+    '--if-exists',
+    '--no-owner',
+    '--no-privileges',
+  ]), backup);
 }
 
 function createDatabase(database) {
@@ -136,6 +169,7 @@ function countSql() {
       'wrongQuestions', (SELECT COUNT(*) FROM wrong_questions),
       'studentLearningGoals', (SELECT COUNT(*) FROM student_learning_goals),
       'questionBookmarks', (SELECT COUNT(*) FROM question_bookmarks)
+      ,'schemaMigrations', (SELECT COUNT(*) FROM schema_migrations)
     )::text;
   `;
 }
@@ -261,4 +295,8 @@ function seedSql() {
 
 function timestampSlug() {
   return new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-');
+}
+
+function sha256(value) {
+  return createHash('sha256').update(value).digest('hex');
 }

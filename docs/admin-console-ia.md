@@ -124,6 +124,7 @@ Admin Console
   - `mode=import` requires server-side `ADMIN_IMPORT_ENABLE_WRITE=true`
   - `resetBeforeImport=true` additionally requires `super_admin` and the maintenance-only `ADMIN_IMPORT_ENABLE_RESET=true`; otherwise it returns `403` or `422`
   - routine imports must use `resetBeforeImport=false` because reset cascades into dependent learning data
+  - create form has no workstation-specific default path; `sourceDir` is required and must be entered from the server-side `ADMIN_IMPORT_ALLOWED_ROOTS`
 - Must show：
   - status/progress
   - sourceDir

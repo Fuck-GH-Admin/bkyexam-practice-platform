@@ -1,6 +1,7 @@
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
-import Fastify from 'fastify';
+import { ApiErrorResponseV1Schema } from '@bkyexam-practice/shared';
+import Fastify, { type FastifyRequest } from 'fastify';
 import {
   createAuditService,
   createMemoryAuditLogRepository,
@@ -110,6 +111,15 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
   const sessionService = options.sessionService
     ?? createSessionService(createMemoryStudentSessionRepository(), { ttlDays: options.sessionTtlDays ?? 30 });
+  const studentByRequest = new WeakMap<FastifyRequest, ReturnType<typeof sessionService.resolveStudent>>();
+  const resolveRequestStudent = (request: FastifyRequest) => {
+    const existing = studentByRequest.get(request);
+    if (existing) return existing;
+
+    const resolved = sessionService.resolveStudent(request.cookies[sessionCookieName]);
+    studentByRequest.set(request, resolved);
+    return resolved;
+  };
   const adminSessionService = options.adminSessionService
     ?? createAdminSessionService(createMemoryAdminSessionRepository(), {
       ttlHours: options.adminSessionTtlHours ?? 8,
@@ -122,6 +132,17 @@ export function buildApp(options: BuildAppOptions = {}) {
     credentials: true,
   });
   void app.register(cookie, { secret: options.cookieSecret ?? 'dev-cookie-secret-change-me' });
+  app.addHook('preHandler', async (request, reply) => {
+    if (!requiresActivatedStudent(request.routeOptions.url)) return;
+
+    const student = await resolveRequestStudent(request);
+    if (student?.passwordResetRequired) {
+      return reply.status(403).send(ApiErrorResponseV1Schema.parse({
+        error: 'Password change required',
+        code: 'PASSWORD_CHANGE_REQUIRED',
+      }));
+    }
+  });
   void app.register(registerAuthRoutes, {
     repository: options.authRepository,
     sessionService,
@@ -176,16 +197,16 @@ export function buildApp(options: BuildAppOptions = {}) {
   void app.register(createBankRoutes(bankRepository));
   void app.register(createLearningRoutes({
     repository: learningRepository,
-    requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
+    requireStudent: resolveRequestStudent,
   }));
   void app.register(createPracticeRoutes({
     practiceRepository,
-    requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
+    requireStudent: resolveRequestStudent,
   }));
   void app.register(createWrongQuestionRoutes({
     wrongQuestionRepository,
     wrongQuestionService,
-    requireStudent: (request) => sessionService.resolveStudent(request.cookies[sessionCookieName]),
+    requireStudent: resolveRequestStudent,
   }));
   void app.register(registerHealthRoutes, {
     readinessProbe: options.readinessProbe,
@@ -193,4 +214,13 @@ export function buildApp(options: BuildAppOptions = {}) {
   });
 
   return app;
+}
+
+function requiresActivatedStudent(routeUrl: string | undefined): boolean {
+  return routeUrl === '/api/practice'
+    || routeUrl?.startsWith('/api/practice/') === true
+    || routeUrl === '/api/wrong-questions'
+    || routeUrl?.startsWith('/api/wrong-questions/') === true
+    || routeUrl === '/api/learning'
+    || routeUrl?.startsWith('/api/learning/') === true;
 }

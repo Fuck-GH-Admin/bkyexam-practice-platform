@@ -9,6 +9,8 @@
 > **B9.34 证据刷新：** 2026-07-16 已把 current release candidate `c8b310e950c6c31faa7f8e45c8f6bd9d435eceb5` 部署到真实服务器，migration 更新到 `0013`，`/` 与 `/admin/` 分别服务学生端和独立 Admin。production gate、学生/Admin smoke、Import worker、reset 二次门禁、非 reset true import、最终隔离 backup/restore、轻量 load baseline 和 deployment evidence 均通过。完整记录见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
 >
 > **文档一致性刷新：** 2026-07-16 已完成 route/config/migration/link 与真实 staging 的文档—代码审计，并新增可重复 `npm run docs:audit`。人工核查入口见 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
+>
+> **B9.35 安全与运维真相收口：** 已补首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控，并移除 Admin 本地 sourceDir 默认值。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。部署证据完成后以 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md) 为准。
 
 ## Executive Summary
 
@@ -17,16 +19,16 @@
 - **学生客观题 MVP：可内部试用。**
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
-- **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记。**
+- **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记；学生 Web 当前没有 Learning 路由、页面或 API 调用。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、受 `ADMIN_IMPORT_ENABLE_RESET=true` 独立维护门禁保护的 reset、cancel/retry、durable worker/heartbeat/stuck recovery、Question Review Flags/Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；override diff/审批/回滚、实时 progress 事件流和最终视觉后置。**
-- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline、migration `0012/0013`、独立 Admin、Import worker、真实数据恢复、最终 backup/restore 与 deployment evidence。全量导入已被明确限制为维护窗口操作；公开生产仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。**
+- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 进一步加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor。全量导入已被明确限制为维护窗口操作；公开生产仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
 
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
-| 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练、学习概览、趋势、目标和长期复习标记 API 均可用；B9.14 已在 staging 完成学生登录和创建练习 smoke；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
+| 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练可用；Learning 仅后端 API 可用；首次改密已由前端和服务端双重门禁；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
 | 当前 HEAD 公开生产就绪度 | **约 88–91%** | current HEAD、migration `0012/0013`、独立 Admin、Question Review override、Import worker、Nginx/static routing、最终 restore 和 deployment evidence 已在真实 staging 通过；仍缺外部告警、持续容量验证、正式发布审批与真实用户验收 |
 | 完整产品愿景 | **约 90%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线、管理平台 IA 初稿、B9.16 前端开工前审查包、B9.17 学生账号启用最小 UI、B9.18 Admin 静态 wireframe 审查包、B9.19 Admin Operational MVP、B9.20 Admin P1 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI、B9.24 Audit Logs read-only UI、B9.25 Admin Users management UI、B9.26 Question Review override 最小闭环、B9.27 Import Jobs reset/cancel/retry、B9.28 durable worker/heartbeat、B9.29 Import Jobs repository split 和 B9.30 Learning repository split 已落地，但分母仍包含最终学生前端、Learning 前端、全题型、运营与生产能力 |
 
@@ -45,10 +47,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 58 | 445 |
+| `apps/api` | 59 | 453 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **63** | **515** |
+| **Total** | **64** | **523** |
 
 仓库内 Playwright smoke：
 

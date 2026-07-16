@@ -1,5 +1,3 @@
-import { readdir } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import type { AdminSystemStatusResponseV1 } from '@bkyexam-practice/shared';
 import type { QueryClient } from '../db/client.js';
 
@@ -13,11 +11,9 @@ interface QueryRows<T> {
 
 interface AdminSystemStatusRepositoryOptions {
   serviceVersion?: string;
-  migrationsDir?: string;
 }
 
 const defaultServiceVersion = '0.1.0';
-const defaultMigrationsDir = fileURLToPath(new URL('../db/migrations/', import.meta.url));
 
 function createEmptyStatus(
   overrides: Partial<AdminSystemStatusResponseV1> = {},
@@ -80,7 +76,6 @@ export function createPgAdminSystemStatusRepository(
   options: AdminSystemStatusRepositoryOptions = {},
 ): AdminSystemStatusRepository {
   const serviceVersion = options.serviceVersion ?? defaultServiceVersion;
-  const migrationsDir = options.migrationsDir ?? defaultMigrationsDir;
 
   return {
     async getSystemStatus() {
@@ -92,7 +87,7 @@ export function createPgAdminSystemStatusRepository(
         imports,
         quality,
       ] = await Promise.all([
-        loadMigrationSummary(migrationsDir),
+        loadMigrationSummary(client),
         loadCorpusSummary(client),
         loadImportSummary(client),
         loadQualitySummary(client),
@@ -105,7 +100,7 @@ export function createPgAdminSystemStatusRepository(
           version: serviceVersion,
         },
         database: {
-          ok: true,
+          ok: migrationSummary.tableExists,
           migrationCount: migrationSummary.migrationCount,
           currentMigration: migrationSummary.currentMigration,
         },
@@ -117,22 +112,32 @@ export function createPgAdminSystemStatusRepository(
   };
 }
 
-async function loadMigrationSummary(migrationsDir: string) {
-  try {
-    const files = (await readdir(migrationsDir))
-      .filter((fileName) => fileName.endsWith('.sql'))
-      .sort();
-
+async function loadMigrationSummary(client: QueryClient) {
+  const tableExists = await hasTable(client, 'public.schema_migrations');
+  if (!tableExists) {
     return {
-      migrationCount: files.length,
-      currentMigration: files.at(-1) ?? null,
-    };
-  } catch {
-    return {
+      tableExists: false,
       migrationCount: 0,
       currentMigration: null,
     };
   }
+
+  const result = await client.query(`
+    SELECT
+      COUNT(*) AS migration_count,
+      MAX(filename) AS current_migration
+    FROM schema_migrations
+  `) as QueryRows<{
+    migration_count: string | number;
+    current_migration: string | null;
+  }>;
+  const row = result.rows[0];
+
+  return {
+    tableExists: true,
+    migrationCount: Number(row?.migration_count ?? 0),
+    currentMigration: row?.current_migration ?? null,
+  };
 }
 
 async function loadCorpusSummary(client: QueryClient): Promise<AdminSystemStatusResponseV1['corpus']> {

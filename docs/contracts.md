@@ -54,7 +54,7 @@ PostgreSQL / memory repository
 | Auth | `AuthStudentV1Schema` with `className/groupName`, password-required login request, login/me/logout response schemas, student password change request/response schemas, optional `passwordResetRequired` |
 | Admin | Auth schemas, role/permission schemas, Admin User manage schemas, Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session schemas, Bank Mapping read/write request/list/detail/bulk-status schemas, System Status response schema, Import Job list/detail/create/error-report/true import gate/reset/cancel/retry schemas, Question Review list/update schemas, Audit Log list schemas |
 | Catalog | `CatalogBankV1Schema`, `CatalogBankListResponseV1Schema` |
-| Error/Health/Observability | `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema`, `MetricsResponseV1Schema` |
+| Error/Health/Observability | `ApiErrorCodeV1Schema`, `ApiErrorResponseV1Schema`, `HealthResponseV1Schema`, `ReadinessResponseV1Schema`, `MetricsResponseV1Schema` |
 | Shared primitives | UUID、option ID、submitted answer、correct answer |
 
 当前未实现 shared schema：
@@ -157,7 +157,8 @@ PRACTICE_COMPLETED_COUNT_SEMANTICS_V1
 
 ### Error And Health
 
-- 通用 error response 固定为 `{ "error": "non-empty message", "requestId"?: "optional request id" }`。
+- 通用 error response 固定为 `{ "error": "non-empty message", "code"?: ApiErrorCodeV1, "requestId"?: "optional request id" }`。
+- 当前 machine-readable error code 为 `PASSWORD_CHANGE_REQUIRED`，供学生首次改密服务端门禁使用。
 - `/api/health` 当前 response 固定为 `{ "ok": true, "service": "bkyexam-practice-api" }`。
 - `/api/health` 只代表 Fastify 进程可响应，不代表 PostgreSQL readiness。
 - `/api/health/readiness` 使用 `ReadinessResponseV1Schema`，固定 `api` 与 `database` dependency；database status 可为 `ok|disabled|down`，整体 `ok` 必须与 dependency 状态一致。

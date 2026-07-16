@@ -59,7 +59,7 @@ npm run ops:production-gate -- --sample-limit=50 *> artifacts\production-gate\pr
 | `CSRF_ORIGIN_CHECK_ENABLED` + `CSRF_ALLOWED_ORIGINS` | yes | 必须开启，并且 allowlist 使用 HTTPS 生产域名，不能是 localhost。 |
 | `ADMIN_BOOTSTRAP_*` | no | runtime env 中仍存在会 warning；bootstrap 后应删除。 |
 | `ADMIN_IMPORT_ENABLE_WRITE` | no | 如果为 `true` 会 warning；只应在受控导入窗口开启。 |
-| `ADMIN_IMPORT_ENABLE_RESET` | manual | 当前 production-gate CLI 尚未单独检查该变量；发布/巡检时必须人工确认保持 `false`。只有已验证备份的破坏性 reset 维护窗口才可临时开启。 |
+| `ADMIN_IMPORT_ENABLE_RESET` | yes | 必须不是 `true`。破坏性 reset 维护窗口不能绕过公开发布 gate；维护时临时开启后必须在恢复服务前重新关闭并重跑 gate。 |
 | `STUDENT_MIGRATION_TEMP_PASSWORD` | no | 如果仍在 runtime env 中会 warning；只应在受控迁移 CLI 调用时临时存在。 |
 
 ## 3. Student Identity Migration Gate
@@ -171,9 +171,10 @@ Warning rule：
 artifacts/production-gate/<date>/
 ```
 
-## 6. B9.13 后仍未完成
+## 6. B9.35 后仍未完成
 
 - 尚未实现更细粒度 login route rate limit。
 - 当前分支 PR CI、branch protection / required checks 已完成；PR 仍需 review / merge 决策。
-- 尚未完成目标环境 production gate、deployment smoke、外部监控告警和性能压测证据。
-- 尚未开始正式管理端前端。
+- B9.34 已完成目标环境 production gate 和 deployment smoke；B9.35 增加了 reset blocking check。
+- 尚未完成外部监控告警、持续性能压测和正式公开生产验收。
+- 管理端 Operational MVP 已实现，最终视觉与完整运营工作流仍未完成。

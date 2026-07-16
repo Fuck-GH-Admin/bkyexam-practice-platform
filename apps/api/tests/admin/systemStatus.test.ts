@@ -1,6 +1,3 @@
-import { mkdtemp, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import {
   createMemoryAdminSystemStatusRepository,
@@ -14,6 +11,8 @@ class SystemStatusQueryClient implements QueryClient {
   constructor(private readonly options: {
     importJobsTable?: boolean;
     qualityFlagsTable?: boolean;
+    migrationTable?: boolean;
+    migrationFiles?: string[];
   } = {}) {}
 
   async query(sql: string, params?: readonly unknown[]) {
@@ -30,6 +29,18 @@ class SystemStatusQueryClient implements QueryClient {
       if (params?.[0] === 'public.question_quality_flags') {
         return { rows: [{ table_name: this.options.qualityFlagsTable ? 'question_quality_flags' : null }] };
       }
+      if (params?.[0] === 'public.schema_migrations') {
+        return { rows: [{ table_name: this.options.migrationTable === false ? null : 'schema_migrations' }] };
+      }
+    }
+    if (compactSql.includes('FROM schema_migrations')) {
+      const migrationFiles = this.options.migrationFiles ?? ['0001_initial.sql', '0002_next.sql'];
+      return {
+        rows: [{
+          migration_count: String(migrationFiles.length),
+          current_migration: migrationFiles.at(-1) ?? null,
+        }],
+      };
     }
     if (compactSql === 'SELECT COUNT(*) AS count FROM classifications') {
       return { rows: [{ count: '3' }] };
@@ -84,9 +95,8 @@ describe('memory admin system status repository', () => {
 
 describe('PostgreSQL admin system status repository', () => {
   it('loads readiness, migration summary, corpus counts, and gracefully missing future tables', async () => {
-    const migrationsDir = await createMigrationsDir(['0001_initial.sql', '0002_next.sql']);
     const client = new SystemStatusQueryClient();
-    const repository = createPgAdminSystemStatusRepository(client, { migrationsDir, serviceVersion: '0.1.0-test' });
+    const repository = createPgAdminSystemStatusRepository(client, { serviceVersion: '0.1.0-test' });
 
     await expect(repository.getSystemStatus()).resolves.toEqual({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0-test' },
@@ -99,9 +109,12 @@ describe('PostgreSQL admin system status repository', () => {
   });
 
   it('includes import job and quality summaries when future tables exist', async () => {
-    const migrationsDir = await createMigrationsDir(['0001_initial.sql']);
-    const client = new SystemStatusQueryClient({ importJobsTable: true, qualityFlagsTable: true });
-    const repository = createPgAdminSystemStatusRepository(client, { migrationsDir });
+    const client = new SystemStatusQueryClient({
+      importJobsTable: true,
+      qualityFlagsTable: true,
+      migrationFiles: ['0001_initial.sql'],
+    });
+    const repository = createPgAdminSystemStatusRepository(client);
 
     await expect(repository.getSystemStatus()).resolves.toMatchObject({
       imports: {
@@ -121,10 +134,17 @@ describe('PostgreSQL admin system status repository', () => {
       },
     });
   });
-});
 
-async function createMigrationsDir(fileNames: string[]) {
-  const dir = await mkdtemp(join(tmpdir(), 'bkyexam-system-status-migrations-'));
-  await Promise.all(fileNames.map((fileName) => writeFile(join(dir, fileName), 'SELECT 1;', 'utf8')));
-  return dir;
-}
+  it('marks database migration status unavailable when the ledger table is missing', async () => {
+    const client = new SystemStatusQueryClient({ migrationTable: false });
+    const repository = createPgAdminSystemStatusRepository(client);
+
+    await expect(repository.getSystemStatus()).resolves.toMatchObject({
+      database: {
+        ok: false,
+        migrationCount: 0,
+        currentMigration: null,
+      },
+    });
+  });
+});

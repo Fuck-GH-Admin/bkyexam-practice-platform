@@ -15,7 +15,7 @@
 - 本地 Markdown 链接全部可解析；
 - 真实 staging HEAD、服务状态、health/readiness、静态学生/Admin 入口和 reset/write gate 已现场复核。
 
-仍有一项明确的**代码/运维工具缺口**：`ops:production-gate` 会检查 `ADMIN_IMPORT_ENABLE_WRITE`，但目前不会独立检查 `ADMIN_IMPORT_ENABLE_RESET`。文档已把它标记为人工门禁；后续应给 production gate 增加 warning/check，避免只靠人工。
+> **B9.35 后续收口：** 本文记录的是修复前审计快照。B9.35 已补 production reset blocking gate、首次改密服务端门禁、migration ledger/checksum、真实 System Status、custom backup checksum/report、导入维护窗口资源监控，并移除 Admin 本地 sourceDir 默认值。当前结论见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 
 ## 2. 审计方法
 
@@ -120,8 +120,8 @@ actor role = super_admin
 
 ### 5.2 代码/运维能力
 
-- production gate 尚未检查 `ADMIN_IMPORT_ENABLE_RESET`。
-- migration runner 没有独立 migration history table；当前依赖 SQL 幂等和按文件名全量重放。
+- production gate 已在 B9.35 检查 `ADMIN_IMPORT_ENABLE_RESET` 并作为 blocking failure。
+- migration runner 已在 B9.35 增加 `schema_migrations` ledger 与 checksum/missing-file drift 检测。
 - Import Jobs 没有 SSE/WebSocket realtime progress。
 - reset 没有 typed destructive confirmation，也没有学习数据保留/版本化设计。
 - 外部告警通知目标尚未接入。
@@ -145,7 +145,7 @@ actor role = super_admin
 - 草稿、当前位置、标记存疑、刷新恢复。
 - 整卷提交、结果回看、历史列表。
 - 错题归集、详情、掌握、再练。
-- Learning dashboard/trends/goals/review marks。
+- Learning dashboard/trends/goals/review marks 后端 API；学生 Web 尚无对应路由、页面和调用。
 - 多 active session 和 URL 恢复。
 
 ### 6.2 管理端
