@@ -88,13 +88,13 @@ npm run docs:audit
 截至 2026-07-16：
 
 ```text
-staging runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
-database schema = migrations 0001..0013
-migration ledger = 13 rows, current 0013_import_job_worker.sql
+staging runtime commit = da89292e3851001f9a3ac7dd6ad801ca9c2ccf29
+database schema = migrations 0001..0015
+migration ledger = 15 rows, current 0015_import_job_events.sql
 student entry = /
 admin entry = /admin/
 ADMIN_IMPORT_ENABLE_WRITE = false
 ADMIN_IMPORT_ENABLE_RESET = false
 ```
 
-B9.34 的 `c8b310e` 与审计开始时的 `5ddbead` 均为历史基线；B9.35 已把当前安全/运维收口代码部署到 runtime commit `2fbaec1`。
+B9.34 的 `c8b310e`、B9.35 的 `2fbaec1` 与审计开始时的 `5ddbead` 均为历史基线；B9.36–B9.38 已把审批工作流、Import realtime events 和 importer 性能收口部署到 runtime commit `da89292`。

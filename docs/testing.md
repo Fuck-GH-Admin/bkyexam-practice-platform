@@ -299,6 +299,37 @@ dead tuples = 0
 
 日志保存在 `artifacts/ops/b9.38-import-capacity/local-capacity-2026-07-16.log`。
 
+### B9.36–B9.38 Current-HEAD Staging Evidence
+
+2026-07-16 将 runtime commit `da89292e3851001f9a3ac7dd6ad801ca9c2ccf29` 部署到真实 staging 后完成：
+
+```text
+service = active/enabled
+schema_migrations = 15 / current 0015_import_job_events.sql
+second migration run = all skipped
+production gate after import = ok=true
+Question Review diff/approve/reject/rollback = PASS
+Import Jobs SSE/JSON/Last-Event-ID replay = PASS
+unchanged non-reset true import = PASS, 11.81 s
+WAL delta = 443864 bytes
+corpus updates/dead tuples = 0
+before/during/after readiness failures = 0
+write/reset gates after window = false/false
+pre/post custom dump checksum = PASS
+```
+
+维护窗口峰值为：
+
+```text
+load1 = 0.36
+CPU iowait = 15.12%
+disk utilization = 36.88%
+disk queue = 4
+readiness latency = 68.61 ms
+```
+
+窗口后 iowait 降至 0.8%、磁盘利用率降至 1.84%，没有饱和信号。服务器证据保存在 `/srv/bkyexam-backups/b9.36-20260716T182355Z/`，完整说明见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
+
 完整真实题库的验证链包括：
 
 - migration。

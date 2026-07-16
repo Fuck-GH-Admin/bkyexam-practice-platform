@@ -17,6 +17,11 @@
 - [x] PostgreSQL integration 验证首次插入、unchanged 零写入和 changed row 更新。
 - [x] 完整题库三轮 non-reset capacity profile 通过：repeat 平均约 9.51 秒，logical writes=0，updated/dead tuples=0。
 - [x] Admin Playwright 覆盖 Question Review 保存草稿、diff、提交、审批和回滚。
+- [x] runtime commit `da89292` 已部署到真实服务器，migration ledger 为 15、current `0015_import_job_events.sql`。
+- [x] 真实 Question Review diff/approve/reject/rollback 与 Import Jobs SSE/JSON/Last-Event-ID 功能验证通过。
+- [x] 受控维护窗口 non-reset true import 通过：11.81 秒、WAL 443,864 bytes、corpus updates/dead tuples=0、readiness failures=0。
+- [x] 测试后 `ADMIN_IMPORT_ENABLE_WRITE=false`、`ADMIN_IMPORT_ENABLE_RESET=false`，pre/post custom dump checksum 均通过。
+- [x] GitHub Actions push/PR 的 quality 与 PostgreSQL integration 均通过；PR #2 仍等待 human review。
 - [x] 详细说明见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
 ## Completed B9.35 Security and operational truth closure — 2026-07-16

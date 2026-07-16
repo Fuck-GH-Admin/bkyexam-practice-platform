@@ -29,7 +29,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP+ | **约 82–85%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs realtime、Question Review diff/审批/回滚、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、批量质检和复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 94–95%** | B9.35 staging 基线之上，本阶段已完成审批工作流、realtime progress 和本地持续容量验证；仍需本阶段 current HEAD 的真实 staging 复验，以及外部告警、PR human approval/merge 和正式用户验收。 |
+| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、Question Review/Import realtime 功能复验、non-reset true import、资源监控和 pre/post checksum；仍需外部告警、PR human approval/merge、正式发布审批和真实用户验收。 |
 | 完整产品愿景 | 主体完成但未收口 | **约 91%** | 分母包含最终学生端、Learning 前端、全题型、复杂运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
@@ -211,44 +211,47 @@ PostgreSQL docker integration：
 
 ```text
 target = https://exam.acgbot.cc.cd
-runtime commit = 2fbaec15adc976e53945a66e0efdd671d4eb60b7
+runtime commit = da89292e3851001f9a3ac7dd6ad801ca9c2ccf29
 production gate = ok=true
 legacyPasswordlessStudents = 0
 HTTP smoke = PASS
-migration ledger = 13 / current 0013 / second run all skipped
+service = active/enabled
+migration ledger = 15 / current 0015 / second run all skipped
 student activation API guard = PASS
 Admin System Status migration truth = PASS
-post-deploy resource monitor saturation = false
+Question Review diff/approve/reject/rollback = PASS
+Import Jobs SSE/JSON/replay = PASS
+unchanged non-reset true import = PASS, 11.81 s / 443864 WAL bytes
+corpus updates/dead tuples = 0
+before/during/after readiness failures = 0
+write/reset gates after window = false/false
 ```
 
 ## 5. 当前最大缺口
 
 按影响排序：
 
-### P0：导入运维安全与容量边界
+### P0：公开发布审批与外部可观测性
 
-B9.34 已完成 current-HEAD staging re-baseline。真实验收确认：
+B9.36–B9.38 已完成 current-HEAD staging 复验。真实验收确认：
 
 - routine true import 使用 `resetBeforeImport=false` 可保留学习数据；
 - reset 会级联删除 practice/attempt/wrongbook，现已由第二层维护门禁默认关闭；
-- 连续全量 upsert 后立即加载认证流量会把当前 2 vCPU 云主机磁盘打满。
+- change-aware importer 使 unchanged full import 降到 11.81 秒和 443,864 bytes WAL，维护窗口内无 readiness failure；
+- 历史连续旧实现仍证明在线叠加导入负载风险存在，因此维护窗口约束继续保留。
 
-优先固化：
+剩余 P0：
 
-1. write/reset gate 默认关闭。
-2. 全量导入维护窗口与操作后健康检查。
-3. importer 避免无变化 `DO UPDATE`、批次/WAL/索引优化。
-4. 如要支持在线导入，升级磁盘与主机规格并重新做容量测试。
+1. PR human review/merge 与正式发布审批。
+2. 接入第三方告警目标并验证告警送达。
+3. 完成真实管理员/学生 UAT。
+4. 若要支持在线导入，升级硬件并建立跨硬件容量阈值。
 
-完整证据见 [`b9.34-current-head-staging-rebaseline.md`](b9.34-current-head-staging-rebaseline.md)。
+完整证据见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
-### P1：修复 staging 暴露的问题并完成人工验收
+### P1：批量运营与错误处置
 
-先由真实环境决定下一项工程工作，避免继续扩大“本地绿、线上旧”的证据断层。
-
-### P1：Question Review 与 Import Jobs 深化
-
-本阶段已完成单题审批责任链和 Import Jobs realtime progress。下一层缺口是：
+单题审批责任链和 Import Jobs realtime progress 已完成。下一层缺口是：
 
 - Question Review 批量操作、审批通知、source drift 报告。
 - Import Jobs 文件/行级错误下载、事件保留策略、跨硬件容量阈值。
@@ -302,12 +305,12 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 ## 7. 推荐下一阶段路线
 
-### B9.34 后的候选
+### B9.38 后的候选
 
-1. 完成本阶段 current HEAD 的真实 staging 部署和 importer 维护窗口复验。
-2. 如果真实验收暴露 route 错误不一致或维护压力，做 route validation/error mapping helpers。
-3. 如果用户审查认为学生学习闭环更重要，进入 Learning 前端 IA/功能页。
-4. 如果管理员需要规模化运营，再做 Question Review 批量工作流和 Import error download。
+1. 先完成人工 UAT、PR review/merge、外部告警接入和正式发布决策。
+2. 如果用户审查认为学生学习闭环更重要，进入 Learning 前端 IA/功能页。
+3. 如果管理员需要规模化运营，做 Question Review 批量工作流和 Import error download。
+4. 如果工程维护成本开始阻塞功能开发，再做 route validation/error mapping helpers 收敛。
 
 ### 不建议作为下一阶段
 
@@ -322,17 +325,17 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 我们现在需要决定下一步走哪条：
 
-1. **发布证据路线：部署并验证 current HEAD。**
-   当前唯一 P0。它能同时验证 migration、Admin 路由、worker、真实数据和运维配置。
+1. **发布治理路线：人工 UAT、PR review/merge、外部告警和正式发布审批。**
+   这是当前唯一 P0，不再需要补本阶段部署证据。
 
-2. **体验路线：补 Import Jobs realtime progress。**
-   保留为验收后的候选，不在 worker 尚未真实部署前叠加。
+2. **学生产品路线：Learning 前端 IA。**
+   后端已就绪，适合在用户审核后定义学习中心，而不是先做最终视觉。
 
-3. **工程路线：收敛 route validation/error mapping。**
-   属于明确技术债，但先不要继续扩大待部署 diff。
+3. **管理运营路线：Question Review 批量复核与 Import error download。**
+   单题闭环已稳定，下一步才是规模化运营。
 
-4. **产品路线：Question Review 完整流或 Learning 前端 IA。**
-   由真实管理员/学生试用反馈决定顺序，最终视觉仍后置。
+4. **工程路线：route validation/error mapping helpers。**
+   属于明确技术债，但可根据后续功能开发的阻塞程度安排。
 
 我的建议是：
-**先停止继续扩大底层能力，保留当前 staging 作为可审核基线。下一步先由用户人工审查学生端和 Admin 工作流；代码侧优先补 importer 的运维安全/性能，再根据审核反馈选择 Question Review 完整流或 Learning 前端 IA。**
+**先停止继续扩大底层能力，保留 `da89292` + migration `0015` 作为可审核 staging 基线。下一步先做人工 UAT 和发布治理；通过后，再根据审核反馈选择 Learning 前端 IA 或批量运营能力。最终视觉仍后置。**

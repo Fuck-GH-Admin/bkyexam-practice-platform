@@ -25,11 +25,11 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 
 尚未完成的主要产品范围：
 
-- 完整管理平台最终视觉、Question Review diff/审批/回滚、Import Jobs 实时 progress 事件流、Admin dashboard/ops summary 等完整运营体验。
+- 完整管理平台最终视觉、Question Review 批量复核/通知、Import Jobs 文件级错误下载、Admin dashboard/ops summary 等复杂运营体验。
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
-- PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
-- **当前 staging 基线：** 2026-07-16 已部署 B9.35 runtime commit `2fbaec1`。本地 current HEAD 已继续完成 migration `0014/0015`、Question Review 审批工作流、Import SSE 和持续容量 profile；本阶段收尾会把该 HEAD 再部署到 staging 复验。当前剩余的是正式发布审批、真实用户验收和外部告警。
+- PR review / merge 决策、外部监控告警、跨硬件持续容量阈值和正式生产发布验收。
+- **当前 staging 基线：** 2026-07-16 已部署 B9.36–B9.38 runtime commit `da89292`，数据库 ledger 为 15 个 migration、current `0015_import_job_events.sql`。Question Review diff/审批/驳回/回滚、Import SSE/JSON 断线续传、non-reset true import 和维护窗口资源采样均已在真实服务器通过；write/reset gate 已恢复为 `false`。当前剩余的是正式发布审批、真实用户验收、外部告警和更复杂的批量运营能力。
 
 文档阅读入口见 [文档索引与真相源](docs/README.md)。当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，本阶段工作流/realtime/capacity 见 [B9.36–B9.38 closure](docs/b9.36-b9.38-workflow-realtime-capacity.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 

@@ -11,7 +11,7 @@
 
 ## 1. 总体判断
 
-后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收；B9.35 已在代码侧补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset blocking gate、custom backup evidence 和导入资源 monitor。
+后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收；B9.35 补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset blocking gate、custom backup evidence 和导入资源 monitor；B9.36–B9.38 又把 Question Review 审批回滚、Import realtime events 和 change-aware importer 部署到真实服务器并完成维护窗口复验。
 
 真实验收还发现并关闭了一个重要风险：`resetBeforeImport=true` 会通过 corpus 外键级联删除 practice/attempt/wrongbook 数据。当前已新增独立 `ADMIN_IMPORT_ENABLE_RESET=false` 维护门禁，routine true import 只允许 non-reset。连续全量 upsert 后的主机挂起经 SAR/journal 确认为磁盘 I/O 饱和，而不是 OOM 或公网网络。
 
@@ -23,7 +23,7 @@
 | 后端工程可验证性 | **约 97%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、三轮持续容量 profile、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是跨硬件容量阈值与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
 | 完整平台后端 | **约 91–92%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、Import Jobs realtime、Question Review diff/审批/回滚、Admin User/Student Manage；Learning 后端、身份安全、production gate、staging 验收和持续容量 profile 已落地，但全题型、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 当前 HEAD 公开生产后端就绪 | **约 94–95%** | B9.35 staging 基线之上已完成 Question Review workflow、Import SSE 和本地持续容量验证；仍需本阶段 current HEAD 的真实 staging 复验，并补外部告警、发布审批与真实用户验收。 |
+| 当前 HEAD 公开生产后端就绪 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、功能复验、non-reset true import、资源采样与 pre/post checksum；仍需外部告警、PR human review/merge、发布审批与真实用户验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -77,6 +77,21 @@ resource monitor after window = no saturation signals
 ```
 
 详细记录见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
+
+当前 B9.36–B9.38 staging 基线：
+
+```text
+runtime commit = da89292e3851001f9a3ac7dd6ad801ca9c2ccf29
+schema_migrations = 15, current 0015_import_job_events.sql
+Question Review diff/approve/reject/rollback = pass
+Import Jobs SSE/JSON/Last-Event-ID = pass
+unchanged non-reset true import = 11.81 s, WAL 443864 bytes
+corpus updates/dead tuples = 0
+readiness failures during maintenance window = 0
+write/reset gates after window = false/false
+```
+
+详细记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
 ## 2. 已完成且被验证的后端能力
 
@@ -1743,4 +1758,4 @@ B9.33 实际落地：
 
 > **学生客观题主链路已经完成并稳定；Learning 后端 MVP+ 已落地；Admin Auth/RBAC/Audit、题库整理、System Status、Import Jobs 完整控制/worker/realtime、Question Review 单题 diff/审批/回滚、Audit Log、Admin User/Student Manage 与独立 Admin app 已落地；B9.38 已完成 change-aware importer 和完整题库持续容量验证。完整平台后端还缺非客观题、推荐策略/完整长期档案、批量运营、外部监控告警和正式生产发布验收。**
 
-下一步先完成本阶段 current HEAD 的真实 staging 复验，再由用户审核决定进入 Learning 前端 IA、route validation/error helper 收敛，或 Question Review 批量运营。最终视觉仍后置。
+下一步先由用户完成学生端/Admin 人工 UAT，并完成 PR human review/merge、外部告警接入和正式发布决策；之后再决定进入 Learning 前端 IA、Question Review 批量运营/Import error download，或 route validation/error helper 收敛。最终视觉仍后置。

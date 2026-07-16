@@ -12,7 +12,7 @@
 >
 > **B9.35 安全与运维真相收口：** runtime commit `2fbaec1` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 >
-> **B9.36–B9.38 工作流与容量收口：** Question Review 已补齐字段级 diff、草稿提交、审批/驳回和可审计回滚；Import Jobs 已增加 durable event log、SSE 断线续传和阶段级批次进度；importer 已改为 change-aware prefilter/upsert，并通过完整题库三轮连续非 reset 容量 profile。完整记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
+> **B9.36–B9.38 工作流与容量收口：** runtime commit `da89292` 已部署到真实服务器，数据库 ledger 为 15 个 migration、current `0015_import_job_events.sql`。Question Review 字段级 diff、草稿提交、审批/驳回和可审计回滚，Import Jobs durable event log、SSE/JSON 断线续传和阶段级批次进度均已实机通过；change-aware importer 的完整题库 non-reset true import 用时 11.81 秒、WAL 443,864 bytes，corpus 表 update/dead tuple 均为 0，维护窗口无 readiness failure，write/reset gate 已恢复关闭。完整记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
 ## Executive Summary
 
@@ -23,7 +23,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记；学生 Web 当前没有 Learning 路由、页面或 API 调用。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat/SSE realtime progress、Question Review Flags/Detail/Override/Diff/Approval/Rollback、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；批量复核、复杂通知和最终视觉后置。**
-- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor；B9.38 又补充 change-aware importer 与持续容量 profile。全量导入仍被明确限制为维护窗口操作；公开生产仍缺外部告警、PR human approval/merge 和正式用户验收。**
+- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor；B9.36–B9.38 的 workflow、realtime events 和 change-aware importer 已完成真实服务器复验。全量导入仍被明确限制为维护窗口操作；公开生产仍缺外部告警、PR human approval/merge 和正式用户验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -31,7 +31,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练可用；Learning 仅后端 API 可用；首次改密已由前端和服务端双重门禁；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
-| 当前 HEAD 公开生产就绪度 | **约 94–95%** | B9.35 staging 基线之上，B9.36–B9.38 已在本地完成审批工作流、realtime events 和连续容量验证；仍需完成本阶段 current HEAD 的真实 staging 复验，并补外部告警、正式发布审批与真实用户验收 |
+| 当前 HEAD 公开生产就绪度 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、功能复验、non-reset true import、资源监控和 pre/post checksum；仍需外部告警、正式发布审批、PR human review/merge 与真实用户验收 |
 | 完整产品愿景 | **约 91%** | 学生信息架构、Learning 后端、管理端主工作流、Question Review 审批回滚、Import Jobs realtime progress、身份安全、运维门禁和持续容量 profile 已落地，但分母仍包含 Learning/最终学生前端、全题型、复杂运营、外部告警和正式生产发布 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
@@ -549,27 +549,27 @@ PracticeSessionService
 
 | Area | 状态 | 估算 | 已有 | 主要缺口 |
 | --- | --- | ---: | --- | --- |
-| Corpus parser/import | 稳定 | 90% | 全量解析、事务导入、幂等 upsert、smoke | 进度事件、错误报告 UI、增量策略 |
-| Bank mapping/catalog | 可用 | 75% | 自动映射、可见性、搜索筛选、v1 runtime contract | 管理编辑、审批、审计、质量抽查 |
+| Corpus parser/import | 稳定 | 94% | 全量解析、事务导入、change-aware 幂等 upsert、logical writes、实时批次进度、持续容量 profile、真实服务器 non-reset import | 文件/行级错误下载、事件归档、跨硬件阈值、真正增量源策略 |
+| Bank mapping/catalog | 可用 | 88% | 自动映射、可见性、搜索筛选、v1 runtime contract、管理编辑、批量状态、审计、乐观并发 | 批量失败自动刷新、复杂审批与质量抽查 |
 | Student identity/session | 正式密码主链路已落地 | 91% | 固定用户名、密码登录、Cookie session、恢复/退出、v1 runtime contract、`className/groupName`、`passwordResetRequired`、学生改密、账号状态、失败计数/临时锁定、旧账号保留、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、旧账号迁移审计 gate、旧账号迁移写入 CLI/runbook、真实 staging 迁移、凭据交付 runbook、学生首次改密前端入口和账号身份显示 | 找回、身份合并、批量导入 UI、设备/会话管理 UI |
 | Objective practice | 核心可用 | 92% | 创建、锁题、草稿、断点、存疑、多会话、整卷判分、结果、历史、v1 runtime contract | 会话归档、计时/考试策略、更多异常 UX |
 | Wrongbook | 核心可用 | 80% | 自动归集、详情、掌握、筛选、再练、v1 runtime contract | 错因、学习计划、掌握规则、历史趋势 |
 | Learning analytics | 后端 MVP+ | 68% | 学习概览 API、最近题库、题型正确率、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏/长期复习标记、v1 runtime contract | 前端展示、推荐策略、完整长期学习档案 |
 | Student product shell | 功能性 | 80% | 密码登录、首次改密、账号身份显示、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
-| Admin console | P1 运营 UI 基本可用，完整工作流 UI 未完成 | 90% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit foundation、管理员登录失败锁定、`/api/admin/auth/*`、Admin User manage API、Admin Student Manage API、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset maintenance gate/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、super_admin bootstrap、practice exclusion、optimistic concurrency、audit、独立 `apps/admin` 及真实 `/admin/` 部署、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 功能页与 Playwright/真实 staging smoke | override diff/审批/回滚、实时 progress 事件流、正式视觉与可用性验收 |
+| Admin console | Operational MVP+ | 94% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit、管理员登录失败锁定、Admin User/Student Manage、Bank Mapping、System Status、Import Jobs 完整控制/worker/realtime、Question Review diff/审批/驳回/回滚、Audit Log、super_admin bootstrap、独立 `apps/admin`、Playwright 与真实 staging smoke | 批量质检、审批通知、文件级 import error 下载、dashboard、正式视觉与可用性验收 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
-| Operations | 可重复验证，容量边界已识别 | 93% | 配置、migration、完整题库双次幂等 import smoke、Playwright、PostgreSQL integration、CI workflow、PR CI、`main` branch protection / required checks、部署文档、readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、backup/restore drill、structured request log、metrics smoke endpoint、production gate CLI、legacy password migration CLI、production operations runbook、真实 current-HEAD staging、独立 Admin、server-side synthetic healthcheck timer、最终实机 restore drill、deployment evidence、负载基线与 I/O 饱和诊断 | PR human approval/merge、第三方告警通知接入、持续容量压测、全量 importer 性能优化/节流、正式生产发布验收 |
+| Operations | 可重复验证，维护窗口边界已量化 | 96% | 配置、15 migration ledger/checksum、change-aware importer、完整题库持续容量 profile、真实服务器 non-reset true import、before/during/after 资源采样、pre/post custom dump checksum、Playwright、PostgreSQL integration、CI/required checks、readiness、metrics、production gate、synthetic healthcheck、deployment evidence 和负载基线 | PR human approval/merge、第三方告警通知接入、跨硬件容量阈值、事件保留策略和正式生产发布验收 |
 
 ## Known Product And Technical Risks
 
 ### P0 Before Public Production
 
-- B9.34 Current-HEAD staging re-baseline 已完成；后续以 commit `c8b310e`、migration `0013` 和 B9.34 evidence 为当前 staging 真相源。
+- B9.36–B9.38 current HEAD 已完成真实 staging 复验；当前运行基线为 commit `da89292`、15 个 migration、current `0015_import_job_events.sql`，证据目录为 `/srv/bkyexam-backups/b9.36-20260716T182355Z/`。
 - `ADMIN_IMPORT_ENABLE_WRITE=false` 与 `ADMIN_IMPORT_ENABLE_RESET=false` 必须保持默认关闭；全量 import 仅允许在维护窗口临时开启 write gate，reset gate 在数据保留/版本化设计完成前不得日常启用。
-- 当前 2 vCPU / 1.6 GiB 主机在连续全量 upsert 后出现 60% iowait、load average 96 和 20 个 blocked tasks；公开生产前必须接受“导入维护窗口”限制，或升级磁盘/主机并优化 importer。
-- 学生密码登录 enforcement、旧账号迁移审计 gate、旧账号迁移写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks、B9.14 目标环境迁移执行证据与 B9.16 前端开工前审查包已落地；公开生产前仍需正式改密前端入口、PR human approval/merge、第三方告警通知接入和最终发布参数验收。
-- 已有 Admin Auth/RBAC/session/audit foundation、题库整理 API、System Status、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap 与管理平台 IA/account ops 审查稿，Bank Mappings、Import Jobs dry-run/history、Question Review preview+override、Audit Logs read-only 与 Admin Users management 功能性 UI 已落地；仍缺 override diff/审批/回滚、实时 progress 事件流和完整审核流程。
-- 已有基础 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、隔离 backup/restore drill、结构化 request log、metrics smoke endpoint、服务器侧 synthetic healthcheck timer、实机 restore drill 和最低限度 staging load baseline；仍没有第三方告警通知目标、长期性能压测和正式生产数据量级恢复策略。
+- 历史连续全量 upsert 曾让 2 vCPU / 1.6 GiB 主机出现 60% iowait、load average 96 和 blocked tasks；change-aware importer 后单轮 unchanged true import 为 11.81 秒、WAL 443,864 bytes，峰值 iowait 15.12%、磁盘利用率 36.88%、队列 4，且 readiness failure 为 0。尽管风险显著下降，公开生产仍必须保持“导入维护窗口”限制，除非升级硬件并重新建立在线导入阈值。
+- 学生密码登录 enforcement、首次改密前后端门禁、旧账号迁移审计/写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks 和目标环境迁移证据已落地；公开生产前仍需 PR human approval/merge、第三方告警通知接入和最终发布参数验收。
+- Admin Auth/RBAC/session/audit、题库整理、System Status、Import Jobs 完整控制/worker/realtime、Question Review diff/审批/驳回/回滚、Audit Log、Admin User/Student Manage 与 super_admin bootstrap 均已落地并完成真实 staging 功能验证；仍缺批量复核、审批通知、文件/行级错误下载、dashboard 和最终可用性验收。
+- 已有 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、可校验 backup/restore、结构化日志、metrics、synthetic healthcheck、真实 import resource monitor 和轻量 staging load baseline；仍没有第三方告警通知目标、跨硬件持续容量阈值和正式生产数据量级恢复演练。
 - 已对 `https://exam.acgbot.cc.cd` 的 current HEAD 做 staging smoke、production gate、worker recovery、reset safety、轻量 load baseline、最终 restore drill 和 deployment evidence；仍未声明正式公开生产发布完成。
 
 ### P1 Before Large Feature Expansion
