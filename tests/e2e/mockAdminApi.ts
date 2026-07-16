@@ -9,6 +9,7 @@ import type {
   AdminQuestionReviewFlagV1,
   AdminQuestionReviewDetailV1,
   AdminQuestionReviewItemV1,
+  AdminQuestionOverrideRevisionV1,
   AdminRoleV1,
   AdminStudentV1,
   BulkCreateAdminStudentItemV1,
@@ -35,6 +36,7 @@ const allAdminPermissions: AdminPermissionV1[] = [
   'bank_mapping:publish',
   'question_review:read',
   'question_review:write',
+  'question_review:approve',
   'import_job:read',
   'import_job:create',
   'system_status:read',
@@ -182,7 +184,7 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
     if (method === 'GET' && pathname === '/api/admin/system/status') {
       return fulfillJson(route, {
         api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-        database: { ok: true, migrationCount: 12, currentMigration: '0012_question_review_overrides.sql' },
+        database: { ok: true, migrationCount: 15, currentMigration: '0015_import_job_events.sql' },
         corpus: {
           classifications: 2941,
           questions: 89922,
@@ -246,6 +248,7 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
       if (!question) return fulfillJson(route, { error: 'Question not found' }, 404);
       const body = readBody<{
         expectedVersion: number;
+        expectedDraftVersion: number;
         content?: string;
         answerRaw?: string;
         analyzeRaw?: string | null;
@@ -255,27 +258,106 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
       if (body.expectedVersion !== question.overrideVersion) {
         return fulfillJson(route, { error: 'Question override version conflict' }, 409);
       }
-      if (body.content !== undefined) question.content = body.content;
-      if (body.answerRaw !== undefined) question.answerRaw = body.answerRaw;
-      if (body.analyzeRaw !== undefined) question.analyzeRaw = body.analyzeRaw;
-      for (const override of body.optionContentOverrides ?? []) {
-        const option = question.options.find((candidate) => candidate.id === override.optionId);
-        if (!option) return fulfillJson(route, { error: 'Question option not found' }, 404);
-        option.overrideContent = override.content;
-        option.effectiveContent = override.content;
+      const active = question.workflow?.activeRevision;
+      if ((active?.version ?? 0) !== body.expectedDraftVersion) {
+        return fulfillJson(route, { error: 'Question override draft version conflict' }, 409);
       }
-      question.overrideVersion += 1;
-      question.contentPreview = preview(question.content, 160);
-      question.answerPreview = preview(question.answerRaw, 120);
-      question.override = {
-        version: question.overrideVersion,
-        contentOverride: body.content ?? question.override?.contentOverride ?? null,
-        answerRawOverride: body.answerRaw ?? question.override?.answerRawOverride ?? null,
-        analyzeRawOverride: body.analyzeRaw ?? question.override?.analyzeRawOverride ?? null,
+      if (active?.status === 'pending_review') {
+        return fulfillJson(route, { error: 'Question override revision is not editable' }, 409);
+      }
+      const optionOverrides = new Map(
+        active?.optionContentOverrides.map((option) => [option.optionId, option.content])
+        ?? question.options.filter((option) => option.overrideContent).map((option) => [option.id, option.overrideContent as string]),
+      );
+      for (const override of body.optionContentOverrides ?? []) optionOverrides.set(override.optionId, override.content);
+      const revision: AdminQuestionOverrideRevisionV1 = {
+        id: active?.id ?? '77777777-7777-4777-8777-100000000001',
+        questionId,
+        version: (active?.version ?? 0) + 1,
+        baseVersion: question.overrideVersion,
+        status: 'draft',
+        contentOverride: body.content ?? active?.contentOverride ?? question.override?.contentOverride ?? null,
+        answerRawOverride: body.answerRaw ?? active?.answerRawOverride ?? question.override?.answerRawOverride ?? null,
+        analyzeRawOverride: body.analyzeRaw ?? active?.analyzeRawOverride ?? question.override?.analyzeRawOverride ?? null,
+        optionContentOverrides: [...optionOverrides].map(([optionId, content]) => ({ optionId, content })),
         note: body.note ?? '',
-        updatedBy: { id: adminId, displayName: '平台管理员' },
+        diff: [
+          ...(body.content !== undefined && body.content !== question.content
+            ? [{ field: 'content', label: '题干', before: question.content, after: body.content }]
+            : []),
+          ...(body.optionContentOverrides ?? []).map((option) => ({
+            field: `option:${option.optionId}`,
+            label: `选项 ${question.options.find((candidate) => candidate.id === option.optionId)?.sort ?? '-'}`,
+            before: question.options.find((candidate) => candidate.id === option.optionId)?.effectiveContent ?? null,
+            after: option.content,
+          })),
+        ],
+        createdBy: active?.createdBy ?? { id: adminId, displayName: '平台管理员' },
+        createdAt: active?.createdAt ?? '2026-07-15T11:00:00.000Z',
         updatedAt: '2026-07-15T11:00:00.000Z',
+        submittedAt: null,
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: '',
+        appliedVersion: null,
+        rollbackFromRevisionId: null,
       };
+      question.workflow = {
+        activeRevision: revision,
+        revisions: [revision, ...(question.workflow?.revisions.filter((item) => item.id !== revision.id) ?? [])],
+      };
+      return fulfillJson(route, { question });
+    }
+
+    const questionOverrideActionMatch = pathname.match(/^\/api\/admin\/question-review\/([^/]+)\/override\/(submit|approve|reject|rollback)$/);
+    if (method === 'POST' && questionOverrideActionMatch) {
+      const [, questionId, action] = questionOverrideActionMatch;
+      const question = state.questionReviews.find((item) => item.questionId === questionId);
+      if (!question) return fulfillJson(route, { error: 'Question not found' }, 404);
+      const body = readBody<{
+        revisionId: string;
+        expectedDraftVersion?: number;
+        expectedVersion?: number;
+        reviewNote?: string;
+        note?: string;
+      }>(route);
+      const revision = question.workflow?.revisions.find((item) => item.id === body.revisionId);
+      if (!revision) return fulfillJson(route, { error: 'Question override revision not found' }, 404);
+
+      if (action === 'submit') {
+        revision.status = 'pending_review';
+        revision.submittedAt = '2026-07-15T11:01:00.000Z';
+        revision.updatedAt = revision.submittedAt;
+        question.workflow = { activeRevision: revision, revisions: question.workflow?.revisions ?? [] };
+      } else if (action === 'approve') {
+        applyMockRevision(question, revision, body.reviewNote ?? '');
+      } else if (action === 'reject') {
+        revision.status = 'rejected';
+        revision.reviewedBy = { id: adminId, displayName: '平台管理员' };
+        revision.reviewedAt = '2026-07-15T11:02:00.000Z';
+        revision.reviewNote = body.reviewNote ?? '';
+        question.workflow = { activeRevision: null, revisions: question.workflow?.revisions ?? [] };
+      } else {
+        const rollback: AdminQuestionOverrideRevisionV1 = {
+          ...structuredClone(revision),
+          id: '77777777-7777-4777-8777-100000000002',
+          version: 1,
+          baseVersion: question.overrideVersion,
+          status: 'approved',
+          note: body.note ?? 'rollback',
+          reviewNote: body.note ?? 'rollback',
+          appliedVersion: question.overrideVersion + 1,
+          rollbackFromRevisionId: revision.id,
+          createdAt: '2026-07-15T11:03:00.000Z',
+          updatedAt: '2026-07-15T11:03:00.000Z',
+          reviewedAt: '2026-07-15T11:03:00.000Z',
+        };
+        applyMockRevision(question, rollback, rollback.reviewNote);
+        question.workflow = {
+          activeRevision: null,
+          revisions: [rollback, ...(question.workflow?.revisions ?? [])],
+        };
+      }
       return fulfillJson(route, { question });
     }
 
@@ -885,6 +967,11 @@ function buildQuestionReview(input: {
     content: '1 + 1 的正确答案是什么？',
     answerRaw: 'B',
     analyzeRaw: '基础加法题。',
+    source: {
+      content: '1 + 1 的正确答案是什么？',
+      answerRaw: 'B',
+      analyzeRaw: '基础加法题。',
+    },
     options: [
       {
         id: '77777777-7777-4777-8777-000000000001',
@@ -917,6 +1004,52 @@ function buildQuestionReview(input: {
     ],
     override: null,
     overrideVersion: 0,
+    workflow: {
+      activeRevision: null,
+      revisions: [],
+    },
+  };
+}
+
+function applyMockRevision(
+  question: AdminQuestionReviewDetailV1,
+  revision: AdminQuestionOverrideRevisionV1,
+  reviewNote: string,
+) {
+  const source = question.source ?? {
+    content: question.content,
+    answerRaw: question.answerRaw,
+    analyzeRaw: question.analyzeRaw,
+  };
+  const optionOverrides = new Map(revision.optionContentOverrides.map((option) => [option.optionId, option.content]));
+  question.overrideVersion += 1;
+  question.content = revision.contentOverride ?? source.content;
+  question.answerRaw = revision.answerRawOverride ?? source.answerRaw;
+  question.analyzeRaw = revision.analyzeRawOverride ?? source.analyzeRaw;
+  question.contentPreview = preview(question.content, 160);
+  question.answerPreview = preview(question.answerRaw, 120);
+  question.options = question.options.map((option) => ({
+    ...option,
+    overrideContent: optionOverrides.get(option.id) ?? null,
+    effectiveContent: optionOverrides.get(option.id) ?? option.content,
+  }));
+  question.override = {
+    version: question.overrideVersion,
+    contentOverride: revision.contentOverride,
+    answerRawOverride: revision.answerRawOverride,
+    analyzeRawOverride: revision.analyzeRawOverride,
+    note: revision.note,
+    updatedBy: { id: adminId, displayName: '平台管理员' },
+    updatedAt: '2026-07-15T11:02:00.000Z',
+  };
+  revision.status = 'approved';
+  revision.reviewedBy = { id: adminId, displayName: '平台管理员' };
+  revision.reviewedAt = '2026-07-15T11:02:00.000Z';
+  revision.reviewNote = reviewNote;
+  revision.appliedVersion = question.overrideVersion;
+  question.workflow = {
+    activeRevision: null,
+    revisions: question.workflow?.revisions ?? [revision],
   };
 }
 

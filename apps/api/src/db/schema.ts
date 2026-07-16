@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   boolean,
+  bigserial,
   check,
   index,
   integer,
@@ -12,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 
 export const classifications = pgTable(
@@ -178,6 +180,26 @@ export const importJobs = pgTable(
   ],
 );
 
+export const importJobEvents = pgTable(
+  'import_job_events',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    jobId: uuid('job_id')
+      .notNull()
+      .references(() => importJobs.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('import_job_events_job_stream_idx').on(table.jobId, table.id),
+    check(
+      'import_job_events_event_type_check',
+      sql`${table.eventType} IN ('queued', 'running', 'progress', 'succeeded', 'failed', 'cancelled', 'recovered')`,
+    ),
+  ],
+);
+
 export const questionQualityFlags = pgTable(
   'question_quality_flags',
   {
@@ -252,6 +274,50 @@ export const questionOptionOverrides = pgTable(
     index('question_option_overrides_question_id_idx').on(table.questionId),
     index('question_option_overrides_updated_by_admin_id_idx').on(table.updatedByAdminId),
     check('question_option_overrides_content_override_check', sql`length(${table.contentOverride}) > 0`),
+  ],
+);
+
+export const questionOverrideRevisions = pgTable(
+  'question_override_revisions',
+  {
+    id: uuid('id').primaryKey(),
+    questionId: uuid('question_id')
+      .notNull()
+      .references(() => questions.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull().default(1),
+    baseVersion: integer('base_version').notNull(),
+    status: text('status').notNull(),
+    contentOverride: text('content_override'),
+    answerRawOverride: text('answer_raw_override'),
+    analyzeRawOverride: text('analyze_raw_override'),
+    optionContentOverrides: jsonb('option_content_overrides').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    diff: jsonb('diff').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+    note: text('note').notNull().default(''),
+    createdByAdminId: uuid('created_by_admin_id').references(() => adminUsers.id),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    reviewedByAdminId: uuid('reviewed_by_admin_id').references(() => adminUsers.id),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    reviewNote: text('review_note').notNull().default(''),
+    appliedVersion: integer('applied_version'),
+    rollbackFromRevisionId: uuid('rollback_from_revision_id')
+      .references((): AnyPgColumn => questionOverrideRevisions.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('question_override_revisions_one_active_idx').on(table.questionId)
+      .where(sql`${table.status} IN ('draft', 'pending_review')`),
+    index('question_override_revisions_question_history_idx').on(table.questionId, table.createdAt.desc(), table.id.desc()),
+    index('question_override_revisions_pending_idx').on(table.status, table.submittedAt, table.createdAt)
+      .where(sql`${table.status} = 'pending_review'`),
+    index('question_override_revisions_created_by_idx').on(table.createdByAdminId),
+    index('question_override_revisions_reviewed_by_idx').on(table.reviewedByAdminId),
+    check('question_override_revisions_version_check', sql`${table.version} >= 1`),
+    check('question_override_revisions_base_version_check', sql`${table.baseVersion} >= 0`),
+    check(
+      'question_override_revisions_status_check',
+      sql`${table.status} IN ('draft', 'pending_review', 'approved', 'rejected')`,
+    ),
   ],
 );
 

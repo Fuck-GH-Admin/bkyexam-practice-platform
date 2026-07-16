@@ -104,10 +104,10 @@ describe('admin question review routes', () => {
     });
   });
 
-  it('loads question detail and saves override edits with audit logs', async () => {
+  it('loads question detail, reviews a diff, approves it, and rolls back with audit logs', async () => {
     const auditLogRepository = createMemoryAuditLogRepository();
     const app = buildApp({
-      adminAuthRepository: await adminAuthRepository(['content_editor']),
+      adminAuthRepository: await adminAuthRepository(['super_admin']),
       adminQuestionReviewRepository: createMemoryAdminQuestionReviewRepository([questionReviewDetail]),
       auditService: createAuditService(auditLogRepository),
     });
@@ -145,14 +145,96 @@ describe('admin question review routes', () => {
     expect(override.json()).toMatchObject({
       question: {
         questionId,
-        content: 'PostgreSQL 中 COMMIT 用于提交当前事务。',
+        content: 'PostgreSQL 中哪个命令用于提交当前事务？',
         answerRaw: 'COMMIT',
-        options: [{ id: optionId, overrideContent: 'COMMIT 命令', effectiveContent: 'COMMIT 命令' }],
-        overrideVersion: 1,
-        override: { version: 1, note: 'Integration override' },
+        options: [{ id: optionId, overrideContent: null, effectiveContent: 'COMMIT' }],
+        overrideVersion: 0,
+        override: null,
+        workflow: {
+          activeRevision: {
+            status: 'draft',
+            version: 1,
+            baseVersion: 0,
+            note: 'Integration override',
+            diff: expect.arrayContaining([
+              expect.objectContaining({ field: 'content' }),
+              expect.objectContaining({ field: `option:${optionId}` }),
+            ]),
+          },
+        },
       },
     });
-    expect(auditLogRepository.entries.filter((entry) => entry.action === 'question_review.override_update')).toHaveLength(1);
+    const revisionId = override.json().question.workflow.activeRevision.id as string;
+    expect(auditLogRepository.entries.filter((entry) => entry.action === 'question_review.override_draft_save')).toHaveLength(1);
+
+    const submitted = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${questionId}/override/submit`,
+      headers: { cookie },
+      payload: {
+        revisionId,
+        expectedDraftVersion: 1,
+      },
+    });
+    expect(submitted.statusCode).toBe(200);
+    expect(submitted.json()).toMatchObject({
+      question: { workflow: { activeRevision: { id: revisionId, status: 'pending_review' } } },
+    });
+
+    const approved = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${questionId}/override/approve`,
+      headers: { cookie },
+      payload: {
+        revisionId,
+        expectedVersion: 0,
+        reviewNote: 'Verified answer and wording',
+      },
+    });
+    expect(approved.statusCode).toBe(200);
+    expect(approved.json()).toMatchObject({
+      question: {
+        content: 'PostgreSQL 中 COMMIT 用于提交当前事务。',
+        options: [{ id: optionId, effectiveContent: 'COMMIT 命令' }],
+        overrideVersion: 1,
+        workflow: {
+          activeRevision: null,
+          revisions: [expect.objectContaining({
+            id: revisionId,
+            status: 'approved',
+            appliedVersion: 1,
+          })],
+        },
+      },
+    });
+    expect(auditLogRepository.entries.filter((entry) => entry.action === 'question_review.override_approve')).toHaveLength(1);
+
+    const rollback = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${questionId}/override/rollback`,
+      headers: { cookie },
+      payload: {
+        revisionId,
+        expectedVersion: 1,
+        note: 'Rollback smoke',
+      },
+    });
+    expect(rollback.statusCode).toBe(200);
+    expect(rollback.json()).toMatchObject({
+      question: {
+        overrideVersion: 2,
+        workflow: {
+          revisions: expect.arrayContaining([
+            expect.objectContaining({
+              status: 'approved',
+              appliedVersion: 2,
+              rollbackFromRevisionId: revisionId,
+            }),
+          ]),
+        },
+      },
+    });
+    expect(auditLogRepository.entries.filter((entry) => entry.action === 'question_review.override_rollback')).toHaveLength(1);
 
     const conflict = await app.inject({
       method: 'PATCH',
@@ -160,6 +242,7 @@ describe('admin question review routes', () => {
       headers: { cookie },
       payload: {
         expectedVersion: 0,
+        expectedDraftVersion: 0,
         content: 'stale edit',
       },
     });
@@ -257,6 +340,18 @@ describe('admin question review routes', () => {
         return null;
       },
       async updateQuestionOverride() {
+        return { status: 'question_not_found' };
+      },
+      async submitQuestionOverride() {
+        return { status: 'question_not_found' };
+      },
+      async approveQuestionOverride() {
+        return { status: 'question_not_found' };
+      },
+      async rejectQuestionOverride() {
+        return { status: 'question_not_found' };
+      },
+      async rollbackQuestionOverride() {
         return { status: 'question_not_found' };
       },
     };

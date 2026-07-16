@@ -15,15 +15,15 @@
 
 真实验收还发现并关闭了一个重要风险：`resetBeforeImport=true` 会通过 corpus 外键级联删除 practice/attempt/wrongbook 数据。当前已新增独立 `ADMIN_IMPORT_ENABLE_RESET=false` 维护门禁，routine true import 只允许 non-reset。连续全量 upsert 后的主机挂起经 SAR/journal 确认为磁盘 I/O 饱和，而不是 OOM 或公网网络。
 
-后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围 Admin 模块化边界和实时 progress/外部可观测性。
+后端尚未完成的是：**完整平台化后端**，尤其是非客观题流程、生产运维、推荐策略、更大范围 Admin 模块化边界、外部可观测性和复杂批量运营。
 
 | 口径 | 后端完成度估算 | 判断 |
 | --- | ---: | --- |
 | 学生客观题后端闭环 | **约 90–94%** | 已可内部试用；核心链路稳定，学习趋势、目标和反馈信号后端也已具备。 |
-| 后端工程可验证性 | **约 96%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是持续容量测试与外部告警。 |
+| 后端工程可验证性 | **约 97%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、三轮持续容量 profile、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是跨硬件容量阈值与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
-| 完整平台后端 | **约 88–89%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、dry-run/import 导入任务、import error report、true import gate、reset/cancel/retry、durable worker/heartbeat/stuck recovery、题目质检 flag/exclusion、管理员 bootstrap、Audit Log read、Admin User manage、Admin Student Manage 与 Question Review detail/override；学生学习概览、趋势、目标、反馈、长期复习标记 API、正式学生身份数据模型、密码登录 enforcement、旧账号迁移 CLI、管理员登录锁定、生产 gate runbook 和真实 staging 验收与 B9.16 前端开工前审查包已落地，但全题型、管理前端、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 当前 HEAD 公开生产后端就绪 | **约 92–94%** | runtime commit `2fbaec1`、migration ledger/checksum、Question Review override、Import worker、独立 Admin、首次改密服务端门禁、reset gate、systemd/Nginx、pre/post checksum dump 和资源 monitor 已通过；仍缺外部告警、持续容量测试、发布审批与真实用户验收。 |
+| 完整平台后端 | **约 91–92%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、Import Jobs realtime、Question Review diff/审批/回滚、Admin User/Student Manage；Learning 后端、身份安全、production gate、staging 验收和持续容量 profile 已落地，但全题型、推荐策略、外部监控和正式生产运营能力仍未完成。 |
+| 当前 HEAD 公开生产后端就绪 | **约 94–95%** | B9.35 staging 基线之上已完成 Question Review workflow、Import SSE 和本地持续容量验证；仍需本阶段 current HEAD 的真实 staging 复验，并补外部告警、发布审批与真实用户验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 
@@ -256,13 +256,13 @@ B9.35 起，`password_reset_required=true` 不再只依赖学生 Web 跳转。�
 已完成质量门：
 
 - `npm run verify:docker`
-- 523 Vitest
-- 453 API tests
+- 526 Vitest
+- 456 API tests
 - 33 Web tests
 - 11 Admin tests
 - 26 Shared tests
 - 5 Playwright browser smoke
-- 1 PostgreSQL integration profile
+- 1 PostgreSQL integration profile / 2 tests
 - API build/typecheck
 - Web build/typecheck
 - Admin build/typecheck
@@ -314,10 +314,10 @@ B9.35 起，`password_reset_required=true` 不再只依赖学生 Web 跳转。�
 
 未完成：
 
-- 实时 progress 事件流和错误文件级下载
+- 错误文件/行级下载、事件保留策略和跨硬件容量阈值
 - 管理端前端最终视觉/完整工作流
 
-Import Jobs 控制和耐久性主链路已补齐；剩余缺口转为实时进度、错误可观测性、完整审核流程和更大范围模块化。
+Import Jobs 控制、耐久性和实时进度主链路已补齐；剩余缺口转为错误文件级可观测性、事件保留策略和更大范围模块化。
 
 ### 3.3 Catalog 已有管理 API，但运营工作流未完成
 
@@ -336,11 +336,11 @@ Import Jobs 控制和耐久性主链路已补齐；剩余缺口转为实时进�
 - 错误下载/按文件行号查看
 - 增量导入策略
 - typed reset 二次确认
-- SSE/WebSocket 实时 progress 事件流
+- 文件/行级错误下载与事件保留策略
 - 阶段级 progress current/total 细化
 - 管理端最终可视化
 
-### 3.5 Question Review 已有 flag/exclusion，尚无完整质检工作台
+### 3.5 Question Review 已有单题完整审批工作流，尚缺规模化运营
 
 已完成：
 
@@ -358,7 +358,7 @@ Import Jobs 控制和耐久性主链路已补齐；剩余缺口转为实时进�
 - 管理端可视化工作台
 - 批量处理/导出
 - 题目原文编辑器
-- 复杂审批流
+- 批量审批、通知和 SLA
 - 质检历史筛选 UI
 
 ### 3.6 非客观题/复杂题型流程未完成
@@ -1575,8 +1575,8 @@ B9.20 已完成 Admin P1 工作流与后端缺口审查，文档见 [`admin-p1-w
 B9.20 结论：
 
 - **Bank Mappings P1 UI 可以优先做**：list/detail/edit/bulk-status、optimistic concurrency、无客观题禁止发布、partial bulk result 和 audit 都已有后端语义。
-- **Import Jobs 已从 dry-run/history/error-report 推进到 reset/cancel/retry 最小控制闭环**：B9.27 已补 cancel/retry endpoint 与 reset 事务策略；B9.28 已补 durable worker、heartbeat 和 stuck recovery；实时 progress 事件流仍后置。
-- **Question Review 已经从 preview-level 升级到 detail/override 最小闭环**：B9.26 已补齐 full question detail、override 保存、版本冲突和导入覆盖语义；后续再补 diff/审批/回滚与批量操作。
+- **Import Jobs 已从 dry-run/history/error-report 推进到完整控制与实时闭环**：B9.27 补 cancel/retry/reset，B9.28 补 durable worker/heartbeat/stuck recovery，B9.37 补 durable events/SSE realtime progress。
+- **Question Review 已从 preview-level 升级到单题审批闭环**：B9.26 补 full detail/override，B9.36 补 diff、draft、submit、approve/reject 和 rollback；后续只剩批量操作、通知和 drift 报告。
 - **System Status 不承载账号运营统计**：如需要 Admin Dashboard 总览，后续新增独立 ops summary API。
 
 B9.21 已完成 Admin Bank Mappings P1 UI，文档见 [`admin-bank-mappings-p1-ui.md`](admin-bank-mappings-p1-ui.md)。
@@ -1741,6 +1741,6 @@ B9.33 实际落地：
 
 后端现在不是“没完成”，而是：
 
-> **学生客观题主链路已经完成并稳定；Learning Dashboard/Trends/Goals/Review Marks 后端 MVP+ 已落地；Admin Auth/RBAC/Audit、题库整理、System Status、Import Jobs dry-run/true import/reset maintenance gate/cancel/retry/worker heartbeat、Question Review Detail/Override、Audit Log、Admin User/Student Manage 与独立 Admin app 已落地；current HEAD、migration `0013`、最终 restore 和 deployment evidence 已在真实 staging 通过。完整平台后端还缺非客观题、推荐策略/完整长期档案、Question Review 完整审批流、实时 progress、外部监控告警、持续容量优化和正式生产发布验收。**
+> **学生客观题主链路已经完成并稳定；Learning 后端 MVP+ 已落地；Admin Auth/RBAC/Audit、题库整理、System Status、Import Jobs 完整控制/worker/realtime、Question Review 单题 diff/审批/回滚、Audit Log、Admin User/Student Manage 与独立 Admin app 已落地；B9.38 已完成 change-aware importer 和完整题库持续容量验证。完整平台后端还缺非客观题、推荐策略/完整长期档案、批量运营、外部监控告警和正式生产发布验收。**
 
-下一步先固化 importer 维护窗口、避免无变化 upsert、增加超时/节流和导入后健康检查，再由用户人工审核学生端/Admin 后选择 Question Review 完整运营流或 Learning 前端 IA。route validation/error helper 继续分批收敛；realtime progress 不应先于容量优化。
+下一步先完成本阶段 current HEAD 的真实 staging 复验，再由用户审核决定进入 Learning 前端 IA、route validation/error helper 收敛，或 Question Review 批量运营。最终视觉仍后置。

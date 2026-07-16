@@ -864,7 +864,7 @@ Rules：
 
 ## Admin Import Jobs
 
-Admin Import Jobs 是 B5.5/B5.8/B5.9/B9.27/B9.28 已实现的导入任务后端。B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode；B9.27 增加 reset/cancel/retry 与 import job 模块拆分；B9.28 增加 queued execution、worker heartbeat 和 stuck job recovery。
+Admin Import Jobs 是 B5.5/B5.8/B5.9/B9.27/B9.28/B9.37 已实现的导入任务后端。B5.8 增加错误报告读取接口；B5.9 增加受环境变量保护的 true import mode；B9.27 增加 reset/cancel/retry 与 import job 模块拆分；B9.28 增加 queued execution、worker heartbeat 和 stuck job recovery；B9.37 增加持久化阶段事件和可断线续传的 SSE。
 
 运行时必须配置 `ADMIN_IMPORT_ALLOWED_ROOTS`（分号分隔路径列表）。请求的 `sourceDir` 必须位于 allowlist 内。`mode=import` 只有在 `USE_DATABASE=true` 且 `ADMIN_IMPORT_ENABLE_WRITE=true` 时才启用；否则返回 `422`。开启 true import 后，`resetBeforeImport=true` 还要求操作者为 `super_admin` 且运行时显式设置独立维护门禁 `ADMIN_IMPORT_ENABLE_RESET=true`。reset 会在同一导入事务内先执行 `TRUNCATE classifications CASCADE` 再重导，因此会清空 corpus 及所有依赖 corpus FK 的练习/错题/收藏/质检/override 数据，不能用于日常导入。
 
@@ -996,6 +996,55 @@ Response：
 
 说明：第一版返回 job 当前保存的 `errorSummary`；额外字段允许透传，便于后续按文件/行号扩展。不存在 job 返回 `404`。
 
+### `GET /api/admin/import-jobs/:jobId/events`
+
+Permission：`import_job:read`
+
+Query：
+
+| Query | Type | Default |
+| --- | --- | --- |
+| `afterEventId` | nonnegative integer string | `0` |
+| `limit` | integer 1..500 | `100` |
+
+当请求不接受 SSE 时返回 JSON：
+
+```json
+{
+  "events": [
+    {
+      "id": "42",
+      "jobId": "import-job-uuid",
+      "type": "progress",
+      "job": {
+        "...": "same shape as job detail",
+        "progress": { "phase": "questions", "current": 10000, "total": 89922 }
+      },
+      "createdAt": "2026-07-16T10:00:00.000Z"
+    }
+  ],
+  "lastEventId": "42",
+  "hasMore": false
+}
+```
+
+当 `Accept: text/event-stream` 时返回 SSE：
+
+```text
+id: 42
+event: progress
+data: {"id":"42","jobId":"...","type":"progress","job":{...},"createdAt":"..."}
+```
+
+Rules：
+
+- 事件类型包含 `queued/running/progress/succeeded/failed/cancelled/recovered`。
+- 事件保存在 `import_job_events`，不是进程内临时消息。
+- 客户端可通过 `Last-Event-ID` header 或 `afterEventId` query 恢复；两者同时存在时使用更大的 event id。
+- 服务端发送 keepalive，并设置 `X-Accel-Buffering: no`。
+- job 到达终态且已发送全部事件后关闭 SSE。
+- `404` 表示 job 不存在；`400` 表示 event cursor/query 无效。
+
 ### `POST /api/admin/import-jobs/:jobId/cancel`
 
 Permission：`import_job:create`
@@ -1052,7 +1101,7 @@ Errors：
 
 ## Admin Question Review
 
-Admin Question Review 是 B5.6 已实现的题目质检后端。第一版只建立 flag/override 层，不直接编辑 `questions.content`、`questions.answer_raw` 或 `question_options`。当 `excludedFromPractice=true` 时，新的学生练习选题会排除该题；已经创建并锁题的旧 session 不回写改变。
+Admin Question Review 以 flag、exclusion、effective override 和 revision workflow 组成题目质检后端，不直接编辑 `questions.content`、`questions.answer_raw` 或 `question_options`。当 `excludedFromPractice=true` 时，新的学生练习选题会排除该题；已经创建并锁题的旧 session 不回写改变。草稿和待审批 revision 不影响学生内容，只有 approved revision 会应用到 effective override。
 
 ### `GET /api/admin/question-review`
 
@@ -1108,7 +1157,7 @@ Response：
 
 Permission：`question_review:read`
 
-返回单题完整 effective 详情。`content`、`answerRaw`、`analyzeRaw` 和每个 option 的 `effectiveContent` 已合并原始导入值与 override；同时保留 `overrideContent`、`override`、`overrideVersion`，供管理端展示和乐观并发更新。
+返回单题完整 effective 详情。`content`、`answerRaw`、`analyzeRaw` 和每个 option 的 `effectiveContent` 已合并原始导入值与已批准 override；同时返回 `source`、`override`、`overrideVersion` 和 `workflow`，供管理端显示字段级 diff、active revision 和历史。
 
 Response 主体：
 
@@ -1133,6 +1182,15 @@ Response 主体：
     ],
     "override": null,
     "overrideVersion": 0,
+    "source": {
+      "content": "PostgreSQL 中哪个命令用于提交当前事务？",
+      "answerRaw": "A",
+      "analyzeRaw": "COMMIT 提交当前事务。"
+    },
+    "workflow": {
+      "activeRevision": null,
+      "revisions": []
+    },
     "flags": [],
     "excludedFromPractice": false
   }
@@ -1154,6 +1212,7 @@ Request：
 ```json
 {
   "expectedVersion": 0,
+  "expectedDraftVersion": 0,
   "content": "修订后的题干",
   "answerRaw": "A",
   "analyzeRaw": "修订后的解析",
@@ -1169,10 +1228,12 @@ Request：
 
 Rules：
 
-- `expectedVersion` 必填，用于 optimistic concurrency；版本冲突返回 `409`。
+- 该 endpoint 保存或更新 `draft`，不会直接改变学生侧 effective 内容。
+- `expectedVersion` 是当前 approved effective version；`expectedDraftVersion` 是 active draft version。
+- 任一版本冲突返回 `409`。
 - 题干、答案、解析、选项或 note 至少有一项变更。
 - `optionContentOverrides` 最多 100 项，同一 option id 不得重复，且 option 必须属于该 question。
-- 成功写入 `question_review.override_update` audit log。
+- 成功写入 `question_review.override_draft_save` audit log。
 - Response 与 `GET /api/admin/question-review/:questionId` 使用同一 `question` detail contract。
 
 Errors：
@@ -1180,7 +1241,54 @@ Errors：
 - `400`：question id 或 request 无效。
 - `401/403`：未登录或缺少 `question_review:write`。
 - `404`：question 或 option 不存在。
-- `409`：`expectedVersion` 与当前 override version 冲突。
+- `409`：effective version 或 active draft version 冲突，或当前 active revision 状态不允许保存。
+
+### `POST /api/admin/question-review/:questionId/override/submit`
+
+Permission：`question_review:write`
+
+```json
+{
+  "revisionId": "revision-uuid",
+  "expectedDraftVersion": 1
+}
+```
+
+把 active revision 从 `draft` 改为 `pending_review`。成功写 `question_review.override_submit` audit log。revision 不存在、不是当前题目的 active draft 或版本冲突时返回 `404/409`。
+
+### `POST /api/admin/question-review/:questionId/override/approve`
+
+Permission：`question_review:approve`
+
+```json
+{
+  "revisionId": "revision-uuid",
+  "expectedVersion": 0,
+  "reviewNote": "题干与选项已复核"
+}
+```
+
+在事务中审批 pending revision，并把其完整 snapshot 应用到 effective override。成功后 revision 为 `approved`，记录 `appliedVersion` 和 `question_review.override_approve` audit log。effective version 冲突或 revision 不再 pending 时返回 `409`。
+
+### `POST /api/admin/question-review/:questionId/override/reject`
+
+Permission：`question_review:approve`
+
+Request 与 approve 相同。把 pending revision 改为 `rejected`，保存审批意见但不改变 effective override，并写 `question_review.override_reject` audit log。
+
+### `POST /api/admin/question-review/:questionId/override/rollback`
+
+Permission：`question_review:approve`
+
+```json
+{
+  "revisionId": "historical-approved-revision-uuid",
+  "expectedVersion": 3,
+  "note": "回滚错误修订"
+}
+```
+
+以目标 approved revision 的 snapshot 创建新的 approved revision 并应用；历史 revision 不删除、不改写。成功写 `question_review.override_rollback` audit log。目标不是 approved revision、effective version 冲突或存在 active draft/pending revision时返回 `409`。
 
 ### `PATCH /api/admin/question-review/:questionId`
 

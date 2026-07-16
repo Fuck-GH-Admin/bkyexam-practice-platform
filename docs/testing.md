@@ -83,12 +83,12 @@ npm run test:e2e
 - 临时密码 session 对 Practice/Wrongbook/Learning 的服务端 `PASSWORD_CHANGE_REQUIRED` 门禁，以及 Auth/Catalog 允许访问边界。
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint、production gate CLI/env/student migration summary、legacy student password migration CLI、管理员登录失败锁定。
 - Web 练习 model 与关键状态转换。
-- Admin route、RBAC nav、student query、bulk-create parser、Bank Mapping query/status badge、Import Job query/status badge、Question Review query/status badge、Question Review override contract、Audit Log query/status badge、Admin User query/badge 与状态 helper。
+- Admin route、RBAC nav、student query、bulk-create parser、Bank Mapping query/status badge、Import Job query/status badge/realtime event contract、Question Review query/status badge、Question Review revision/diff/approval/rollback contract、Audit Log query/status badge、Admin User query/badge 与状态 helper。
 - 学生端 URL parser/builder。
-- Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
+- Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery/realtime event boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override/revision approval boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 453 项、Web 33 项、Admin 11 项，共 523 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+其中 shared 26 项、API 456 项、Web 33 项、Admin 11 项，共 526 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
@@ -117,7 +117,7 @@ B9.33 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` �
 - 临时密码账号会被强制进入 `/account/password`，改密成功后回到原练习 URL。
 - Web 对 Practice/Wrongbook mock response 使用与生产相同的 shared Zod runtime parser。
 - 移动 viewport 的练习台与提交弹窗没有横向溢出。
-- Admin Login、System Status、Student Accounts list/detail/update/reset-password/revoke-sessions/create/bulk-create，以及 Bank Mappings list/detail/edit/bulk-status、Import Jobs list/create dry-run/import/reset/detail/error-report/cancel/retry/worker heartbeat detail、Question Review list/detail preview/override/add flag/resolve/exclude、Audit Logs list/detail preview、Admin Users list/detail/update/reset-password/create 可以在独立 `apps/admin` 中跑通。
+- Admin Login、System Status、Student Accounts list/detail/update/reset-password/revoke-sessions/create/bulk-create，以及 Bank Mappings list/detail/edit/bulk-status、Import Jobs list/create dry-run/import/reset/detail/error-report/cancel/retry/worker heartbeat/realtime detail、Question Review list/detail/draft/diff/submit/approve/rollback/add flag/resolve/exclude、Audit Logs list/detail preview、Admin Users list/detail/update/reset-password/create 可以在独立 `apps/admin` 中跑通。
 - 关键流程没有未预期的 console error 或 page error。
 
 这层不启动 Fastify，也不连接 PostgreSQL，适合成为每次提交都运行的稳定浏览器回归门。
@@ -134,7 +134,7 @@ npm run test:integration:db:docker
 
 1. 通过 Compose 在 `127.0.0.1:55432` 启动临时 `postgres:16-alpine`。
 2. 等待数据库 healthcheck。
-3. 对空的 `bkyexam_test` 执行全部十三份 migration。
+3. 对空的 `bkyexam_test` 执行全部十五份 migration。
 4. 装载只含可见/隐藏题库、父子分类和客观题的最小 fixture。
 5. 运行真实 PostgreSQL repository + Fastify API integration test。
 6. 无论成功或失败都停止并删除临时容器。
@@ -144,7 +144,8 @@ npm run test:integration:db:docker
 - PostgreSQL migration 可落到空数据库。
 - 无密码默认失败、学生密码登录、学生改密、Cookie session、学生身份安全字段、题库可见性和递归客观题计数。
 - DB-aware readiness health 与 metrics smoke。
-- Admin Auth/RBAC/session/audit foundation、管理员登录失败锁定字段、Admin bootstrap、Admin Audit Log read、Admin User manage、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run/import/reset create/list/detail/error-report/cancel/retry/audit/status summary、true import write/idempotency/failed rollback/reset success、worker queue/heartbeat/stuck recovery、Admin Question Review detail/override/flag/exclusion/status summary、version conflict、audit log，且 `bky_admin_session` 与 `bky_session` 隔离。
+- Admin Auth/RBAC/session/audit foundation、管理员登录失败锁定字段、Admin bootstrap、Admin Audit Log read、Admin User manage、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run/import/reset create/list/detail/error-report/cancel/retry/audit/status summary、true import write/idempotency/failed rollback/reset success、worker queue/heartbeat/stuck recovery/durable events、Admin Question Review detail/draft/diff/submit/approve/rollback/flag/exclusion/status summary、version conflict、audit log，且 `bky_admin_session` 与 `bky_session` 隔离。
+- importer 真实 SQL：首次插入有 logical writes、相同数据重复导入为零写入、修改 classification/question/option 后能正确更新。
 - `question_overrides` / `question_option_overrides` 会在 Practice/Wrongbook/Learning 读取链路中以 effective 内容生效。
 - `excludedFromPractice=true` 的 open quality flag 会从新的 Practice bank session 自动选题中排除对应题目。
 - 创建练习、题目锁定、草稿、`false`、存疑和当前位置持久化。
@@ -268,6 +269,35 @@ production gate connected-client pg deprecation warning = fixed
 服务器证据保存在 `/srv/bkyexam-backups/b9.35-20260716T150029Z/`。
 
 该 profile 依赖未提交到 Git 的完整源题库，因此保持手动/定期运行，不进入每次 push 的 CI。源数据合法更新时，应先审查差异，再同步更新 `currentCorpusBaseline.ts` 与状态文档。
+
+### Sustained Import Capacity Profile
+
+完整题库连续非 reset profile：
+
+```powershell
+npm run smoke:import:capacity:docker -- C:\path\to\BKYExam\Monitor\questionbank --cycles=3 --batch-size=1000
+```
+
+该 profile 在隔离 `bkyexam_test` 中执行一次初始导入和 N 次 unchanged repeat，逐轮断言：
+
+- corpus count 与固定 baseline 一致；
+- `writes.classifications/questions/options/bankMappings` 全部为 0；
+- 记录 duration、WAL delta、database size、insert/update/dead tuple stats；
+- 可通过 `--max-repeat-ms` 和 `--max-repeat-wal-bytes` 设置环境容量阈值。
+
+2026-07-16 完整题库三轮结果：
+
+```text
+initial = 24685.58 ms
+repeat = 9321.40 / 9406.21 / 9792.22 ms
+repeat average = 9506.61 ms
+logical writes = 0 / 0 / 0 / 0 in every repeat
+WAL = 1177512 / 168 / 244424 bytes
+updated tuples = 0
+dead tuples = 0
+```
+
+日志保存在 `artifacts/ops/b9.38-import-capacity/local-capacity-2026-07-16.log`。
 
 完整真实题库的验证链包括：
 

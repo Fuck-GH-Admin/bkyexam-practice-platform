@@ -8,13 +8,14 @@
 
 建议按顺序阅读：
 
-1. [B9.35 安全与运维真相收口](b9.35-security-operational-truth-closure.md)：首次改密服务端门禁、migration ledger、真实 System Status、checksum、导入资源监控与 Learning 交付边界。
-2. [文档—代码一致性审计](documentation-code-consistency-audit-2026-07-16.md)：自动比对、已修复漂移、剩余人工核查点；其中被 B9.35 修复的缺口以 B9.35 文档为准。
-3. [当前进度总览](project-progress-overview.md)：当前完整度、模块完成度和主要缺口。
-4. [系统状态](status.md)：测试数量、功能边界、已完成阶段和当前风险。
-5. [B9.34 staging re-baseline](b9.34-current-head-staging-rebaseline.md)：B9.35 前的真实服务器部署、恢复演练、导入风险和容量证据。
-6. [后端完整度与后续规划](backend-completeness-plan.md)：后端范围、阶段历史和剩余后端债务。
-7. [下一优先级复核](next-priority-review-b9.34.md)：B9.34 决策依据；其“部署前基线”段落是历史输入。
+1. [B9.36–B9.38 工作流、实时进度与容量收口](b9.36-b9.38-workflow-realtime-capacity.md)：Question Review 审批回滚、Import SSE 和 importer 持续容量证据。
+2. [B9.35 安全与运维真相收口](b9.35-security-operational-truth-closure.md)：首次改密服务端门禁、migration ledger、真实 System Status、checksum、导入资源监控与 Learning 交付边界。
+3. [文档—代码一致性审计](documentation-code-consistency-audit-2026-07-16.md)：自动比对、已修复漂移、剩余人工核查点；其中被后续阶段修复的缺口以后续 closure 为准。
+4. [当前进度总览](project-progress-overview.md)：当前完整度、模块完成度和主要缺口。
+5. [系统状态](status.md)：测试数量、功能边界、已完成阶段和当前风险。
+6. [B9.34 staging re-baseline](b9.34-current-head-staging-rebaseline.md)：B9.35 前的真实服务器部署、恢复演练、导入风险和容量证据。
+7. [后端完整度与后续规划](backend-completeness-plan.md)：后端范围、阶段历史和剩余后端债务。
+8. [下一优先级复核](next-priority-review-b9.34.md)：B9.34 决策依据；其“部署前基线”段落是历史输入。
 
 ## 2. 规范类文档
 

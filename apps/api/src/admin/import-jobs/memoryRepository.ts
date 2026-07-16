@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import type { AdminImportJobStatusV1, AdminImportJobV1 } from '@bkyexam-practice/shared';
+import type {
+  AdminImportJobEventTypeV1,
+  AdminImportJobEventV1,
+  AdminImportJobStatusV1,
+  AdminImportJobV1,
+} from '@bkyexam-practice/shared';
 import {
   initialProgress,
   type AdminImportJobRepository,
@@ -12,6 +17,19 @@ export function createMemoryAdminImportJobRepository(
   jobs: readonly AdminImportJobV1[] = [],
 ): AdminImportJobRepository {
   const records = jobs.map(cloneJob);
+  const events: AdminImportJobEventV1[] = [];
+  let nextEventId = 1n;
+
+  function appendEvent(job: AdminImportJobV1, type: AdminImportJobEventTypeV1) {
+    events.push({
+      id: String(nextEventId),
+      jobId: job.id,
+      type,
+      job: cloneJob(job),
+      createdAt: new Date().toISOString(),
+    });
+    nextEventId += 1n;
+  }
 
   return {
     async listImportJobs(filters) {
@@ -44,6 +62,7 @@ export function createMemoryAdminImportJobRepository(
 
       const job = createMemoryImportJob(input, 'queued');
       records.unshift(cloneJob(job));
+      appendEvent(job, 'queued');
 
       return { status: 'created', job: cloneJob(job) };
     },
@@ -55,6 +74,7 @@ export function createMemoryAdminImportJobRepository(
 
       const job = createMemoryImportJob(input, 'running');
       records.unshift(cloneJob(job));
+      appendEvent(job, 'running');
 
       return { status: 'created', job: cloneJob(job) };
     },
@@ -73,6 +93,7 @@ export function createMemoryAdminImportJobRepository(
         finishedAt: new Date().toISOString(),
         workerId: null,
       };
+      appendEvent(records[index], 'succeeded');
 
       return cloneJob(records[index]);
     },
@@ -90,6 +111,7 @@ export function createMemoryAdminImportJobRepository(
         finishedAt: new Date().toISOString(),
         workerId: null,
       };
+      appendEvent(records[index], 'failed');
 
       return cloneJob(records[index]);
     },
@@ -107,6 +129,7 @@ export function createMemoryAdminImportJobRepository(
         finishedAt: new Date().toISOString(),
         workerId: null,
       };
+      appendEvent(records[index], 'cancelled');
 
       return cloneJob(records[index]);
     },
@@ -129,6 +152,7 @@ export function createMemoryAdminImportJobRepository(
         workerId: input.workerId,
         heartbeatAt: now,
       };
+      appendEvent(records[next.index], 'running');
 
       return cloneJob(records[next.index]);
     },
@@ -147,6 +171,28 @@ export function createMemoryAdminImportJobRepository(
       };
 
       return cloneJob(records[index]);
+    },
+
+    async updateImportJobProgress(input) {
+      const index = records.findIndex((job) => job.id === input.jobId && job.status === 'running');
+      if (index < 0) return null;
+      records[index] = {
+        ...records[index],
+        progress: { ...input.progress },
+      };
+      appendEvent(records[index], 'progress');
+      return cloneJob(records[index]);
+    },
+
+    async listImportJobEvents(input) {
+      const after = BigInt(input.afterEventId);
+      return events
+        .filter((event) => event.jobId === input.jobId && BigInt(event.id) > after)
+        .slice(0, input.limit)
+        .map((event) => ({
+          ...event,
+          job: cloneJob(event.job),
+        }));
     },
 
     async recoverStaleImportJobs(input) {
@@ -169,6 +215,7 @@ export function createMemoryAdminImportJobRepository(
           finishedAt: now.toISOString(),
           workerId: null,
         };
+        appendEvent(records[index], 'recovered');
         recovered.push(cloneJob(records[index]));
       }
 

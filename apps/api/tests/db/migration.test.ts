@@ -168,4 +168,18 @@ describe('initial database migration', () => {
     expect(sql).toContain('content_override text NOT NULL CHECK (length(content_override) > 0)');
     expect(sql).toContain('question_option_overrides_question_id_idx');
   });
+
+  it('creates question review workflow revisions and durable import job events', async () => {
+    const workflowSql = await readFile(join(process.cwd(), 'src/db/migrations/0014_question_review_workflow.sql'), 'utf8');
+    const eventsSql = await readFile(join(process.cwd(), 'src/db/migrations/0015_import_job_events.sql'), 'utf8');
+
+    expect(workflowSql).toContain('CREATE TABLE IF NOT EXISTS question_override_revisions');
+    expect(workflowSql).toContain("status IN ('draft', 'pending_review', 'approved', 'rejected')");
+    expect(workflowSql).toContain('question_override_revisions_one_active_idx');
+    expect(workflowSql).toContain('rollback_from_revision_id');
+    expect(workflowSql).toContain('diff jsonb');
+    expect(eventsSql).toContain('CREATE TABLE IF NOT EXISTS import_job_events');
+    expect(eventsSql).toContain('event_type');
+    expect(eventsSql).toContain('import_job_events_job_stream_idx');
+  });
 });

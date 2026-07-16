@@ -540,12 +540,14 @@ describe('PostgreSQL admin import job repository', () => {
         started_at: null,
         finished_at: null,
       })],
+      [],
       [createPgJobRow({
         status: 'running',
         progress: { phase: 'running', current: 0, total: 0 },
         worker_id: 'worker-1',
         heartbeat_at: new Date('2026-07-13T10:00:01.000Z'),
       })],
+      [],
       [createPgJobRow({
         status: 'running',
         worker_id: 'worker-1',
@@ -558,6 +560,7 @@ describe('PostgreSQL admin import job repository', () => {
         worker_id: null,
         finished_at: new Date('2026-07-13T10:10:00.000Z'),
       })],
+      [],
     ]);
     const repository = createPgAdminImportJobRepository(client);
 
@@ -589,10 +592,10 @@ describe('PostgreSQL admin import job repository', () => {
 
     expect(client.queries[0].sql).toContain("'queued'");
     expect(client.queries[0].sql).toContain("status IN ('queued', 'running')");
-    expect(client.queries[1].sql).toContain('FOR UPDATE SKIP LOCKED');
-    expect(client.queries[1].sql).toContain('worker_id = $1');
-    expect(client.queries[2].sql).toContain('heartbeat_at = now()');
-    expect(client.queries[3].sql).toContain('COALESCE(heartbeat_at, started_at, created_at)');
+    expect(client.queries[2].sql).toContain('FOR UPDATE SKIP LOCKED');
+    expect(client.queries[2].sql).toContain('worker_id = $1');
+    expect(client.queries[4].sql).toContain('heartbeat_at = now()');
+    expect(client.queries[5].sql).toContain('COALESCE(heartbeat_at, started_at, created_at)');
   });
 });
 

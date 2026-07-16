@@ -27,7 +27,19 @@ describe('importQuestionBank', () => {
 
     const result = await importQuestionBank(client, questionBankData(), { batchSize: 10 });
 
-    expect(result).toEqual({ classifications: 2, questions: 2, options: 3, skippedOptions: 0, bankMappings: 2 });
+    expect(result).toEqual({
+      classifications: 2,
+      questions: 2,
+      options: 3,
+      skippedOptions: 0,
+      bankMappings: 2,
+      writes: {
+        classifications: 0,
+        questions: 0,
+        options: 0,
+        bankMappings: 0,
+      },
+    });
     expect(client.queries.at(0)?.sql).toBe('BEGIN');
     expect(client.queries.at(-1)?.sql).toBe('COMMIT');
   });
@@ -117,12 +129,34 @@ describe('importQuestionBank', () => {
       } else {
         expect(write.sql).toContain('ON CONFLICT (id) DO UPDATE');
       }
+      expect(write.sql).toContain('IS DISTINCT FROM');
       expect(write.sql).toContain('$1');
       expect(write.params?.length).toBeGreaterThan(0);
       expect(write.sql).not.toContain('Classification One');
       expect(write.sql).not.toContain('Question One');
       expect(write.sql).not.toContain('Option One');
     }
+  });
+
+  it('reports phase-level batch progress', async () => {
+    const client = new FakeClient();
+    const progress: Array<{ phase: string; current: number; total: number }> = [];
+
+    await importQuestionBank(client, questionBankData(), {
+      batchSize: 2,
+      onProgress: (entry) => {
+        progress.push(entry);
+      },
+    });
+
+    expect(progress).toEqual(expect.arrayContaining([
+      { phase: 'classifications', current: 0, total: 2 },
+      { phase: 'classifications', current: 2, total: 2 },
+      { phase: 'questions', current: 2, total: 2 },
+      { phase: 'options', current: 2, total: 3 },
+      { phase: 'options', current: 3, total: 3 },
+      { phase: 'bank_mappings', current: 2, total: 2 },
+    ]));
   });
 });
 

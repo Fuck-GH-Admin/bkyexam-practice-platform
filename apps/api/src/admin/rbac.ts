@@ -22,6 +22,7 @@ export const adminPermissions = [
   'bank_mapping:publish',
   'question_review:read',
   'question_review:write',
+  'question_review:approve',
   'import_job:read',
   'import_job:create',
   'system_status:read',

@@ -11,6 +11,7 @@ export const AdminPermissionV1Schema = z.enum([
   'bank_mapping:publish',
   'question_review:read',
   'question_review:write',
+  'question_review:approve',
   'import_job:read',
   'import_job:create',
   'system_status:read',
@@ -548,6 +549,42 @@ export const AdminImportJobV1Schema = z.object({
 }).strict();
 export type AdminImportJobV1 = z.infer<typeof AdminImportJobV1Schema>;
 
+export const AdminImportJobEventTypeV1Schema = z.enum([
+  'queued',
+  'running',
+  'progress',
+  'succeeded',
+  'failed',
+  'cancelled',
+  'recovered',
+]);
+export type AdminImportJobEventTypeV1 = z.infer<typeof AdminImportJobEventTypeV1Schema>;
+
+export const AdminImportJobEventV1Schema = z.object({
+  id: z.string().regex(/^\d+$/),
+  jobId: CanonicalUuidV1Schema,
+  type: AdminImportJobEventTypeV1Schema,
+  job: AdminImportJobV1Schema,
+  createdAt: z.string().datetime(),
+}).strict();
+export type AdminImportJobEventV1 = z.infer<typeof AdminImportJobEventV1Schema>;
+
+export const ListAdminImportJobEventsRequestV1Schema = z.object({
+  afterEventId: z.coerce.string().regex(/^\d+$/).default('0'),
+  limit: z.coerce.number().int().min(1).max(200).default(100),
+}).strict();
+export type ListAdminImportJobEventsRequestV1 = z.infer<
+  typeof ListAdminImportJobEventsRequestV1Schema
+>;
+
+export const AdminImportJobEventListResponseV1Schema = z.object({
+  events: z.array(AdminImportJobEventV1Schema),
+  lastEventId: z.string().regex(/^\d+$/),
+}).strict();
+export type AdminImportJobEventListResponseV1 = z.infer<
+  typeof AdminImportJobEventListResponseV1Schema
+>;
+
 export const ListAdminImportJobsRequestV1Schema = z.object({
   status: AdminImportJobStatusV1Schema.optional(),
   createdBy: CaseInsensitiveUuidV1Schema.optional(),
@@ -666,13 +703,81 @@ export const AdminQuestionReviewOverrideV1Schema = z.object({
 }).strict();
 export type AdminQuestionReviewOverrideV1 = z.infer<typeof AdminQuestionReviewOverrideV1Schema>;
 
+export const AdminQuestionOverrideRevisionStatusV1Schema = z.enum([
+  'draft',
+  'pending_review',
+  'approved',
+  'rejected',
+]);
+export type AdminQuestionOverrideRevisionStatusV1 = z.infer<
+  typeof AdminQuestionOverrideRevisionStatusV1Schema
+>;
+
+export const AdminQuestionOverrideRevisionOptionV1Schema = z.object({
+  optionId: CanonicalUuidV1Schema,
+  content: z.string().min(1),
+}).strict();
+export type AdminQuestionOverrideRevisionOptionV1 = z.infer<
+  typeof AdminQuestionOverrideRevisionOptionV1Schema
+>;
+
+export const AdminQuestionOverrideDiffEntryV1Schema = z.object({
+  field: z.string().min(1),
+  label: z.string().min(1),
+  before: z.string().nullable(),
+  after: z.string().nullable(),
+}).strict();
+export type AdminQuestionOverrideDiffEntryV1 = z.infer<
+  typeof AdminQuestionOverrideDiffEntryV1Schema
+>;
+
+export const AdminQuestionOverrideRevisionV1Schema = z.object({
+  id: CanonicalUuidV1Schema,
+  questionId: CanonicalUuidV1Schema,
+  version: z.number().int().positive(),
+  baseVersion: z.number().int().nonnegative(),
+  status: AdminQuestionOverrideRevisionStatusV1Schema,
+  contentOverride: z.string().nullable(),
+  answerRawOverride: z.string().nullable(),
+  analyzeRawOverride: z.string().nullable(),
+  optionContentOverrides: z.array(AdminQuestionOverrideRevisionOptionV1Schema),
+  note: z.string(),
+  diff: z.array(AdminQuestionOverrideDiffEntryV1Schema),
+  createdBy: AdminQuestionReviewActorV1Schema.nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  submittedAt: z.string().datetime().nullable(),
+  reviewedBy: AdminQuestionReviewActorV1Schema.nullable(),
+  reviewedAt: z.string().datetime().nullable(),
+  reviewNote: z.string(),
+  appliedVersion: z.number().int().positive().nullable(),
+  rollbackFromRevisionId: CanonicalUuidV1Schema.nullable(),
+}).strict();
+export type AdminQuestionOverrideRevisionV1 = z.infer<
+  typeof AdminQuestionOverrideRevisionV1Schema
+>;
+
+export const AdminQuestionOverrideWorkflowV1Schema = z.object({
+  activeRevision: AdminQuestionOverrideRevisionV1Schema.nullable(),
+  revisions: z.array(AdminQuestionOverrideRevisionV1Schema),
+}).strict();
+export type AdminQuestionOverrideWorkflowV1 = z.infer<
+  typeof AdminQuestionOverrideWorkflowV1Schema
+>;
+
 export const AdminQuestionReviewDetailV1Schema = AdminQuestionReviewItemV1Schema.extend({
   content: z.string(),
   answerRaw: z.string(),
   analyzeRaw: z.string().nullable(),
+  source: z.object({
+    content: z.string(),
+    answerRaw: z.string(),
+    analyzeRaw: z.string().nullable(),
+  }).strict().optional(),
   options: z.array(AdminQuestionReviewOptionV1Schema),
   override: AdminQuestionReviewOverrideV1Schema.nullable(),
   overrideVersion: z.number().int().nonnegative(),
+  workflow: AdminQuestionOverrideWorkflowV1Schema.optional(),
 }).strict();
 export type AdminQuestionReviewDetailV1 = z.infer<typeof AdminQuestionReviewDetailV1Schema>;
 
@@ -741,6 +846,7 @@ export type UpdateAdminQuestionOverrideOptionV1 = z.infer<
 
 export const UpdateAdminQuestionOverrideRequestV1Schema = z.object({
   expectedVersion: z.number().int().nonnegative(),
+  expectedDraftVersion: z.number().int().nonnegative().default(0),
   content: z.string().min(1).optional(),
   answerRaw: z.string().optional(),
   analyzeRaw: z.string().nullable().optional(),
@@ -775,6 +881,32 @@ export const UpdateAdminQuestionOverrideRequestV1Schema = z.object({
 });
 export type UpdateAdminQuestionOverrideRequestV1 = z.infer<
   typeof UpdateAdminQuestionOverrideRequestV1Schema
+>;
+
+export const SubmitAdminQuestionOverrideRequestV1Schema = z.object({
+  revisionId: CaseInsensitiveUuidV1Schema,
+  expectedDraftVersion: z.number().int().positive(),
+}).strict();
+export type SubmitAdminQuestionOverrideRequestV1 = z.infer<
+  typeof SubmitAdminQuestionOverrideRequestV1Schema
+>;
+
+export const ReviewAdminQuestionOverrideRequestV1Schema = z.object({
+  revisionId: CaseInsensitiveUuidV1Schema,
+  expectedVersion: z.number().int().nonnegative(),
+  reviewNote: z.string().default(''),
+}).strict();
+export type ReviewAdminQuestionOverrideRequestV1 = z.infer<
+  typeof ReviewAdminQuestionOverrideRequestV1Schema
+>;
+
+export const RollbackAdminQuestionOverrideRequestV1Schema = z.object({
+  revisionId: CaseInsensitiveUuidV1Schema,
+  expectedVersion: z.number().int().nonnegative(),
+  note: z.string().min(1),
+}).strict();
+export type RollbackAdminQuestionOverrideRequestV1 = z.infer<
+  typeof RollbackAdminQuestionOverrideRequestV1Schema
 >;
 
 export const AdminQuestionReviewListResponseV1Schema = z.object({

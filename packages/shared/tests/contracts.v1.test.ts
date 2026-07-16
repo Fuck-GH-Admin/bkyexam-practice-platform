@@ -5,6 +5,7 @@ import {
   AdminLoginResponseV1Schema,
   AdminLogoutResponseV1Schema,
   AdminImportJobDetailResponseV1Schema,
+  AdminImportJobEventListResponseV1Schema,
   AdminImportJobErrorReportResponseV1Schema,
   AdminImportJobListResponseV1Schema,
   AdminAuditLogListResponseV1Schema,
@@ -32,6 +33,9 @@ import {
   ListAdminQuestionReviewsRequestV1Schema,
   ListAdminBankMappingsRequestV1Schema,
   ListAdminImportJobsRequestV1Schema,
+  ReviewAdminQuestionOverrideRequestV1Schema,
+  RollbackAdminQuestionOverrideRequestV1Schema,
+  SubmitAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
@@ -350,6 +354,16 @@ describe('v1 auth/catalog/error/health contracts', () => {
       page: { limit: 20, offset: 0, hasMore: false },
     }).jobs[0]?.id).toBe(jobId);
     expect(AdminImportJobDetailResponseV1Schema.parse({ job }).job.createdBy?.id).toBe(createdBy);
+    expect(AdminImportJobEventListResponseV1Schema.parse({
+      events: [{
+        id: '42',
+        jobId: job.id,
+        type: 'progress',
+        job: { ...job, progress: { phase: 'questions', current: 1, total: 2 } },
+        createdAt: '2026-07-13T10:00:00.500Z',
+      }],
+      lastEventId: '42',
+    }).events[0]?.job.progress.phase).toBe('questions');
     expect(AdminImportJobErrorReportResponseV1Schema.parse({
       jobId,
       status: 'failed',
@@ -621,6 +635,7 @@ describe('v1 auth/catalog/error/health contracts', () => {
       note: '人工复核修订',
     })).toMatchObject({
       expectedVersion: 0,
+      expectedDraftVersion: 0,
       content: 'PostgreSQL 中哪个命令用于提交当前事务？（已复核）',
       optionContentOverrides: [{ optionId, content: 'COMMIT 命令' }],
       note: '人工复核修订',
@@ -635,6 +650,19 @@ describe('v1 auth/catalog/error/health contracts', () => {
     expect(() => UpdateAdminQuestionOverrideRequestV1Schema.parse({
       expectedVersion: 1,
     })).toThrow();
+    expect(SubmitAdminQuestionOverrideRequestV1Schema.parse({
+      revisionId: optionId.toUpperCase(),
+      expectedDraftVersion: 2,
+    })).toEqual({ revisionId: optionId, expectedDraftVersion: 2 });
+    expect(ReviewAdminQuestionOverrideRequestV1Schema.parse({
+      revisionId: optionId,
+      expectedVersion: 1,
+    })).toEqual({ revisionId: optionId, expectedVersion: 1, reviewNote: '' });
+    expect(RollbackAdminQuestionOverrideRequestV1Schema.parse({
+      revisionId: optionId,
+      expectedVersion: 2,
+      note: '回滚到稳定版本',
+    }).note).toBe('回滚到稳定版本');
 
     const question = {
       questionId,
@@ -684,6 +712,31 @@ describe('v1 auth/catalog/error/health contracts', () => {
         updatedAt: '2026-07-13T10:10:00.000Z',
       },
       overrideVersion: 1,
+      workflow: {
+        activeRevision: null,
+        revisions: [{
+          id: '72000000-0000-4000-8000-000000000001',
+          questionId,
+          version: 1,
+          baseVersion: 0,
+          status: 'approved',
+          contentOverride: null,
+          answerRawOverride: 'COMMIT',
+          analyzeRawOverride: null,
+          optionContentOverrides: [{ optionId, content: 'COMMIT 命令' }],
+          note: '人工复核修订',
+          diff: [{ field: `option:${optionId}`, label: '选项 1', before: 'COMMIT', after: 'COMMIT 命令' }],
+          createdBy: { id: '50000000-0000-4000-8000-000000000001', displayName: 'Operator' },
+          createdAt: '2026-07-13T10:00:00.000Z',
+          updatedAt: '2026-07-13T10:10:00.000Z',
+          submittedAt: '2026-07-13T10:05:00.000Z',
+          reviewedBy: { id: '50000000-0000-4000-8000-000000000001', displayName: 'Operator' },
+          reviewedAt: '2026-07-13T10:10:00.000Z',
+          reviewNote: 'approved',
+          appliedVersion: 1,
+          rollbackFromRevisionId: null,
+        }],
+      },
     };
 
     expect(AdminQuestionReviewDetailResponseV1Schema.parse({ question: detailQuestion }).question.flags[0]?.type).toBe('bad_answer');

@@ -33,6 +33,7 @@ export function cloneQuestionDetail(question: AdminQuestionReviewDetailV1): Admi
     content: question.content,
     answerRaw: question.answerRaw,
     analyzeRaw: question.analyzeRaw,
+    source: question.source ? { ...question.source } : undefined,
     options: question.options.map((option) => ({ ...option })),
     override: question.override
       ? {
@@ -41,6 +42,26 @@ export function cloneQuestionDetail(question: AdminQuestionReviewDetailV1): Admi
       }
       : null,
     overrideVersion: question.overrideVersion,
+    workflow: question.workflow
+      ? {
+        activeRevision: question.workflow.activeRevision
+          ? {
+            ...question.workflow.activeRevision,
+            optionContentOverrides: question.workflow.activeRevision.optionContentOverrides.map((option) => ({ ...option })),
+            diff: question.workflow.activeRevision.diff.map((entry) => ({ ...entry })),
+            createdBy: question.workflow.activeRevision.createdBy ? { ...question.workflow.activeRevision.createdBy } : null,
+            reviewedBy: question.workflow.activeRevision.reviewedBy ? { ...question.workflow.activeRevision.reviewedBy } : null,
+          }
+          : null,
+        revisions: question.workflow.revisions.map((revision) => ({
+          ...revision,
+          optionContentOverrides: revision.optionContentOverrides.map((option) => ({ ...option })),
+          diff: revision.diff.map((entry) => ({ ...entry })),
+          createdBy: revision.createdBy ? { ...revision.createdBy } : null,
+          reviewedBy: revision.reviewedBy ? { ...revision.reviewedBy } : null,
+        })),
+      }
+      : undefined,
   };
 }
 
@@ -50,6 +71,11 @@ export function detailFromItem(question: AdminQuestionReviewItemV1): AdminQuesti
     content: question.contentPreview,
     answerRaw: question.answerPreview,
     analyzeRaw: null,
+    source: {
+      content: question.contentPreview,
+      answerRaw: question.answerPreview,
+      analyzeRaw: null,
+    },
     options: [],
     override: null,
     overrideVersion: 0,
@@ -109,6 +135,11 @@ export function mapQuestionDetail(
     content: row.effective_content,
     answerRaw: row.effective_answer_raw,
     analyzeRaw: row.effective_analyze_raw,
+    source: {
+      content: row.source_content,
+      answerRaw: row.source_answer_raw,
+      analyzeRaw: row.source_analyze_raw,
+    },
     options: options.map(mapQuestionOptionRow),
     override: overrideVersion > 0 && row.override_updated_at
       ? {

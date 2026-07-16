@@ -13,7 +13,7 @@ worker claim = implemented
 heartbeat = implemented
 stuck recovery = implemented
 cancel/retry compatibility = preserved
-stage-level realtime progress stream = deferred
+stage-level realtime progress stream = implemented
 external durable queue service = deferred
 ```
 
@@ -172,7 +172,21 @@ npm run typecheck -w @bkyexam-practice/shared
 ## 7. 明确未做
 
 - 不引入外部队列系统（BullMQ/SQS/RabbitMQ 等）。
-- 不做 SSE/WebSocket 实时 progress 事件流。
-- 不做阶段级 progress current/total 细化。
 - 不做 typed reset 二次确认 UI。
 - 不做最终视觉打磨。
+
+## 8. B9.37 实时进度扩展
+
+B9.37 在 durable worker 上增加了数据库持久化事件流和 SSE：
+
+- migration `0015_import_job_events.sql` 新增 `import_job_events`。
+- queued/running/progress/succeeded/failed/cancelled/recovered 会写入带单调递增 `id` 的事件。
+- importer 按 classifications/questions/options/bank_mappings 批次报告 `current/total`。
+- `GET /api/admin/import-jobs/:jobId/events`：
+  - `Accept: text/event-stream` 时返回 SSE。
+  - 其他 Accept 返回 JSON event page，便于测试和轮询降级。
+  - 支持 `Last-Event-ID` 和 `afterEventId`，断线后只补拉缺失事件。
+  - 返回 `X-Accel-Buffering: no` 并发送 keepalive，避免 Nginx 缓冲长连接。
+- Admin detail 页面在 queued/running 状态使用 `EventSource`，实时更新 job、进度条和最近事件；终态后关闭连接。
+
+事件表是重连和审计的 durable source，SSE 只是传输层。因此 API 重启或浏览器重连不会依赖进程内事件缓存。

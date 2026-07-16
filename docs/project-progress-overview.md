@@ -15,7 +15,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 当前最准确的定位是：
 
-> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的最小运营能力；B9.34 已完成真实 staging re-baseline，B9.35 又补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset production gate、可校验恢复演练和导入维护窗口资源采样。Learning 仍是后端能力，学生前端尚未交付。**
+> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的运营能力；B9.36–B9.38 已补齐 Question Review diff/审批/回滚、Import Jobs durable events/SSE realtime progress，以及 change-aware importer 和完整题库连续容量 profile。Learning 仍是后端能力，学生前端尚未交付。**
 
 文档阅读顺序与本轮代码一致性结果见 [`README.md`](README.md) 和 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 
@@ -24,13 +24,13 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | 层级 | 当前判断 | 估算完成度 | 说明 |
 | --- | --- | ---: | --- |
 | 学生客观题核心闭环 | 内部可用 | **约 95%** | 登录、首页、多会话、题库、练习、草稿、提交、结果、历史、错题、错题再练已经可用；Learning 后端已具备概览/趋势/目标/长期复习标记；缺 Learning 前端与最终 UX。 |
-| 后端主功能 | 基本成型 | **约 88–89%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs、Question Review、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控、实时 progress、部分完整运营流。 |
-| 后端工程化/可验证性 | 本地与 current-HEAD staging 已验证 | **约 96%** | 在既有质量门和 staging evidence 上，B9.35 新增 migration ledger/checksum、真实 migration status、custom backup checksum/report、reset blocking gate 与资源 monitor；仍缺外部告警和持续容量验证。 |
+| 后端主功能 | 基本成型 | **约 91–92%** | Auth、Practice、Wrongbook、Learning、Admin Auth/RBAC/Audit、Admin Users、Student Manage、Bank Mappings、Import Jobs realtime、Question Review workflow、System Status 等主干都已落地；缺非客观题、推荐策略、外部监控和部分复杂运营流。 |
+| 后端工程化/可验证性 | 本地与 current-HEAD staging 已验证 | **约 97%** | 既有质量门、staging evidence、migration ledger/checksum、backup checksum、reset gate、资源 monitor 之上，新增真实 PostgreSQL changed-row 验证和完整题库三轮持续容量 profile；仍缺外部告警和不同硬件档位容量阈值。 |
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
-| 管理平台功能 | Operational MVP | **约 70–75%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、Question Review diff/审批/回滚、Import realtime progress、复杂安全策略 UI。 |
+| 管理平台功能 | Operational MVP+ | **约 82–85%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs realtime、Question Review diff/审批/回滚、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、批量质检和复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 92–94%** | B9.35 runtime commit `2fbaec1`、migration ledger/checksum、独立 Admin、worker、首次改密服务端门禁、reset safety、pre/post checksum dump、资源 monitor 和远端 CI 已通过；仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。 |
-| 完整产品愿景 | 主体完成但未收口 | **约 90%** | 分母包含最终学生端、Learning 前端、管理平台完整工作流、全题型、运营能力和正式生产发布，所以仍不能称为完整产品。 |
+| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 94–95%** | B9.35 staging 基线之上，本阶段已完成审批工作流、realtime progress 和本地持续容量验证；仍需本阶段 current HEAD 的真实 staging 复验，以及外部告警、PR human approval/merge 和正式用户验收。 |
+| 完整产品愿景 | 主体完成但未收口 | **约 91%** | 分母包含最终学生端、Learning 前端、全题型、复杂运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
 
@@ -96,6 +96,8 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
   - durable worker
   - heartbeat
   - stuck recovery
+  - durable progress events
+  - SSE reconnect / realtime progress
 - Question Review：
   - list/filter
   - flags
@@ -103,6 +105,9 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
   - full detail
   - override layer
   - optimistic concurrency
+  - field diff
+  - draft/submit/approve/reject
+  - rollback history
   - audit
 - Audit Logs read-only UI。
 - System Status UI。
@@ -111,8 +116,8 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 仍未完成：
 
 - Admin dashboard / ops summary。
-- Question Review diff、审批、回滚、批量操作。
-- Import Jobs SSE/WebSocket 实时 progress 事件流。
+- Question Review 批量操作、审批通知和 source drift 报告。
+- Import Jobs 文件/行级错误下载和跨硬件容量阈值。
 - Admin 全局最终视觉与交互体系。
 - 更复杂的安全策略 UI，例如 MFA/SSO/邀请通知。
 - Admin 侧大文件进一步模块化。
@@ -134,9 +139,8 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 仍未完成：
 
-- 实时 progress 推送。
 - 外部队列服务接入；目前内置 worker 已足够当前规模。
-- 导入 UI 的更细粒度日志/阶段图。
+- 导入 UI 的文件/行级错误日志和更复杂阶段图。
 - 题库运营质量指标 dashboard。
 
 ### 3.4 生产与运维
@@ -168,7 +172,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 仍未完成：
 
 - 外部监控告警接入。
-- 持续性能压测。
+- 多硬件档位持续性能阈值与长期趋势存储。
 - 正式生产发布验收。
 - PR human approval / merge。
 - 正式事故 runbook 与告警联系人。
@@ -186,10 +190,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 59 | 453 |
+| `apps/api` | 59 | 456 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **64** | **523** |
+| **Total** | **64** | **526** |
 
 Playwright smoke：
 
@@ -200,7 +204,7 @@ Playwright smoke：
 PostgreSQL docker integration：
 
 ```text
-1 file / 1 test passed
+1 file / 2 tests passed
 ```
 
 真实服务器 staging 已有证据：
@@ -242,27 +246,12 @@ B9.34 已完成 current-HEAD staging re-baseline。真实验收确认：
 
 先由真实环境决定下一项工程工作，避免继续扩大“本地绿、线上旧”的证据断层。
 
-### P1：Question Review 完整运营流
+### P1：Question Review 与 Import Jobs 深化
 
-当前 override 已能编辑，但还不是完整质检平台。
+本阶段已完成单题审批责任链和 Import Jobs realtime progress。下一层缺口是：
 
-缺：
-
-- override diff
-- 审批/发布状态
-- 回滚
-- 批量操作
-- 更清晰的质检责任链
-
-### P1：Import Jobs 实时进度
-
-当前 worker 已稳定，但 UI 只能轮询/查看结果。
-
-缺：
-
-- SSE 或 WebSocket progress stream
-- 阶段化 progress event
-- 导入过程中更细粒度的可观测性
+- Question Review 批量操作、审批通知、source drift 报告。
+- Import Jobs 文件/行级错误下载、事件保留策略、跨硬件容量阈值。
 
 ### P2：Learning 前端与学生信息架构
 
@@ -315,10 +304,10 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 ### B9.34 后的候选
 
-1. 如果真实导入暴露出进度不可见问题，做 Import Jobs realtime progress。
+1. 完成本阶段 current HEAD 的真实 staging 部署和 importer 维护窗口复验。
 2. 如果真实验收暴露 route 错误不一致或维护压力，做 route validation/error mapping helpers。
-3. 如果底层稳定但运营流程不足，优先 Question Review diff/审批/回滚。
-4. 如果用户审查认为学生学习闭环更重要，进入 Learning 前端 IA/功能页。
+3. 如果用户审查认为学生学习闭环更重要，进入 Learning 前端 IA/功能页。
+4. 如果管理员需要规模化运营，再做 Question Review 批量工作流和 Import error download。
 
 ### 不建议作为下一阶段
 

@@ -88,4 +88,4 @@ npm run verify:docker
 - `admin/adminStudents.ts` 可继续拆 memory/pg/mapper/service。
 - `admin/bankMappings.ts` 可继续拆 read/write repository 与 mapper。
 - `practice` route/service validation 与错误映射仍可继续收敛。
-- Import Jobs 实时 progress 事件流仍后置。
+- Import Jobs realtime progress 已在 B9.37 完成；当前剩余文件/行级错误下载和事件保留策略。

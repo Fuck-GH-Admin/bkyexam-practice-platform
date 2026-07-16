@@ -9,11 +9,13 @@ import {
   bankMappings,
   classifications,
   importJobs,
+  importJobEvents,
   practiceAttempts,
   practiceSessionDrafts,
   practiceSessionQuestions,
   practiceSessions,
   questionOptionOverrides,
+  questionOverrideRevisions,
   questionQualityFlags,
   questionOptions,
   questionOverrides,
@@ -33,9 +35,11 @@ describe('database schema', () => {
     expect(getTableName(adminUserRoles)).toBe('admin_user_roles');
     expect(getTableName(auditLogs)).toBe('audit_logs');
     expect(getTableName(importJobs)).toBe('import_jobs');
+    expect(getTableName(importJobEvents)).toBe('import_job_events');
     expect(getTableName(questionQualityFlags)).toBe('question_quality_flags');
     expect(getTableName(questionOverrides)).toBe('question_overrides');
     expect(getTableName(questionOptionOverrides)).toBe('question_option_overrides');
+    expect(getTableName(questionOverrideRevisions)).toBe('question_override_revisions');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -242,6 +246,38 @@ describe('database schema', () => {
       'question_option_overrides_question_id_idx',
       'question_option_overrides_updated_by_admin_id_idx',
     ]));
+  });
+
+  it('defines immutable question override revisions and import job event streams', () => {
+    const revisionConfig = getTableConfig(questionOverrideRevisions);
+    const eventConfig = getTableConfig(importJobEvents);
+
+    expect(revisionConfig.columns.map((column) => column.name)).toEqual(expect.arrayContaining([
+      'id',
+      'question_id',
+      'version',
+      'base_version',
+      'status',
+      'option_content_overrides',
+      'diff',
+      'applied_version',
+      'rollback_from_revision_id',
+    ]));
+    expect(revisionConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_override_revisions_one_active_idx',
+      'question_override_revisions_question_history_idx',
+      'question_override_revisions_pending_idx',
+    ]));
+    expect(eventConfig.columns.map((column) => column.name)).toEqual([
+      'id',
+      'job_id',
+      'event_type',
+      'payload',
+      'created_at',
+    ]);
+    expect(eventConfig.indexes.map((tableIndex) => tableIndex.config.name)).toContain(
+      'import_job_events_job_stream_idx',
+    );
   });
 
   it('tracks current practice position with a positive sort check', () => {

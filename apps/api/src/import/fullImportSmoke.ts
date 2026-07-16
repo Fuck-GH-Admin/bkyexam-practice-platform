@@ -57,6 +57,12 @@ export async function runFullImportSmoke(
   const firstImport = await importQuestionBank(client, data, { batchSize: 1_000 });
   const firstImportDuration = performance.now() - firstImportStartedAt;
   assertCurrentCorpusImportCounts(firstImport);
+  assertEqual('first import write count', firstImport.writes, {
+    classifications: currentCorpusBaseline.classifications,
+    questions: currentCorpusBaseline.questions,
+    options: currentCorpusBaseline.importedOptions,
+    bankMappings: currentCorpusBaseline.bankMappings,
+  });
   const firstSmoke = await runDatabaseSmoke(client);
   assertDatabaseCounts(firstSmoke.tables);
 
@@ -68,6 +74,12 @@ export async function runFullImportSmoke(
   assertDatabaseCounts(secondSmoke.tables);
 
   assertEqual('second import counts', secondImport, firstImport);
+  assertEqual('second import unchanged write count', secondImport.writes, {
+    classifications: 0,
+    questions: 0,
+    options: 0,
+    bankMappings: 0,
+  });
   assertEqual('database counts after second import', secondSmoke.tables, firstSmoke.tables);
 
   return {
@@ -94,7 +106,8 @@ export function assertCurrentCorpusSummary(summary: ImportedQuestionBankData['su
 }
 
 export function assertCurrentCorpusImportCounts(counts: ImportQuestionBankCounts) {
-  assertEqual('import counts', counts, {
+  const { writes: _writes, ...semanticCounts } = counts;
+  assertEqual('import counts', semanticCounts, {
     classifications: currentCorpusBaseline.classifications,
     questions: currentCorpusBaseline.questions,
     options: currentCorpusBaseline.importedOptions,
@@ -103,7 +116,7 @@ export function assertCurrentCorpusImportCounts(counts: ImportQuestionBankCounts
   });
 }
 
-async function resetFullImportDatabase(client: QueryClient) {
+export async function resetFullImportDatabase(client: QueryClient) {
   await client.query(`
     TRUNCATE TABLE
       question_quality_flags,

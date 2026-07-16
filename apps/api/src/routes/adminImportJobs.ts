@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   AdminImportJobDetailResponseV1Schema,
+  AdminImportJobEventListResponseV1Schema,
   AdminImportJobErrorReportResponseV1Schema,
   AdminImportJobListResponseV1Schema,
   ApiErrorResponseV1Schema,
@@ -8,6 +9,7 @@ import {
   CreateAdminImportJobRequestV1Schema,
   CreateAdminImportJobResponseV1Schema,
   ListAdminImportJobsRequestV1Schema,
+  ListAdminImportJobEventsRequestV1Schema,
   type AdminPermissionV1,
 } from '@bkyexam-practice/shared';
 import {
@@ -113,6 +115,88 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       }
 
       return AdminImportJobDetailResponseV1Schema.parse({ job });
+    });
+
+    app.get('/api/admin/import-jobs/:jobId/events', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'import_job:read');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+
+      const params = request.params as { jobId?: unknown };
+      const parsedJobId = CaseInsensitiveUuidV1Schema.safeParse(params.jobId);
+      if (!parsedJobId.success) {
+        return reply.status(400).send(errorResponse('Invalid import job id'));
+      }
+      const jobId = parsedJobId.data.toLocaleLowerCase();
+      const job = await service.findImportJobById(jobId);
+      if (!job) {
+        return reply.status(404).send(errorResponse('Import job not found'));
+      }
+
+      const parsedQuery = ListAdminImportJobEventsRequestV1Schema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        return reply.status(400).send(errorResponse('Invalid import job event query'));
+      }
+      const headerEventId = request.headers['last-event-id'];
+      const afterEventId = typeof headerEventId === 'string' && /^\d+$/.test(headerEventId)
+        ? headerEventId
+        : parsedQuery.data.afterEventId;
+
+      if (!String(request.headers.accept ?? '').includes('text/event-stream')) {
+        const events = await repository.listImportJobEvents({
+          jobId,
+          afterEventId,
+          limit: parsedQuery.data.limit,
+        });
+        return AdminImportJobEventListResponseV1Schema.parse({
+          events,
+          lastEventId: events.at(-1)?.id ?? afterEventId,
+        });
+      }
+
+      reply.hijack();
+      reply.raw.statusCode = 200;
+      reply.raw.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      reply.raw.setHeader('Cache-Control', 'no-cache, no-transform');
+      reply.raw.setHeader('Connection', 'keep-alive');
+      reply.raw.setHeader('X-Accel-Buffering', 'no');
+      reply.raw.flushHeaders?.();
+
+      let closed = false;
+      request.raw.on('close', () => {
+        closed = true;
+      });
+      let cursor = afterEventId;
+      let keepaliveAt = Date.now();
+
+      while (!closed) {
+        const events = await repository.listImportJobEvents({
+          jobId,
+          afterEventId: cursor,
+          limit: 100,
+        });
+        for (const event of events) {
+          reply.raw.write(`id: ${event.id}\n`);
+          reply.raw.write(`event: ${event.type}\n`);
+          reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+          cursor = event.id;
+        }
+
+        const latest = events.at(-1)?.job ?? await service.findImportJobById(jobId);
+        if (latest && isTerminalImportJobStatus(latest.status) && events.length === 0) {
+          break;
+        }
+        if (Date.now() - keepaliveAt >= 15_000) {
+          reply.raw.write(': keepalive\n\n');
+          keepaliveAt = Date.now();
+        }
+        await delay(750);
+      }
+
+      if (!reply.raw.destroyed) reply.raw.end();
+      return reply;
     });
 
     app.get('/api/admin/import-jobs/:jobId/errors', async (request, reply) => {
@@ -303,4 +387,15 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
       return AdminImportJobDetailResponseV1Schema.parse({ job: result.job });
     });
   };
+}
+
+function isTerminalImportJobStatus(status: string): boolean {
+  return status === 'succeeded' || status === 'failed' || status === 'cancelled';
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, milliseconds);
+    timer.unref?.();
+  });
 }

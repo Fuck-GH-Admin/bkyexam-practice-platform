@@ -1,5 +1,24 @@
 # Roadmap
 
+## Completed B9.36–B9.38 Question Review workflow, Import realtime progress, and importer capacity — 2026-07-16
+
+- [x] 新增 `0014_question_review_workflow.sql` 与 `question_override_revisions`。
+- [x] Question Review 支持 draft、字段级 diff、submit、approve、reject 和 rollback。
+- [x] 新增 `question_review:approve` 权限；content editor 与审批者职责分离。
+- [x] approved revision 才写入 effective override；draft/pending/rejected 不影响学生读取。
+- [x] 回滚创建新的 approved revision，不删除历史。
+- [x] 新增 `0015_import_job_events.sql` 与 durable event stream。
+- [x] 新增 `GET /api/admin/import-jobs/:jobId/events` JSON/SSE 双模式。
+- [x] 支持 `Last-Event-ID`/`afterEventId` 断线补拉、keepalive 和 Nginx no-buffer。
+- [x] importer/worker 报告 classifications/questions/options/bank_mappings 批次进度。
+- [x] Admin Import Jobs detail 显示实时进度条和事件历史。
+- [x] importer 对 unchanged incoming row 先做 `NOT EXISTS` prefilter，并保留 conflict race guard。
+- [x] importer 返回实际 logical write counts。
+- [x] PostgreSQL integration 验证首次插入、unchanged 零写入和 changed row 更新。
+- [x] 完整题库三轮 non-reset capacity profile 通过：repeat 平均约 9.51 秒，logical writes=0，updated/dead tuples=0。
+- [x] Admin Playwright 覆盖 Question Review 保存草稿、diff、提交、审批和回滚。
+- [x] 详细说明见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
+
 ## Completed B9.35 Security and operational truth closure — 2026-07-16
 
 - [x] 首次改密从前端跳转升级为 Practice/Wrongbook/Learning 服务端门禁。
@@ -736,7 +755,7 @@
 - [x] 真正执行写入的 import mode（受 `ADMIN_IMPORT_ENABLE_WRITE=true` gate 保护）。
 - [x] import reset、cancel/retry。
 - [x] API 进程内 durable worker/队列、heartbeat 和 stuck job recovery。
-- [ ] SSE/WebSocket 实时 progress 事件流与阶段级进度细化。
+- [x] SSE 实时 progress 事件流与阶段级进度细化。
 
 ### Frontend
 

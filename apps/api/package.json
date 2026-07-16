@@ -13,6 +13,7 @@
     "import:summary": "tsx src/import/loadQuestionBank.ts",
     "import:db": "tsx src/import/importQuestionBank.ts",
     "smoke:import:full": "tsx src/import/fullImportSmoke.ts",
+    "smoke:import:capacity": "tsx src/import/importCapacityProfile.ts",
     "admin:bootstrap": "tsx src/admin/bootstrapAdmin.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:smoke": "tsx src/db/smoke.ts",

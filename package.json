@@ -18,6 +18,7 @@
     "test:integration:db": "npm run build:shared && npm run test:integration:db -w @bkyexam-practice/api",
     "test:integration:db:docker": "node scripts/run-postgres-integration.mjs",
     "smoke:import:full:docker": "node scripts/run-full-import-smoke.mjs",
+    "smoke:import:capacity:docker": "node scripts/run-import-capacity-profile.mjs",
     "ops:backup-restore:docker": "node scripts/run-backup-restore-drill.mjs",
     "admin:bootstrap": "npm run admin:bootstrap -w @bkyexam-practice/api",
     "test:e2e": "npm run build:shared && playwright test",

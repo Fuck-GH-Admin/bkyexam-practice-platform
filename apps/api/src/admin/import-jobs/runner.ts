@@ -18,7 +18,9 @@ export function createPgQuestionBankImportRunner(
 
   return async function runQuestionBankImport(sourceDir, importOptions, context) {
     await throwIfJobCancelled(context);
+    await context?.reportProgress?.({ phase: 'loading_source', current: 0, total: 1 });
     const data = await loadData(sourceDir);
+    await context?.reportProgress?.({ phase: 'loading_source', current: 1, total: 1 });
     await throwIfJobCancelled(context);
     const dbClient = await pool.connect();
 
@@ -28,6 +30,7 @@ export function createPgQuestionBankImportRunner(
         generateMappings: importOptions.generateMappings,
         resetBeforeImport: importOptions.resetBeforeImport,
         shouldAbort: context?.shouldAbort,
+        onProgress: context?.reportProgress,
       });
 
       return {
@@ -51,13 +54,20 @@ export async function dryRunQuestionBankImport(
   context?: AdminImportJobRunContext,
 ): Promise<AdminImportJobSummaryV1> {
   await throwIfJobCancelled(context);
+  await context?.reportProgress?.({ phase: 'loading_source', current: 0, total: 1 });
   const data = await loadQuestionBankData(sourceDir);
+  await context?.reportProgress?.({ phase: 'loading_source', current: 1, total: 1 });
   await throwIfJobCancelled(context);
   const bankMappings = options.generateMappings === false
     ? []
     : generateBankMappings(data.classifications, data.questions);
   const questionIds = new Set(data.questions.map((question) => question.id));
   const importableOptions = data.options.filter((option) => questionIds.has(option.questionId));
+  await context?.reportProgress?.({
+    phase: 'dry_run_summary',
+    current: data.questions.length,
+    total: data.questions.length,
+  });
 
   return {
     classifications: data.classifications.length,

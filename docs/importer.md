@@ -89,7 +89,9 @@ The loader does not write to PostgreSQL. `importQuestionBank` consumes this stru
 
 Location: `apps/api/src/import/importQuestionBank.ts`
 
-`importQuestionBank(client, data, { batchSize })` writes data returned by `loadQuestionBankData` into PostgreSQL. It wraps the import in a transaction, writes classifications before questions, questions before options, and generated bank mappings after options, and returns counts for inserted or updated records:
+`importQuestionBank(client, data, { batchSize, onProgress })` writes data returned by `loadQuestionBankData` into PostgreSQL. It wraps the import in a transaction, writes classifications before questions, questions before options, and generated bank mappings after options. `onProgress` receives phase-level batch progress for `classifications/questions/options/bank_mappings`.
+
+The result separates corpus input counts from actual logical writes:
 
 ```ts
 {
@@ -98,17 +100,41 @@ Location: `apps/api/src/import/importQuestionBank.ts`
   options: number;
   skippedOptions: number;
   bankMappings: number;
+  writes: {
+    classifications: number;
+    questions: number;
+    options: number;
+    bankMappings: number;
+  };
 }
 ```
 
 The source option export can contain records whose `questionId` is not present in the exported question files. Those orphan options cannot satisfy the database foreign key, so the importer skips them and reports the count as `skippedOptions`.
 
-The importer uses parameterized SQL and PostgreSQL upsert semantics:
+The importer uses parameterized SQL and change-aware PostgreSQL upsert semantics:
 
 - `classifications`: `ON CONFLICT (id) DO UPDATE` for `name`, `parent_id`, `q_group`, `sort`, and `is_deleted`.
 - `questions`: `ON CONFLICT (id) DO UPDATE` for classification, type, content, answer, analysis, usage, difficulty, and searchable text fields.
 - `question_options`: `ON CONFLICT (id) DO UPDATE` for `question_id`, `sort`, and `content`.
 - `bank_mappings`: generated with `generateBankMappings(data.classifications, data.questions)` and persisted with `ON CONFLICT (bank_id) DO UPDATE` for generated mapping metadata and question counts.
+
+Each batch first filters rows whose persisted values are already identical:
+
+```sql
+INSERT INTO target (...)
+SELECT incoming.*
+FROM (VALUES ...) incoming (...)
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM target existing
+  WHERE existing.id = incoming.id
+    AND ROW(existing...) IS NOT DISTINCT FROM ROW(incoming...)
+)
+ON CONFLICT (...) DO UPDATE ...
+WHERE ROW(target...) IS DISTINCT FROM ROW(EXCLUDED...)
+```
+
+The prefilter avoids conflict-update work for unchanged corpus rows; the conflict-level predicate remains as a race-safe final guard. Repeating the same full import therefore reports zero logical writes and does not create updated/dead tuples.
 
 If any write fails, the importer rolls back the transaction and rethrows the original error.
 
@@ -137,6 +163,46 @@ The recorded baseline includes:
 - the complete normalized question-type distribution.
 
 The profile is intentionally not part of every CI run because the source corpus is external to Git and the full double import takes minutes. A legitimate source update should be reviewed before changing the baseline.
+
+## Sustained Capacity Profile
+
+Use the isolated capacity profile for repeated full non-reset imports:
+
+```powershell
+npm run smoke:import:capacity:docker -- C:\path\to\BKYExam\Monitor\questionbank --cycles=3 --batch-size=1000
+```
+
+The profile:
+
+1. applies all migrations and resets only the dedicated test database;
+2. loads the source files once;
+3. performs one initial full import;
+4. repeats the same full import for the requested cycle count;
+5. requires every repeat cycle to report zero logical writes;
+6. records duration, WAL delta, database size and PostgreSQL insert/update/dead-tuple statistics;
+7. verifies final corpus counts against the fixed baseline.
+
+Optional thresholds:
+
+```text
+--max-repeat-ms=<milliseconds>
+--max-repeat-wal-bytes=<bytes>
+```
+
+2026-07-16 local Docker result with the complete corpus, `batchSize=1000`, and three repeat cycles:
+
+| Metric | Result |
+| --- | ---: |
+| Initial import | 24,685.58 ms |
+| Repeat durations | 9,321.40 / 9,406.21 / 9,792.22 ms |
+| Repeat average / max | 9,506.61 / 9,792.22 ms |
+| Repeat logical writes | 0 for all four tables in all cycles |
+| Repeat WAL | 1,177,512 / 168 / 244,424 bytes |
+| Repeat WAL average / max | 474,034.67 / 1,177,512 bytes |
+| Updated tuples / dead tuples | 0 / 0 |
+| Final counts | 2,941 / 89,922 / 154,899 / 2,662 |
+
+Before the incoming-row prefilter, the same unchanged repeats took about 13.9–14.6 seconds and generated about 14–15 MiB WAL per cycle. The optimized run reduces repeat time by roughly one third and reduces measured WAL by more than 90%, while preserving changed-row updates. A real PostgreSQL integration test separately verifies initial insert, zero-write unchanged repeat, and a subsequent changed classification/question/option update.
 
 ## Import Summary Command
 
@@ -188,4 +254,4 @@ npm run import:db -w @bkyexam-practice/api -- <questionbank-dir>
 
 ## Current Boundaries
 
-The parser layer remains side-effect free. The database importer handles transactional, idempotent loading, and the slow smoke now verifies full-corpus count stability. Progress reporting and detailed import error summaries are still future enhancements.
+The parser layer remains side-effect free. The database importer handles transactional, change-aware idempotent loading, phase-level progress callbacks, logical write counts, and isolated sustained capacity profiling. Import Jobs persists these progress snapshots and streams them through SSE. File/line-level structured error downloads, adaptive batch sizing, parallel table loading, online index strategy, and a production capacity threshold for every hardware class remain future enhancements.

@@ -3,6 +3,7 @@ import type {
   AddAdminQuestionReviewFlagV1,
   AdminQuestionReviewDetailV1,
   AdminQuestionReviewFlagV1,
+  AdminQuestionOverrideRevisionV1,
 } from '@bkyexam-practice/shared';
 import type { QueryClient } from '../../db/client.js';
 import type {
@@ -14,7 +15,9 @@ import type {
   QuestionContextRow,
   QuestionCoreRow,
   QuestionOptionRow,
+  QuestionOverrideRevisionRow,
   QuestionReviewRow,
+  QuestionOverrideWorkflowResult,
   TransactionClient,
   UpdateAdminQuestionOverrideInput,
 } from './types.js';
@@ -23,6 +26,14 @@ import {
   mapQuestionDetail,
   mapQuestionReviewRow,
 } from './mappers.js';
+import {
+  attachWorkflow,
+  buildOverrideDiff,
+  mapRevisionRow,
+  mergeDraftSnapshot,
+  revisionSnapshot,
+  type QuestionOverrideSnapshot,
+} from './workflow.js';
 
 export function createPgAdminQuestionReviewRepository(client: QueryClient): AdminQuestionReviewRepository {
   return {
@@ -292,6 +303,7 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
       try {
         await transactionClient.query('BEGIN');
         transactionStarted = true;
+        await lockQuestion(transactionClient, input.questionId);
 
         const before = await loadQuestionDetail(transactionClient, input.questionId);
         if (!before) {
@@ -304,16 +316,33 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
           transactionStarted = false;
           return { status: 'version_conflict', current: before };
         }
+        const activeRevision = before.workflow?.activeRevision ?? null;
+        if (activeRevision?.status === 'pending_review') {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'revision_not_editable', current: before };
+        }
+        if ((activeRevision?.version ?? 0) !== input.changes.expectedDraftVersion) {
+          await transactionClient.query('ROLLBACK');
+          transactionStarted = false;
+          return { status: 'draft_version_conflict', current: before };
+        }
         if (!await allOptionsBelongToQuestion(transactionClient, input.questionId, input.changes.optionContentOverrides.map((option) => option.optionId))) {
           await transactionClient.query('ROLLBACK');
           transactionStarted = false;
           return { status: 'option_not_found' };
         }
 
-        await upsertQuestionOverride(transactionClient, input);
-        for (const option of input.changes.optionContentOverrides) {
-          await upsertQuestionOptionOverride(transactionClient, input.questionId, option.optionId, option.content, input.actor.id);
-        }
+        const snapshot = mergeDraftSnapshot(before, activeRevision, input.changes);
+        const revisionId = await upsertDraftRevision(transactionClient, {
+          questionId: input.questionId,
+          activeRevision,
+          baseVersion: before.overrideVersion,
+          snapshot,
+          diff: buildOverrideDiff(before, snapshot),
+          note: input.changes.note,
+          actorId: input.actor.id,
+        });
 
         const after = await loadQuestionDetail(transactionClient, input.questionId);
         if (!after) {
@@ -323,7 +352,8 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
         await transactionClient.query('COMMIT');
         transactionStarted = false;
 
-        return { status: 'updated', before, after };
+        const revision = findRevision(after, revisionId);
+        return { status: 'updated', before, after, revision };
       } catch (error) {
         if (transactionStarted) {
           await transactionClient.query('ROLLBACK');
@@ -333,6 +363,170 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
       } finally {
         transactionClient.release?.();
       }
+    },
+
+    async submitQuestionOverride(input) {
+      return runWorkflowTransaction(client, input.questionId, async (transactionClient, before) => {
+        const revision = before.workflow?.activeRevision;
+        if (!revision || revision.id !== input.request.revisionId) {
+          return { status: 'revision_not_found' as const };
+        }
+        if (revision.status !== 'draft') {
+          return { status: 'revision_not_editable' as const, current: before };
+        }
+        if (revision.version !== input.request.expectedDraftVersion) {
+          return { status: 'draft_version_conflict' as const, current: before };
+        }
+
+        await transactionClient.query(
+          `
+            UPDATE question_override_revisions
+            SET status = 'pending_review',
+                submitted_at = now(),
+                updated_at = now()
+            WHERE id = $1
+              AND question_id = $2
+              AND status = 'draft'
+              AND version = $3
+          `,
+          [revision.id, input.questionId, revision.version],
+        );
+        const after = await requireQuestionDetail(transactionClient, input.questionId);
+        return { status: 'updated' as const, before, after, revision: findRevision(after, revision.id) };
+      });
+    },
+
+    async approveQuestionOverride(input) {
+      return runWorkflowTransaction(client, input.questionId, async (transactionClient, before) => {
+        const revision = findRevisionOrNull(before, input.request.revisionId);
+        if (!revision) return { status: 'revision_not_found' as const };
+        if (revision.status !== 'pending_review') {
+          return { status: 'revision_not_editable' as const, current: before };
+        }
+        if (before.overrideVersion !== input.request.expectedVersion || revision.baseVersion !== before.overrideVersion) {
+          return { status: 'version_conflict' as const, current: before };
+        }
+
+        const appliedVersion = await applyOverrideSnapshot(
+          transactionClient,
+          input.questionId,
+          revisionSnapshot(revision),
+          input.actor.id,
+          before.overrideVersion,
+          revision.note,
+        );
+        await transactionClient.query(
+          `
+            UPDATE question_override_revisions
+            SET status = 'approved',
+                reviewed_by_admin_id = $2,
+                reviewed_at = now(),
+                review_note = $3,
+                applied_version = $4,
+                updated_at = now()
+            WHERE id = $1
+          `,
+          [revision.id, input.actor.id, input.request.reviewNote, appliedVersion],
+        );
+        const after = await requireQuestionDetail(transactionClient, input.questionId);
+        return { status: 'updated' as const, before, after, revision: findRevision(after, revision.id) };
+      });
+    },
+
+    async rejectQuestionOverride(input) {
+      return runWorkflowTransaction(client, input.questionId, async (transactionClient, before) => {
+        const revision = findRevisionOrNull(before, input.request.revisionId);
+        if (!revision) return { status: 'revision_not_found' as const };
+        if (revision.status !== 'pending_review') {
+          return { status: 'revision_not_editable' as const, current: before };
+        }
+        if (before.overrideVersion !== input.request.expectedVersion) {
+          return { status: 'version_conflict' as const, current: before };
+        }
+
+        await transactionClient.query(
+          `
+            UPDATE question_override_revisions
+            SET status = 'rejected',
+                reviewed_by_admin_id = $2,
+                reviewed_at = now(),
+                review_note = $3,
+                updated_at = now()
+            WHERE id = $1
+          `,
+          [revision.id, input.actor.id, input.request.reviewNote],
+        );
+        const after = await requireQuestionDetail(transactionClient, input.questionId);
+        return { status: 'updated' as const, before, after, revision: findRevision(after, revision.id) };
+      });
+    },
+
+    async rollbackQuestionOverride(input) {
+      return runWorkflowTransaction(client, input.questionId, async (transactionClient, before) => {
+        const target = findRevisionOrNull(before, input.request.revisionId);
+        if (!target || target.status !== 'approved') {
+          return { status: 'revision_not_found' as const };
+        }
+        if (before.workflow?.activeRevision) {
+          return { status: 'revision_not_editable' as const, current: before };
+        }
+        if (before.overrideVersion !== input.request.expectedVersion) {
+          return { status: 'version_conflict' as const, current: before };
+        }
+
+        const snapshot = revisionSnapshot(target);
+        const diff = buildOverrideDiff(before, snapshot);
+        const appliedVersion = await applyOverrideSnapshot(
+          transactionClient,
+          input.questionId,
+          snapshot,
+          input.actor.id,
+          before.overrideVersion,
+          input.request.note,
+        );
+        const revisionId = randomUUID();
+        await transactionClient.query(
+          `
+            INSERT INTO question_override_revisions (
+              id,
+              question_id,
+              version,
+              base_version,
+              status,
+              content_override,
+              answer_raw_override,
+              analyze_raw_override,
+              option_content_overrides,
+              diff,
+              note,
+              created_by_admin_id,
+              submitted_at,
+              reviewed_by_admin_id,
+              reviewed_at,
+              review_note,
+              applied_version,
+              rollback_from_revision_id
+            )
+            VALUES ($1, $2, 1, $3, 'approved', $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, now(), $10, now(), $9, $11, $12)
+          `,
+          [
+            revisionId,
+            input.questionId,
+            before.overrideVersion,
+            snapshot.contentOverride,
+            snapshot.answerRawOverride,
+            snapshot.analyzeRawOverride,
+            JSON.stringify(snapshot.optionContentOverrides),
+            JSON.stringify(diff),
+            input.request.note,
+            input.actor.id,
+            appliedVersion,
+            target.id,
+          ],
+        );
+        const after = await requireQuestionDetail(transactionClient, input.questionId);
+        return { status: 'updated' as const, before, after, revision: findRevision(after, revisionId) };
+      });
     },
   };
 }
@@ -421,8 +615,10 @@ async function loadQuestionDetail(
   if (!core) return null;
   const flags = await loadQuestionFlags(client, questionId);
   const options = await loadQuestionOptions(client, questionId);
+  const question = mapQuestionDetail(core, flags, options);
+  const revisions = await loadQuestionOverrideRevisions(client, questionId, question);
 
-  return mapQuestionDetail(core, flags, options);
+  return attachWorkflow(question, revisions);
 }
 
 async function loadQuestionCore(client: QueryClient, questionId: string): Promise<QuestionCoreRow | null> {
@@ -463,6 +659,9 @@ async function loadQuestionCore(client: QueryClient, questionId: string): Promis
         COALESCE(question_overrides.content_override, questions.content) AS effective_content,
         COALESCE(question_overrides.answer_raw_override, questions.answer_raw) AS effective_answer_raw,
         COALESCE(question_overrides.analyze_raw_override, questions.analyze_raw) AS effective_analyze_raw,
+        questions.content AS source_content,
+        questions.answer_raw AS source_answer_raw,
+        questions.analyze_raw AS source_analyze_raw,
         question_overrides.version AS override_version,
         question_overrides.content_override,
         question_overrides.answer_raw_override,
@@ -537,6 +736,30 @@ async function loadQuestionOptions(client: QueryClient, questionId: string): Pro
   )) as QueryRows<QuestionOptionRow>;
 
   return result.rows;
+}
+
+async function loadQuestionOverrideRevisions(
+  client: QueryClient,
+  questionId: string,
+  question: AdminQuestionReviewDetailV1,
+): Promise<AdminQuestionOverrideRevisionV1[]> {
+  const result = (await client.query(
+    `
+      SELECT
+        revisions.*,
+        created_by.display_name AS created_by_display_name,
+        reviewed_by.display_name AS reviewed_by_display_name
+      FROM question_override_revisions revisions
+      LEFT JOIN admin_users created_by ON created_by.id = revisions.created_by_admin_id
+      LEFT JOIN admin_users reviewed_by ON reviewed_by.id = revisions.reviewed_by_admin_id
+      WHERE revisions.question_id = $1
+      ORDER BY revisions.created_at DESC, revisions.id DESC
+      LIMIT 50
+    `,
+    [questionId],
+  )) as QueryRows<QuestionOverrideRevisionRow>;
+
+  return result.rows.map((row) => mapRevisionRow(row, question));
 }
 
 async function insertFlag(
@@ -667,75 +890,226 @@ async function allOptionsBelongToQuestion(
   return optionIds.every((optionId) => found.has(optionId));
 }
 
-async function upsertQuestionOverride(
+async function lockQuestion(client: QueryClient, questionId: string): Promise<void> {
+  await client.query('SELECT id FROM questions WHERE id = $1 FOR UPDATE', [questionId]);
+}
+
+async function requireQuestionDetail(
   client: QueryClient,
-  input: UpdateAdminQuestionOverrideInput,
-): Promise<void> {
+  questionId: string,
+): Promise<AdminQuestionReviewDetailV1> {
+  const question = await loadQuestionDetail(client, questionId);
+  if (!question) throw new Error(`Question review disappeared: ${questionId}`);
+  return question;
+}
+
+function findRevision(
+  question: AdminQuestionReviewDetailV1,
+  revisionId: string,
+): AdminQuestionOverrideRevisionV1 {
+  const revision = findRevisionOrNull(question, revisionId);
+  if (!revision) throw new Error(`Question override revision disappeared: ${revisionId}`);
+  return revision;
+}
+
+function findRevisionOrNull(
+  question: AdminQuestionReviewDetailV1,
+  revisionId: string,
+): AdminQuestionOverrideRevisionV1 | null {
+  return question.workflow?.revisions.find((revision) => revision.id === revisionId) ?? null;
+}
+
+async function upsertDraftRevision(
+  client: QueryClient,
+  input: {
+    questionId: string;
+    activeRevision: AdminQuestionOverrideRevisionV1 | null;
+    baseVersion: number;
+    snapshot: QuestionOverrideSnapshot;
+    diff: AdminQuestionOverrideRevisionV1['diff'];
+    note: string;
+    actorId: string;
+  },
+): Promise<string> {
+  if (input.activeRevision?.status === 'draft') {
+    await client.query(
+      `
+        UPDATE question_override_revisions
+        SET version = version + 1,
+            base_version = $2,
+            content_override = $3,
+            answer_raw_override = $4,
+            analyze_raw_override = $5,
+            option_content_overrides = $6::jsonb,
+            diff = $7::jsonb,
+            note = $8,
+            updated_at = now()
+        WHERE id = $1
+          AND status = 'draft'
+      `,
+      [
+        input.activeRevision.id,
+        input.baseVersion,
+        input.snapshot.contentOverride,
+        input.snapshot.answerRawOverride,
+        input.snapshot.analyzeRawOverride,
+        JSON.stringify(input.snapshot.optionContentOverrides),
+        JSON.stringify(input.diff),
+        input.note,
+      ],
+    );
+    return input.activeRevision.id;
+  }
+
+  const revisionId = randomUUID();
   await client.query(
     `
-      INSERT INTO question_overrides (
+      INSERT INTO question_override_revisions (
+        id,
         question_id,
+        version,
+        base_version,
+        status,
         content_override,
         answer_raw_override,
         analyze_raw_override,
+        option_content_overrides,
+        diff,
         note,
-        version,
-        updated_by_admin_id
+        created_by_admin_id
       )
-      VALUES (
-        $1,
-        CASE WHEN $3::boolean THEN $2::text ELSE NULL END,
-        CASE WHEN $5::boolean THEN $4::text ELSE NULL END,
-        CASE WHEN $7::boolean THEN $6::text ELSE NULL END,
-        $8,
-        1,
-        $9
-      )
-      ON CONFLICT (question_id) DO UPDATE SET
-        content_override = CASE WHEN $3::boolean THEN $2::text ELSE question_overrides.content_override END,
-        answer_raw_override = CASE WHEN $5::boolean THEN $4::text ELSE question_overrides.answer_raw_override END,
-        analyze_raw_override = CASE WHEN $7::boolean THEN $6::text ELSE question_overrides.analyze_raw_override END,
-        note = $8,
-        version = question_overrides.version + 1,
-        updated_by_admin_id = $9,
-        updated_at = now()
+      VALUES ($1, $2, 1, $3, 'draft', $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10)
     `,
     [
+      revisionId,
       input.questionId,
-      input.changes.content ?? null,
-      input.changes.content !== undefined,
-      input.changes.answerRaw ?? null,
-      input.changes.answerRaw !== undefined,
-      input.changes.analyzeRaw ?? null,
-      input.changes.analyzeRaw !== undefined,
-      input.changes.note,
-      input.actor.id,
+      input.baseVersion,
+      input.snapshot.contentOverride,
+      input.snapshot.answerRawOverride,
+      input.snapshot.analyzeRawOverride,
+      JSON.stringify(input.snapshot.optionContentOverrides),
+      JSON.stringify(input.diff),
+      input.note,
+      input.actorId,
     ],
   );
+  return revisionId;
 }
 
-async function upsertQuestionOptionOverride(
+async function applyOverrideSnapshot(
   client: QueryClient,
   questionId: string,
-  optionId: string,
-  content: string,
+  snapshot: QuestionOverrideSnapshot,
   actorId: string,
-): Promise<void> {
-  await client.query(
-    `
-      INSERT INTO question_option_overrides (
-        option_id,
-        question_id,
-        content_override,
-        updated_by_admin_id
-      )
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (option_id) DO UPDATE SET
-        question_id = EXCLUDED.question_id,
-        content_override = EXCLUDED.content_override,
-        updated_by_admin_id = EXCLUDED.updated_by_admin_id,
-        updated_at = now()
-    `,
-    [optionId, questionId, content, actorId],
-  );
+  expectedVersion: number,
+  note: string,
+): Promise<number> {
+  const nextVersion = expectedVersion + 1;
+  if (expectedVersion === 0) {
+    await client.query(
+      `
+        INSERT INTO question_overrides (
+          question_id,
+          content_override,
+          answer_raw_override,
+          analyze_raw_override,
+          note,
+          version,
+          updated_by_admin_id
+        )
+        VALUES ($1, $2, $3, $4, $5, 1, $6)
+      `,
+      [
+        questionId,
+        snapshot.contentOverride,
+        snapshot.answerRawOverride,
+        snapshot.analyzeRawOverride,
+        note,
+        actorId,
+      ],
+    );
+  } else {
+    const updated = await client.query(
+      `
+        UPDATE question_overrides
+        SET content_override = $2,
+            answer_raw_override = $3,
+            analyze_raw_override = $4,
+            note = $5,
+            version = version + 1,
+            updated_by_admin_id = $6,
+            updated_at = now()
+        WHERE question_id = $1
+          AND version = $7
+      `,
+      [
+        questionId,
+        snapshot.contentOverride,
+        snapshot.answerRawOverride,
+        snapshot.analyzeRawOverride,
+        note,
+        actorId,
+        expectedVersion,
+      ],
+    ) as { rowCount?: number };
+    if (updated.rowCount !== 1) {
+      throw new Error(`Question override version conflict while applying revision: ${questionId}`);
+    }
+  }
+
+  await client.query('DELETE FROM question_option_overrides WHERE question_id = $1', [questionId]);
+  if (snapshot.optionContentOverrides.length > 0) {
+    await client.query(
+      `
+        INSERT INTO question_option_overrides (
+          option_id,
+          question_id,
+          content_override,
+          updated_by_admin_id
+        )
+        SELECT
+          (entry->>'optionId')::uuid,
+          $1,
+          entry->>'content',
+          $2
+        FROM jsonb_array_elements($3::jsonb) entry
+      `,
+      [questionId, actorId, JSON.stringify(snapshot.optionContentOverrides)],
+    );
+  }
+
+  return nextVersion;
+}
+
+async function runWorkflowTransaction(
+  client: QueryClient,
+  questionId: string,
+  operation: (
+    transactionClient: TransactionClient,
+    before: AdminQuestionReviewDetailV1,
+  ) => Promise<QuestionOverrideWorkflowResult>,
+): Promise<QuestionOverrideWorkflowResult> {
+  const transactionClient = await checkoutTransactionClient(client);
+  let transactionStarted = false;
+  try {
+    await transactionClient.query('BEGIN');
+    transactionStarted = true;
+    await lockQuestion(transactionClient, questionId);
+    const before = await loadQuestionDetail(transactionClient, questionId);
+    if (!before) {
+      await transactionClient.query('ROLLBACK');
+      transactionStarted = false;
+      return { status: 'question_not_found' };
+    }
+
+    const result = await operation(transactionClient, before);
+    await transactionClient.query('COMMIT');
+    transactionStarted = false;
+    return result;
+  } catch (error) {
+    if (transactionStarted) await transactionClient.query('ROLLBACK');
+    throw error;
+  } finally {
+    transactionClient.release?.();
+  }
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AddAdminQuestionReviewFlagV1,
+  AdminQuestionOverrideRevisionV1,
   AdminQuestionReviewDetailV1,
   AdminQuestionReviewFlagV1,
   AdminQuestionReviewItemV1,
@@ -17,12 +18,23 @@ import {
   itemFromDetail,
   preview,
 } from './mappers.js';
+import {
+  attachWorkflow,
+  buildOverrideDiff,
+  cloneRevision,
+  mergeDraftSnapshot,
+  revisionSnapshot,
+  type QuestionOverrideSnapshot,
+} from './workflow.js';
 
 export function createMemoryAdminQuestionReviewRepository(
   questions: readonly (AdminQuestionReviewItemV1 | AdminQuestionReviewDetailV1)[] = [],
 ): AdminQuestionReviewRepository {
   const records = questions.map((question) => (
-    'options' in question ? cloneQuestionDetail(question) : detailFromItem(question)
+    attachWorkflow(
+      'options' in question ? cloneQuestionDetail(question) : detailFromItem(question),
+      'options' in question ? question.workflow?.revisions ?? [] : [],
+    )
   ));
 
   return {
@@ -129,6 +141,13 @@ export function createMemoryAdminQuestionReviewRepository(
       if (before.overrideVersion !== input.changes.expectedVersion) {
         return { status: 'version_conflict', current: before };
       }
+      const activeRevision = before.workflow?.activeRevision ?? null;
+      if (activeRevision?.status === 'pending_review') {
+        return { status: 'revision_not_editable', current: before };
+      }
+      if ((activeRevision?.version ?? 0) !== input.changes.expectedDraftVersion) {
+        return { status: 'draft_version_conflict', current: before };
+      }
 
       const optionIds = new Set(before.options.map((option) => option.id));
       if (input.changes.optionContentOverrides.some((option) => !optionIds.has(option.optionId))) {
@@ -136,41 +155,226 @@ export function createMemoryAdminQuestionReviewRepository(
       }
 
       const now = new Date().toISOString();
-      const nextOptions = before.options.map((option) => {
-        const override = input.changes.optionContentOverrides.find((candidate) => candidate.optionId === option.id);
-        if (!override) return { ...option };
-        return {
-          ...option,
-          overrideContent: override.content,
-          effectiveContent: override.content,
-        };
-      });
-      const after: AdminQuestionReviewDetailV1 = {
-        ...before,
-        content: input.changes.content ?? before.content,
-        answerRaw: input.changes.answerRaw ?? before.answerRaw,
-        analyzeRaw: input.changes.analyzeRaw === undefined ? before.analyzeRaw : input.changes.analyzeRaw,
-        options: nextOptions,
-        overrideVersion: before.overrideVersion + 1,
-        override: {
-          version: before.overrideVersion + 1,
-          contentOverride: input.changes.content ?? before.override?.contentOverride ?? null,
-          answerRawOverride: input.changes.answerRaw ?? before.override?.answerRawOverride ?? null,
-          analyzeRawOverride: input.changes.analyzeRaw === undefined
-            ? before.override?.analyzeRawOverride ?? null
-            : input.changes.analyzeRaw,
+      const snapshot = mergeDraftSnapshot(before, activeRevision, input.changes);
+      const revision: AdminQuestionOverrideRevisionV1 = activeRevision?.status === 'draft'
+        ? {
+          ...cloneRevision(activeRevision),
+          version: activeRevision.version + 1,
+          baseVersion: before.overrideVersion,
+          contentOverride: snapshot.contentOverride,
+          answerRawOverride: snapshot.answerRawOverride,
+          analyzeRawOverride: snapshot.analyzeRawOverride,
+          optionContentOverrides: snapshot.optionContentOverrides,
           note: input.changes.note,
-          updatedBy: { id: input.actor.id, displayName: input.actor.displayName },
+          diff: buildOverrideDiff(before, snapshot),
           updatedAt: now,
-        },
-      };
-      after.contentPreview = preview(after.content, 160);
-      after.answerPreview = preview(after.answerRaw, 120);
+        }
+        : {
+          id: randomUUID(),
+          questionId: before.questionId,
+          version: 1,
+          baseVersion: before.overrideVersion,
+          status: 'draft',
+          contentOverride: snapshot.contentOverride,
+          answerRawOverride: snapshot.answerRawOverride,
+          analyzeRawOverride: snapshot.analyzeRawOverride,
+          optionContentOverrides: snapshot.optionContentOverrides,
+          note: input.changes.note,
+          diff: buildOverrideDiff(before, snapshot),
+          createdBy: { id: input.actor.id, displayName: input.actor.displayName },
+          createdAt: now,
+          updatedAt: now,
+          submittedAt: null,
+          reviewedBy: null,
+          reviewedAt: null,
+          reviewNote: '',
+          appliedVersion: null,
+          rollbackFromRevisionId: null,
+        };
+      const revisions = replaceRevision(before.workflow?.revisions ?? [], revision);
+      const after = attachWorkflow(before, revisions);
       records[index] = cloneQuestionDetail(after);
 
-      return { status: 'updated', before, after: cloneQuestionDetail(after) };
+      return { status: 'updated', before, after: cloneQuestionDetail(after), revision: cloneRevision(revision) };
+    },
+
+    async submitQuestionOverride(input) {
+      const index = records.findIndex((question) => question.questionId === input.questionId);
+      if (index < 0) return { status: 'question_not_found' };
+      const before = cloneQuestionDetail(records[index]);
+      const revision = before.workflow?.activeRevision;
+      if (!revision || revision.id !== input.request.revisionId) return { status: 'revision_not_found' };
+      if (revision.status !== 'draft') return { status: 'revision_not_editable', current: before };
+      if (revision.version !== input.request.expectedDraftVersion) {
+        return { status: 'draft_version_conflict', current: before };
+      }
+      const now = new Date().toISOString();
+      const submitted = {
+        ...cloneRevision(revision),
+        status: 'pending_review' as const,
+        submittedAt: now,
+        updatedAt: now,
+      };
+      const after = attachWorkflow(before, replaceRevision(before.workflow?.revisions ?? [], submitted));
+      records[index] = cloneQuestionDetail(after);
+      return { status: 'updated', before, after: cloneQuestionDetail(after), revision: submitted };
+    },
+
+    async approveQuestionOverride(input) {
+      const index = records.findIndex((question) => question.questionId === input.questionId);
+      if (index < 0) return { status: 'question_not_found' };
+      const before = cloneQuestionDetail(records[index]);
+      const revision = findMemoryRevision(before, input.request.revisionId);
+      if (!revision) return { status: 'revision_not_found' };
+      if (revision.status !== 'pending_review') return { status: 'revision_not_editable', current: before };
+      if (before.overrideVersion !== input.request.expectedVersion || revision.baseVersion !== before.overrideVersion) {
+        return { status: 'version_conflict', current: before };
+      }
+      const now = new Date().toISOString();
+      const appliedVersion = before.overrideVersion + 1;
+      const approved = {
+        ...cloneRevision(revision),
+        status: 'approved' as const,
+        reviewedBy: { id: input.actor.id, displayName: input.actor.displayName },
+        reviewedAt: now,
+        reviewNote: input.request.reviewNote,
+        appliedVersion,
+        updatedAt: now,
+      };
+      const effective = applyMemorySnapshot(before, revisionSnapshot(revision), {
+        actor: input.actor,
+        note: revision.note,
+        now,
+      });
+      const after = attachWorkflow(effective, replaceRevision(before.workflow?.revisions ?? [], approved));
+      records[index] = cloneQuestionDetail(after);
+      return { status: 'updated', before, after: cloneQuestionDetail(after), revision: approved };
+    },
+
+    async rejectQuestionOverride(input) {
+      const index = records.findIndex((question) => question.questionId === input.questionId);
+      if (index < 0) return { status: 'question_not_found' };
+      const before = cloneQuestionDetail(records[index]);
+      const revision = findMemoryRevision(before, input.request.revisionId);
+      if (!revision) return { status: 'revision_not_found' };
+      if (revision.status !== 'pending_review') return { status: 'revision_not_editable', current: before };
+      if (before.overrideVersion !== input.request.expectedVersion) {
+        return { status: 'version_conflict', current: before };
+      }
+      const now = new Date().toISOString();
+      const rejected = {
+        ...cloneRevision(revision),
+        status: 'rejected' as const,
+        reviewedBy: { id: input.actor.id, displayName: input.actor.displayName },
+        reviewedAt: now,
+        reviewNote: input.request.reviewNote,
+        updatedAt: now,
+      };
+      const after = attachWorkflow(before, replaceRevision(before.workflow?.revisions ?? [], rejected));
+      records[index] = cloneQuestionDetail(after);
+      return { status: 'updated', before, after: cloneQuestionDetail(after), revision: rejected };
+    },
+
+    async rollbackQuestionOverride(input) {
+      const index = records.findIndex((question) => question.questionId === input.questionId);
+      if (index < 0) return { status: 'question_not_found' };
+      const before = cloneQuestionDetail(records[index]);
+      const target = findMemoryRevision(before, input.request.revisionId);
+      if (!target || target.status !== 'approved') return { status: 'revision_not_found' };
+      if (before.workflow?.activeRevision) return { status: 'revision_not_editable', current: before };
+      if (before.overrideVersion !== input.request.expectedVersion) {
+        return { status: 'version_conflict', current: before };
+      }
+      const now = new Date().toISOString();
+      const snapshot = revisionSnapshot(target);
+      const effective = applyMemorySnapshot(before, snapshot, {
+        actor: input.actor,
+        note: input.request.note,
+        now,
+      });
+      const rollback: AdminQuestionOverrideRevisionV1 = {
+        id: randomUUID(),
+        questionId: before.questionId,
+        version: 1,
+        baseVersion: before.overrideVersion,
+        status: 'approved',
+        ...snapshot,
+        note: input.request.note,
+        diff: buildOverrideDiff(before, snapshot),
+        createdBy: { id: input.actor.id, displayName: input.actor.displayName },
+        createdAt: now,
+        updatedAt: now,
+        submittedAt: now,
+        reviewedBy: { id: input.actor.id, displayName: input.actor.displayName },
+        reviewedAt: now,
+        reviewNote: input.request.note,
+        appliedVersion: before.overrideVersion + 1,
+        rollbackFromRevisionId: target.id,
+      };
+      const after = attachWorkflow(effective, [rollback, ...(before.workflow?.revisions ?? [])]);
+      records[index] = cloneQuestionDetail(after);
+      return { status: 'updated', before, after: cloneQuestionDetail(after), revision: rollback };
     },
   };
+}
+
+function replaceRevision(
+  revisions: readonly AdminQuestionOverrideRevisionV1[],
+  revision: AdminQuestionOverrideRevisionV1,
+): AdminQuestionOverrideRevisionV1[] {
+  const others = revisions.filter((candidate) => candidate.id !== revision.id).map(cloneRevision);
+  return [cloneRevision(revision), ...others];
+}
+
+function findMemoryRevision(
+  question: AdminQuestionReviewDetailV1,
+  revisionId: string,
+): AdminQuestionOverrideRevisionV1 | null {
+  return question.workflow?.revisions.find((revision) => revision.id === revisionId) ?? null;
+}
+
+function applyMemorySnapshot(
+  question: AdminQuestionReviewDetailV1,
+  snapshot: QuestionOverrideSnapshot,
+  input: {
+    actor: AdminQuestionReviewActor;
+    note: string;
+    now: string;
+  },
+): AdminQuestionReviewDetailV1 {
+  const source = question.source ?? {
+    content: question.content,
+    answerRaw: question.answerRaw,
+    analyzeRaw: question.analyzeRaw,
+  };
+  const optionOverrides = new Map(
+    snapshot.optionContentOverrides.map((option) => [option.optionId, option.content]),
+  );
+  const nextVersion = question.overrideVersion + 1;
+  const after: AdminQuestionReviewDetailV1 = {
+    ...question,
+    content: snapshot.contentOverride ?? source.content,
+    answerRaw: snapshot.answerRawOverride ?? source.answerRaw,
+    analyzeRaw: snapshot.analyzeRawOverride ?? source.analyzeRaw,
+    options: question.options.map((option) => ({
+      ...option,
+      overrideContent: optionOverrides.get(option.id) ?? null,
+      effectiveContent: optionOverrides.get(option.id) ?? option.content,
+    })),
+    overrideVersion: nextVersion,
+    override: {
+      version: nextVersion,
+      contentOverride: snapshot.contentOverride,
+      answerRawOverride: snapshot.answerRawOverride,
+      analyzeRawOverride: snapshot.analyzeRawOverride,
+      note: input.note,
+      updatedBy: { id: input.actor.id, displayName: input.actor.displayName },
+      updatedAt: input.now,
+    },
+  };
+  after.contentPreview = preview(after.content, 160);
+  after.answerPreview = preview(after.answerRaw, 120);
+  return after;
 }
 
 function createMemoryFlag(

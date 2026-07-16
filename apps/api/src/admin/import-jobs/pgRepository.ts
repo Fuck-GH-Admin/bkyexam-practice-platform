@@ -1,8 +1,15 @@
-import type { AdminImportJobStatusV1 } from '@bkyexam-practice/shared';
+import {
+  AdminImportJobV1Schema,
+  type AdminImportJobEventTypeV1,
+  type AdminImportJobEventV1,
+  type AdminImportJobStatusV1,
+  type AdminImportJobV1,
+} from '@bkyexam-practice/shared';
 import type { QueryClient } from '../../db/client.js';
 import {
   initialProgress,
   type AdminImportJobRepository,
+  type AdminImportJobEventRow,
   type AdminImportJobRow,
   type QueryRows,
 } from './types.js';
@@ -108,7 +115,10 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       )) as QueryRows<AdminImportJobRow>;
       const row = result.rows[0];
 
-      return row ? { status: 'created', job: mapImportJobRow(row) } : { status: 'running_conflict' };
+      if (!row) return { status: 'running_conflict' };
+      const job = mapImportJobRow(row);
+      await appendPgImportJobEvent(client, job, 'queued');
+      return { status: 'created', job };
     },
 
     async createRunningImportJob(input) {
@@ -165,7 +175,10 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       )) as QueryRows<AdminImportJobRow>;
       const row = result.rows[0];
 
-      return row ? { status: 'created', job: mapImportJobRow(row) } : { status: 'running_conflict' };
+      if (!row) return { status: 'running_conflict' };
+      const job = mapImportJobRow(row);
+      await appendPgImportJobEvent(client, job, 'running');
+      return { status: 'created', job };
     },
 
     async completeImportJob(input) {
@@ -193,7 +206,11 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       )) as QueryRows<AdminImportJobRow>;
 
       const row = result.rows[0];
-      if (row) return mapImportJobRow(row);
+      if (row) {
+        const job = mapImportJobRow(row);
+        await appendPgImportJobEvent(client, job, 'succeeded');
+        return job;
+      }
 
       const job = await findPgImportJobById(client, input.jobId);
       if (!job) throw new Error(`Import job not found: ${input.jobId}`);
@@ -228,7 +245,11 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       )) as QueryRows<AdminImportJobRow>;
 
       const row = result.rows[0];
-      if (row) return mapImportJobRow(row);
+      if (row) {
+        const job = mapImportJobRow(row);
+        await appendPgImportJobEvent(client, job, 'failed');
+        return job;
+      }
 
       const job = await findPgImportJobById(client, input.jobId);
       if (!job) throw new Error(`Import job not found: ${input.jobId}`);
@@ -256,6 +277,9 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
 
       const after = await findPgImportJobById(client, input.jobId);
       if (!after) throw new Error(`Import job not found: ${input.jobId}`);
+      if (after.status === 'cancelled') {
+        await appendPgImportJobEvent(client, after, 'cancelled');
+      }
       return after.status === 'cancelled' ? after : null;
     },
 
@@ -296,7 +320,10 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       )) as QueryRows<AdminImportJobRow>;
       const row = result.rows[0];
 
-      return row ? mapImportJobRow(row) : null;
+      if (!row) return null;
+      const job = mapImportJobRow(row);
+      await appendPgImportJobEvent(client, job, 'running');
+      return job;
     },
 
     async heartbeatImportJob(input) {
@@ -323,6 +350,47 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
       return row ? mapImportJobRow(row) : null;
     },
 
+    async updateImportJobProgress(input) {
+      const result = (await client.query(
+        `
+          WITH updated AS (
+            UPDATE import_jobs
+            SET progress = $2::jsonb
+            WHERE id = $1
+              AND status = 'running'
+            RETURNING *
+          )
+          SELECT
+            updated.*,
+            admin_users.display_name AS created_by_display_name
+          FROM updated
+          LEFT JOIN admin_users ON admin_users.id = updated.created_by_admin_id
+        `,
+        [input.jobId, JSON.stringify(input.progress)],
+      )) as QueryRows<AdminImportJobRow>;
+      const row = result.rows[0];
+      if (!row) return null;
+      const job = mapImportJobRow(row);
+      await appendPgImportJobEvent(client, job, 'progress');
+      return job;
+    },
+
+    async listImportJobEvents(input) {
+      const result = (await client.query(
+        `
+          SELECT id, job_id, event_type, payload, created_at
+          FROM import_job_events
+          WHERE job_id = $1
+            AND id > $2::bigint
+          ORDER BY id ASC
+          LIMIT $3
+        `,
+        [input.jobId, input.afterEventId, input.limit],
+      )) as QueryRows<AdminImportJobEventRow>;
+
+      return result.rows.map(mapImportJobEventRow);
+    },
+
     async recoverStaleImportJobs(input) {
       const message = input.message ?? 'Import job heartbeat timed out';
       const result = (await client.query(
@@ -347,7 +415,11 @@ export function createPgAdminImportJobRepository(client: QueryClient): AdminImpo
         [input.staleAfterMs, JSON.stringify([{ message }])],
       )) as QueryRows<AdminImportJobRow>;
 
-      return result.rows.map(mapImportJobRow);
+      const jobs = result.rows.map(mapImportJobRow);
+      for (const job of jobs) {
+        await appendPgImportJobEvent(client, job, 'recovered');
+      }
+      return jobs;
     },
   };
 }
@@ -368,6 +440,37 @@ async function findPgImportJobById(client: QueryClient, jobId: string) {
   const row = result.rows[0];
 
   return row ? mapImportJobRow(row) : null;
+}
+
+async function appendPgImportJobEvent(
+  client: QueryClient,
+  job: AdminImportJobV1,
+  type: AdminImportJobEventTypeV1,
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO import_job_events (job_id, event_type, payload)
+      VALUES ($1, $2, $3::jsonb)
+    `,
+    [job.id, type, JSON.stringify({ job })],
+  );
+}
+
+function mapImportJobEventRow(row: AdminImportJobEventRow): AdminImportJobEventV1 {
+  const payload = isRecord(row.payload) ? row.payload : {};
+  return {
+    id: String(row.id),
+    jobId: row.job_id,
+    type: row.event_type,
+    job: AdminImportJobV1Schema.parse(payload.job),
+    createdAt: row.created_at instanceof Date
+      ? row.created_at.toISOString()
+      : new Date(row.created_at).toISOString(),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isRunnableStatus(status: AdminImportJobStatusV1): boolean {

@@ -115,18 +115,34 @@ Stores admin-triggered import task state.
 
 - `id`: UUID primary key.
 - `kind`: currently `full_corpus_import`.
-- `mode`: `dry_run` or future `import`.
+- `mode`: `dry_run` or `import`.
 - `status`: `queued`, `running`, `succeeded`, `failed`, or `cancelled`.
 - `source_dir`: normalized source directory.
 - `options`, `progress`, `summary`, `error_summary`: JSON payloads for task execution.
 - `created_by_admin_id`: nullable FK to `admin_users`.
+- `worker_id`, `heartbeat_at`: queued worker ownership and liveness.
 - `created_at`, `started_at`, `finished_at`: task timestamps.
 
 Indexes and constraints:
 
 - `import_jobs_status_created_at_idx` on `(status, created_at DESC)`.
 - `import_jobs_created_by_idx` on `(created_by_admin_id, created_at DESC)`.
-- `import_jobs_one_running_kind_idx` allows only one `running` job for each `kind`.
+- `import_jobs_worker_scan_idx` supports queued claim and stale heartbeat scans.
+- `import_jobs_one_active_kind_idx` allows only one `queued` or `running` job for each `kind`.
+
+### `import_job_events`
+
+Stores durable Import Job state/progress events used by JSON history and SSE reconnect.
+
+- `id`: monotonic `bigserial` event id.
+- `job_id`: FK to `import_jobs.id`, deleted with the job.
+- `event_type`: `queued`, `running`, `progress`, `succeeded`, `failed`, `cancelled`, or `recovered`.
+- `payload`: complete Admin Import Job snapshot as JSONB.
+- `created_at`: event timestamp.
+
+Index:
+
+- `import_job_events_job_stream_idx` on `(job_id, id)` for `Last-Event-ID` replay.
 
 ### `question_quality_flags`
 
@@ -149,6 +165,48 @@ Indexes:
 - `question_quality_flags_bank_status_idx` on `(bank_id, status)`.
 - `question_quality_flags_type_status_idx` on `(flag_type, status)`.
 - `question_quality_flags_excluded_open_idx` on excluded open flags used by practice selection.
+
+### `question_overrides`
+
+Stores the currently approved effective question-level override without changing imported `questions`.
+
+- `question_id`: PK/FK to `questions.id`.
+- `content_override`, `answer_raw_override`, `analyze_raw_override`: nullable approved values.
+- `note`: approved revision note.
+- `version`: positive optimistic-concurrency version.
+- `updated_by_admin_id`, `updated_at`: approval attribution.
+
+### `question_option_overrides`
+
+Stores currently approved option text overrides.
+
+- `option_id`: PK/FK to `question_options.id`.
+- `question_id`: FK to `questions.id`.
+- `content_override`: approved option text.
+- `updated_by_admin_id`, `updated_at`: approval attribution.
+
+### `question_override_revisions`
+
+Stores immutable/auditable Question Review workflow revisions.
+
+- `id`: UUID primary key.
+- `question_id`: FK to `questions.id`.
+- `version`: per-revision draft version.
+- `base_version`: effective override version used to create the revision.
+- `status`: `draft`, `pending_review`, `approved`, or `rejected`.
+- `content_override`, `answer_raw_override`, `analyze_raw_override`, `option_content_overrides`: revision snapshot.
+- `diff`: field-level before/after JSON.
+- `note`, `review_note`: editor/reviewer notes.
+- `created_by_admin_id`, `reviewed_by_admin_id`: actor attribution.
+- `submitted_at`, `reviewed_at`, `created_at`, `updated_at`: workflow timestamps.
+- `applied_version`: effective override version produced by approval/rollback.
+- `rollback_from_revision_id`: historical approved revision used as rollback source.
+
+Indexes and constraints:
+
+- one partial unique active revision per question for `draft/pending_review`.
+- question history ordered by creation time.
+- pending-review queue and actor lookup indexes.
 
 ### `students`
 
@@ -378,6 +436,10 @@ runner 在单一 transaction 中创建/锁定 ledger、核对 release 文件和 
 
 `apps/api/src/db/migrations/0013_import_job_worker.sql` adds durable Import Job worker state. It adds nullable `worker_id` and `heartbeat_at`, creates the worker scan index, and replaces the running-only lock with a partial unique index that allows only one queued/running job per kind.
 
+`apps/api/src/db/migrations/0014_question_review_workflow.sql` adds revision workflow state for Question Review. It creates `question_override_revisions`, the one-active-revision constraint, history/pending indexes, immutable snapshot/diff fields, reviewer attribution, applied version, and rollback source.
+
+`apps/api/src/db/migrations/0015_import_job_events.sql` adds durable Import Job events. It creates `import_job_events` and the `(job_id, id)` stream index used by JSON pagination and SSE `Last-Event-ID` replay.
+
 B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
 B9.7 Password Login Enforcement now updates `failed_login_count`, `failed_login_window_started_at`, `locked_until`, and `last_login_at` during student login, and clears `password_reset_required` plus failure/lockout state on successful `POST /api/auth/password/change`.
@@ -394,7 +456,7 @@ DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:migrate 
 
 The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, calculates SHA-256, and handles them in filename order inside a single transaction. It prints the complete file list, newly applied files, and skipped files. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
 
-旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十三份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十三份全部 skipped。
+旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十五份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十五份全部 skipped。
 
 On PowerShell, set `DATABASE_URL` before running migration commands:
 
@@ -403,7 +465,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all thirteen migrations, including Question Review overrides and durable Import Job worker state, passed the same empty-database integration profile and were verified on staging.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all fifteen migrations, including Question Review workflow revisions and durable Import Job events, passed the same empty-database integration profile; staging verification for `0014/0015` is recorded in the B9.36–B9.38 closure evidence.
 
 ## Isolated Integration Profile
 

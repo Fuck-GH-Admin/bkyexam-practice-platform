@@ -19,6 +19,8 @@ import { createPgPool } from '../../src/db/client.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { requireDedicatedTestDatabaseUrl } from '../../src/db/testDatabaseSafety.js';
 import { createPgReadinessProbe } from '../../src/health/readiness.js';
+import { importQuestionBank } from '../../src/import/importQuestionBank.js';
+import type { ImportedQuestionBankData } from '../../src/import/loadQuestionBankData.js';
 import { createPgLearningDashboardRepository } from '../../src/learning/repository.js';
 import { createPgPracticeSessionService } from '../../src/modules/practice/sessionService.js';
 import { createPgPracticeRepository } from '../../src/practice/repository.js';
@@ -190,7 +192,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 13, currentMigration: '0013_import_job_worker.sql' },
+      database: { ok: true, migrationCount: 15, currentMigration: '0015_import_job_events.sql' },
       corpus: {
         classifications: 3,
         questions: 5,
@@ -872,12 +874,67 @@ describe('PostgreSQL-backed API integration', () => {
     expect(unansweredOverride.json()).toMatchObject({
       question: {
         questionId: fixtureIds.questions.unanswered,
+        content: '哪一个是 PostgreSQL 的默认端口？',
+        options: [
+          { id: fixtureIds.options.unansweredCorrect, overrideContent: null, effectiveContent: '5432' },
+          { id: fixtureIds.options.unansweredWrong, effectiveContent: '3306' },
+        ],
+        overrideVersion: 0,
+        workflow: {
+          activeRevision: {
+            status: 'draft',
+            version: 1,
+            diff: expect.arrayContaining([
+              expect.objectContaining({ field: 'content' }),
+              expect.objectContaining({ field: `option:${fixtureIds.options.unansweredCorrect}` }),
+            ]),
+          },
+        },
+      },
+    });
+    const unansweredRevisionId = unansweredOverride.json().question.workflow.activeRevision.id as string;
+    const submittedUnansweredOverride = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override/submit`,
+      headers: { cookie: editorCookie },
+      payload: {
+        revisionId: unansweredRevisionId,
+        expectedDraftVersion: 1,
+      },
+    });
+    expect(submittedUnansweredOverride.statusCode).toBe(200);
+    expect(submittedUnansweredOverride.json()).toMatchObject({
+      question: { workflow: { activeRevision: { status: 'pending_review' } } },
+    });
+    const approvedUnansweredOverride = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override/approve`,
+      headers: { cookie: superAdminCookie },
+      payload: {
+        revisionId: unansweredRevisionId,
+        expectedVersion: 0,
+        reviewNote: 'PostgreSQL integration approval',
+      },
+    });
+    expect(approvedUnansweredOverride.statusCode).toBe(200);
+    expect(approvedUnansweredOverride.json()).toMatchObject({
+      question: {
         content: '哪一个端口是 PostgreSQL 的默认监听端口？',
         options: [
           { id: fixtureIds.options.unansweredCorrect, overrideContent: '5432（默认端口）', effectiveContent: '5432（默认端口）' },
           { id: fixtureIds.options.unansweredWrong, effectiveContent: '3306' },
         ],
         overrideVersion: 1,
+        workflow: {
+          activeRevision: null,
+          revisions: expect.arrayContaining([
+            expect.objectContaining({
+              id: unansweredRevisionId,
+              status: 'approved',
+              appliedVersion: 1,
+            }),
+          ]),
+        },
       },
     });
     const staleUnansweredOverride = await app.inject({
@@ -1833,6 +1890,120 @@ describe('PostgreSQL-backed API integration', () => {
       headers: { cookie: aliceCookie },
     });
     expect(afterLogout.statusCode).toBe(401);
+  });
+
+  it('skips unchanged importer rows and still applies changed rows', async () => {
+    const client = await pool.connect();
+    const classificationId = '71000000-0000-4000-8000-000000000001';
+    const questionId = '72000000-0000-4000-8000-000000000001';
+    const optionId = '73000000-0000-4000-8000-000000000001';
+    const data: ImportedQuestionBankData = {
+      classifications: [{
+        id: classificationId,
+        name: 'Importer Integration Classification',
+        parentId: null,
+        qGroup: 71,
+        sort: 1,
+        isDeleted: false,
+      }],
+      questions: [{
+        id: questionId,
+        classificationId,
+        qType: 1,
+        normalizedType: 'single_choice',
+        qGroup: 71,
+        content: 'Importer integration original question',
+        answerRaw: optionId,
+        analyzeRaw: '',
+        useCount: 0,
+        difficulty: 0.5,
+        searchableText: 'Importer integration original question',
+      }],
+      options: [{
+        id: optionId,
+        questionId,
+        sort: 1,
+        content: 'Original option',
+      }],
+      summary: {
+        classifications: 1,
+        questions: 1,
+        options: 1,
+        questionTypes: { single_choice: 1 },
+      },
+    };
+
+    try {
+      const initial = await importQuestionBank(client, data, {
+        batchSize: 100,
+        generateMappings: false,
+      });
+      expect(initial.writes).toEqual({
+        classifications: 1,
+        questions: 1,
+        options: 1,
+        bankMappings: 0,
+      });
+
+      const unchanged = await importQuestionBank(client, data, {
+        batchSize: 100,
+        generateMappings: false,
+      });
+      expect(unchanged.writes).toEqual({
+        classifications: 0,
+        questions: 0,
+        options: 0,
+        bankMappings: 0,
+      });
+
+      const changed = structuredClone(data);
+      changed.classifications[0]!.name = 'Importer Integration Classification Updated';
+      changed.questions[0]!.content = 'Importer integration updated question';
+      changed.questions[0]!.searchableText = 'Importer integration updated question';
+      changed.options[0]!.content = 'Updated option';
+
+      const updated = await importQuestionBank(client, changed, {
+        batchSize: 100,
+        generateMappings: false,
+      });
+      expect(updated.writes).toEqual({
+        classifications: 1,
+        questions: 1,
+        options: 1,
+        bankMappings: 0,
+      });
+
+      const persisted = await client.query<{
+        classification_name: string;
+        question_content: string;
+        option_content: string;
+      }>(
+        `
+          SELECT
+            classification.name AS classification_name,
+            question.content AS question_content,
+            option.content AS option_content
+          FROM classifications classification
+          JOIN questions question ON question.classification_id = classification.id
+          JOIN question_options option ON option.question_id = question.id
+          WHERE classification.id = $1
+        `,
+        [classificationId],
+      );
+      expect(persisted.rows[0]).toEqual({
+        classification_name: 'Importer Integration Classification Updated',
+        question_content: 'Importer integration updated question',
+        option_content: 'Updated option',
+      });
+    } finally {
+      try {
+        await client.query('DELETE FROM question_options WHERE question_id = $1', [questionId]);
+        await client.query('DELETE FROM questions WHERE id = $1', [questionId]);
+        await client.query('DELETE FROM classifications WHERE id = $1', [classificationId]);
+      } finally {
+        client.release();
+      }
+    }
   });
 });
 

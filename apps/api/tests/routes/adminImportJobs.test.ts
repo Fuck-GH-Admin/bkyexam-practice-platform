@@ -115,6 +115,19 @@ describe('admin import job routes', () => {
     expect(detail.statusCode).toBe(200);
     expect(detail.json().job.id).toBe(jobId);
 
+    const events = await app.inject({
+      method: 'GET',
+      url: `/api/admin/import-jobs/${jobId}/events?afterEventId=0&limit=100`,
+      headers: { cookie, accept: 'application/json' },
+    });
+    expect(events.statusCode).toBe(200);
+    expect(events.json().events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ jobId, type: 'running' }),
+      expect.objectContaining({ jobId, type: 'progress' }),
+      expect.objectContaining({ jobId, type: 'succeeded', job: expect.objectContaining({ status: 'succeeded' }) }),
+    ]));
+    expect(Number(events.json().lastEventId)).toBeGreaterThan(0);
+
     const errors = await app.inject({
       method: 'GET',
       url: `/api/admin/import-jobs/${jobId}/errors`,

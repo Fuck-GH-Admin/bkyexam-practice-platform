@@ -4,6 +4,7 @@ import {
   AdminBankMappingDetailResponseV1Schema,
   AdminBankMappingListResponseV1Schema,
   AdminImportJobDetailResponseV1Schema,
+  AdminImportJobEventV1Schema,
   AdminImportJobErrorReportResponseV1Schema,
   AdminImportJobListResponseV1Schema,
   AdminLoginResponseV1Schema,
@@ -28,7 +29,10 @@ import {
   CreateAdminStudentRequestV1Schema,
   ResetAdminStudentPasswordRequestV1Schema,
   ResetAdminStudentPasswordResponseV1Schema,
+  ReviewAdminQuestionOverrideRequestV1Schema,
+  RollbackAdminQuestionOverrideRequestV1Schema,
   RevokeAdminStudentSessionsResponseV1Schema,
+  SubmitAdminQuestionOverrideRequestV1Schema,
   UpdateAdminBankMappingRequestV1Schema,
   UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
@@ -40,6 +44,7 @@ import {
   type AdminBankMappingListItemV1,
   type AdminBankMappingStatusV1,
   type AdminImportJobErrorSummaryV1,
+  type AdminImportJobEventTypeV1,
   type AdminImportJobStatusV1,
   type AdminImportJobV1,
   type AdminPermissionV1,
@@ -49,6 +54,7 @@ import {
   type AdminQuestionReviewDetailV1,
   type AdminQuestionReviewFlagV1,
   type AdminQuestionReviewItemV1,
+  type AdminQuestionOverrideRevisionV1,
   type AdminManagedUserStatusV1,
   type AdminManagedUserV1,
   type AdminRoleV1,
@@ -233,7 +239,7 @@ const adminNavigation: Array<{
     path: '/admin/import-jobs',
     permissions: ['import_job:read'],
     implemented: true,
-    description: '导入任务 dry-run/true import、reset、cancel/retry、历史、详情和错误摘要。',
+    description: '导入任务 dry-run/true import、reset、cancel/retry、历史、详情、错误摘要和实时进度。',
   },
   {
     key: 'question-review',
@@ -1421,7 +1427,7 @@ function ImportJobsPage({
       <PageHeader
         eyebrow="Import operations"
         title="Import Jobs"
-        description="导入任务支持 dry-run、受 gate 保护的 true import、resetBeforeImport、cancel/retry、历史、详情和错误摘要。"
+        description="导入任务支持 dry-run、受 gate 保护的 true import、resetBeforeImport、cancel/retry、历史、详情、错误摘要和可断线续传的 SSE 实时进度。"
         action={(
           <div className="button-row">
             <button type="button" onClick={() => navigate('/admin/import-jobs/create')} disabled={!canCreate}>创建导入任务</button>
@@ -1654,6 +1660,8 @@ function ImportJobDetailPanel({
   const [acting, setActing] = useState(false);
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+  const [liveState, setLiveState] = useState<'idle' | 'connecting' | 'connected' | 'disconnected'>('idle');
+  const [liveEvents, setLiveEvents] = useState<Array<{ id: string; type: AdminImportJobEventTypeV1; phase: string; at: string }>>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1730,6 +1738,62 @@ function ImportJobDetailPanel({
     void load();
   }, [load]);
 
+  useEffect(() => {
+    setLiveEvents([]);
+  }, [jobId]);
+
+  useEffect(() => {
+    if (!job || isTerminalImportJob(job) || typeof EventSource === 'undefined') {
+      setLiveState('idle');
+      return;
+    }
+
+    const source = new EventSource(`/api/admin/import-jobs/${encodeURIComponent(jobId)}/events`);
+    const eventTypes: AdminImportJobEventTypeV1[] = [
+      'queued',
+      'running',
+      'progress',
+      'succeeded',
+      'failed',
+      'cancelled',
+      'recovered',
+    ];
+    setLiveState('connecting');
+    source.onopen = () => setLiveState('connected');
+    source.onerror = () => setLiveState('disconnected');
+    const onEvent = (event: MessageEvent<string>) => {
+      try {
+        const parsed = AdminImportJobEventV1Schema.parse(JSON.parse(event.data));
+        setJob(parsed.job);
+        setLiveEvents((current) => [
+          {
+            id: parsed.id,
+            type: parsed.type,
+            phase: parsed.job.progress.phase,
+            at: parsed.createdAt,
+          },
+          ...current.filter((entry) => entry.id !== parsed.id),
+        ].slice(0, 12));
+        if (isTerminalImportJob(parsed.job)) {
+          setLiveState('idle');
+          source.close();
+        }
+      } catch {
+        setLiveState('disconnected');
+      }
+    };
+    for (const eventType of eventTypes) {
+      source.addEventListener(eventType, onEvent as EventListener);
+    }
+
+    return () => {
+      for (const eventType of eventTypes) {
+        source.removeEventListener(eventType, onEvent as EventListener);
+      }
+      source.close();
+    };
+  }, [jobId, job?.status]);
+
   if (loading) return <InfoPanel title="正在加载导入任务详情…" />;
   if (error && !job) return <ErrorPanel message={error} onRetry={() => void load()} />;
   if (!job) return <InfoPanel title="导入任务不存在" detail="返回列表后重新选择。" />;
@@ -1752,6 +1816,13 @@ function ImportJobDetailPanel({
 
       <section className="detail-section">
         <h3>Progress / summary</h3>
+        <div className="progress-block">
+          <div className="card-heading">
+            <strong>{job.progress.phase}</strong>
+            <span className="muted">{job.progress.current}/{job.progress.total} · realtime {liveState}</span>
+          </div>
+          <progress max={Math.max(1, job.progress.total)} value={Math.min(job.progress.current, Math.max(1, job.progress.total))} />
+        </div>
         <dl className="key-values single">
           <div><dt>jobId</dt><dd>{job.id}</dd></div>
           <div><dt>sourceDir</dt><dd>{job.sourceDir}</dd></div>
@@ -1759,6 +1830,17 @@ function ImportJobDetailPanel({
           <div><dt>summary</dt><dd>{formatImportJobSummary(job)}</dd></div>
           <div><dt>questionTypes</dt><dd>{job.summary.questionTypes ? Object.entries(job.summary.questionTypes).map(([type, count]) => `${type}: ${count}`).join('；') : '-'}</dd></div>
         </dl>
+        {liveEvents.length > 0 ? (
+          <ul className="event-list">
+            {liveEvents.map((event) => (
+              <li key={event.id}>
+                <strong>{event.type}</strong>
+                <span>{event.phase}</span>
+                <time>{formatAdminDate(event.at)}</time>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="muted">任务运行时会通过 SSE 显示阶段级实时事件；断线后浏览器使用 Last-Event-ID 补拉。</p>}
       </section>
 
       <section className="detail-section">
@@ -1802,6 +1884,10 @@ function ImportJobErrorReport({ errors }: { errors: AdminImportJobErrorSummaryV1
   );
 }
 
+function isTerminalImportJob(job: AdminImportJobV1): boolean {
+  return job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled';
+}
+
 function QuestionReviewPage({
   admin,
   route,
@@ -1824,6 +1910,7 @@ function QuestionReviewPage({
   const limit = 20;
 
   const canWrite = admin.permissions.includes('question_review:write');
+  const canApprove = admin.permissions.includes('question_review:approve');
   const selectedQuestion = route.questionId
     ? (detailOverride?.questionId === route.questionId ? detailOverride : questions.find((question) => question.questionId === route.questionId) ?? null)
     : null;
@@ -1885,7 +1972,7 @@ function QuestionReviewPage({
       <PageHeader
         eyebrow="Quality operations"
         title="Question Review"
-        description="B9.26 增加题目 override 编辑闭环：列表仍用于 flag 队列，详情页通过独立覆盖层维护题干、答案、解析和选项文案，不直接改导入原表。"
+        description="题目复核使用独立覆盖层：编辑者保存草稿并查看字段级 diff，提交后由审批权限角色批准或驳回；已批准版本可审计回滚，不直接改导入原表。"
         action={<button className="ghost" type="button" onClick={() => void loadQuestions()} disabled={loading}>刷新列表</button>}
       />
 
@@ -1958,6 +2045,7 @@ function QuestionReviewPage({
               questionId={route.questionId}
               initialQuestion={selectedQuestion}
               canWrite={canWrite}
+              canApprove={canApprove}
               onChanged={refreshAfterMutation}
               onSessionExpired={onSessionExpired}
             />
@@ -2029,12 +2117,14 @@ function QuestionReviewDetailPanel({
   questionId,
   initialQuestion,
   canWrite,
+  canApprove,
   onChanged,
   onSessionExpired,
 }: {
   questionId: string;
   initialQuestion: AdminQuestionReviewItemV1 | AdminQuestionReviewDetailV1 | null;
   canWrite: boolean;
+  canApprove: boolean;
   onChanged: (question: AdminQuestionReviewDetailV1) => void;
   onSessionExpired: () => void;
 }) {
@@ -2050,17 +2140,30 @@ function QuestionReviewDetailPanel({
   const [overrideAnswerRaw, setOverrideAnswerRaw] = useState('');
   const [overrideAnalyzeRaw, setOverrideAnalyzeRaw] = useState('');
   const [overrideNote, setOverrideNote] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
   const [optionDrafts, setOptionDrafts] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const syncOverrideDraft = useCallback((next: AdminQuestionReviewDetailV1) => {
-    setOverrideContent(next.content);
-    setOverrideAnswerRaw(next.answerRaw);
-    setOverrideAnalyzeRaw(next.analyzeRaw ?? '');
-    setOverrideNote(next.override?.note ?? '');
-    setOptionDrafts(Object.fromEntries(next.options.map((option) => [option.id, option.effectiveContent])));
+    const active = next.workflow?.activeRevision;
+    const source = next.source ?? {
+      content: next.content,
+      answerRaw: next.answerRaw,
+      analyzeRaw: next.analyzeRaw,
+    };
+    const optionOverrides = new Map(
+      active?.optionContentOverrides.map((option) => [option.optionId, option.content]) ?? [],
+    );
+    setOverrideContent(active ? active.contentOverride ?? source.content : next.content);
+    setOverrideAnswerRaw(active ? active.answerRawOverride ?? source.answerRaw : next.answerRaw);
+    setOverrideAnalyzeRaw(active ? active.analyzeRawOverride ?? source.analyzeRaw ?? '' : next.analyzeRaw ?? '');
+    setOverrideNote(active?.note ?? next.override?.note ?? '');
+    setOptionDrafts(Object.fromEntries(next.options.map((option) => [
+      option.id,
+      active ? optionOverrides.get(option.id) ?? option.content : option.effectiveContent,
+    ])));
   }, []);
 
   const loadDetail = useCallback(async () => {
@@ -2183,6 +2286,7 @@ function QuestionReviewDetailPanel({
       const hasOverrideChange = contentChanged || answerChanged || analyzeChanged || optionContentOverrides.length > 0;
       const request = UpdateAdminQuestionOverrideRequestV1Schema.parse({
         expectedVersion: currentQuestion.overrideVersion,
+        expectedDraftVersion: currentQuestion.workflow?.activeRevision?.version ?? 0,
         content: contentChanged ? overrideContent : undefined,
         answerRaw: answerChanged ? overrideAnswerRaw : undefined,
         analyzeRaw: analyzeChanged ? overrideAnalyzeRaw : undefined,
@@ -2199,7 +2303,83 @@ function QuestionReviewDetailPanel({
       );
       setQuestion(response.question);
       syncOverrideDraft(response.question);
-      setMessage(`题目 override 已保存；version = ${response.question.overrideVersion}。`);
+      setMessage(`题目修订草稿已保存；draft version = ${response.question.workflow?.activeRevision?.version ?? '-'}。`);
+      onChanged(response.question);
+    } catch (caught: unknown) {
+      if (isUnauthorized(caught)) onSessionExpired();
+      else setError(mapQuestionReviewError(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitOverrideRevision() {
+    const revision = currentQuestion.workflow?.activeRevision;
+    if (!canWrite || revision?.status !== 'draft') return;
+    await runOverrideWorkflowAction(
+      `/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}/override/submit`,
+      SubmitAdminQuestionOverrideRequestV1Schema.parse({
+        revisionId: revision.id,
+        expectedDraftVersion: revision.version,
+      }),
+      '修订已提交审批。',
+    );
+  }
+
+  async function approveOverrideRevision() {
+    const revision = currentQuestion.workflow?.activeRevision;
+    if (!canApprove || revision?.status !== 'pending_review') return;
+    await runOverrideWorkflowAction(
+      `/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}/override/approve`,
+      ReviewAdminQuestionOverrideRequestV1Schema.parse({
+        revisionId: revision.id,
+        expectedVersion: currentQuestion.overrideVersion,
+        reviewNote,
+      }),
+      '修订已批准并生效。',
+    );
+  }
+
+  async function rejectOverrideRevision() {
+    const revision = currentQuestion.workflow?.activeRevision;
+    if (!canApprove || revision?.status !== 'pending_review') return;
+    await runOverrideWorkflowAction(
+      `/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}/override/reject`,
+      ReviewAdminQuestionOverrideRequestV1Schema.parse({
+        revisionId: revision.id,
+        expectedVersion: currentQuestion.overrideVersion,
+        reviewNote,
+      }),
+      '修订已驳回。',
+    );
+  }
+
+  async function rollbackOverrideRevision(revision: AdminQuestionOverrideRevisionV1) {
+    if (!canApprove || revision.status !== 'approved') return;
+    await runOverrideWorkflowAction(
+      `/api/admin/question-review/${encodeURIComponent(currentQuestion.questionId)}/override/rollback`,
+      RollbackAdminQuestionOverrideRequestV1Schema.parse({
+        revisionId: revision.id,
+        expectedVersion: currentQuestion.overrideVersion,
+        note: reviewNote.trim() || `Rollback to revision ${revision.id}`,
+      }),
+      `已回滚到修订 ${revision.id}。`,
+    );
+  }
+
+  async function runOverrideWorkflowAction(url: string, body: unknown, successMessage: string) {
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+    try {
+      const response = await requestJson(url, AdminQuestionOverrideResponseV1Schema, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      setQuestion(response.question);
+      syncOverrideDraft(response.question);
+      setReviewNote('');
+      setMessage(successMessage);
       onChanged(response.question);
     } catch (caught: unknown) {
       if (isUnauthorized(caught)) onSessionExpired();
@@ -2210,6 +2390,9 @@ function QuestionReviewDetailPanel({
   }
 
   const openFlags = currentQuestion.flags.filter((flag) => flag.status === 'open');
+  const activeRevision = currentQuestion.workflow?.activeRevision ?? null;
+  const revisionHistory = currentQuestion.workflow?.revisions ?? [];
+  const editorLocked = activeRevision?.status === 'pending_review';
 
   return (
     <section className="student-detail">
@@ -2239,16 +2422,16 @@ function QuestionReviewDetailPanel({
       </section>
 
       <form className="stack-form detail-section" onSubmit={saveOverride}>
-        <h3>Override editor</h3>
-        <p className="muted">保存到 question_overrides / question_option_overrides；导入原始题库时不会覆盖这些人工修订。</p>
+        <h3>Revision editor</h3>
+        <p className="muted">编辑先保存为 draft，不会立即影响学生端；提交后由具有 `question_review:approve` 权限的管理员批准，批准时才写入 effective override。</p>
         <label>题干 content override
-          <textarea value={overrideContent} onChange={(event) => setOverrideContent(event.target.value)} rows={5} disabled={!canWrite || submitting} />
+          <textarea value={overrideContent} onChange={(event) => setOverrideContent(event.target.value)} rows={5} disabled={!canWrite || submitting || editorLocked} />
         </label>
         <label>answerRaw override
-          <input value={overrideAnswerRaw} onChange={(event) => setOverrideAnswerRaw(event.target.value)} disabled={!canWrite || submitting} />
+          <input value={overrideAnswerRaw} onChange={(event) => setOverrideAnswerRaw(event.target.value)} disabled={!canWrite || submitting || editorLocked} />
         </label>
         <label>analyzeRaw override
-          <textarea value={overrideAnalyzeRaw} onChange={(event) => setOverrideAnalyzeRaw(event.target.value)} rows={3} disabled={!canWrite || submitting} />
+          <textarea value={overrideAnalyzeRaw} onChange={(event) => setOverrideAnalyzeRaw(event.target.value)} rows={3} disabled={!canWrite || submitting || editorLocked} />
         </label>
         {currentQuestion.options.length > 0 ? (
           <div className="option-editor-list">
@@ -2258,7 +2441,7 @@ function QuestionReviewDetailPanel({
                 <input
                   value={optionDrafts[option.id] ?? option.effectiveContent}
                   onChange={(event) => setOptionDrafts({ ...optionDrafts, [option.id]: event.target.value })}
-                  disabled={!canWrite || submitting}
+                  disabled={!canWrite || submitting || editorLocked}
                 />
                 <span className="muted">{option.id}{option.overrideContent ? ' · overridden' : ''}</span>
               </label>
@@ -2266,10 +2449,63 @@ function QuestionReviewDetailPanel({
           </div>
         ) : <p className="muted">该题没有选项记录。</p>}
         <label>override note
-          <textarea value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} rows={2} disabled={!canWrite || submitting} placeholder="说明为什么覆盖题干/答案/选项。" />
+          <textarea value={overrideNote} onChange={(event) => setOverrideNote(event.target.value)} rows={2} disabled={!canWrite || submitting || editorLocked} placeholder="说明为什么覆盖题干/答案/选项。" />
         </label>
-        <button type="submit" disabled={!canWrite || submitting}>{submitting ? '保存中…' : '保存题目 override'}</button>
+        <div className="button-row">
+          <button type="submit" disabled={!canWrite || submitting || editorLocked}>{submitting ? '保存中…' : '保存修订草稿'}</button>
+          <button className="ghost" type="button" onClick={() => void submitOverrideRevision()} disabled={!canWrite || submitting || activeRevision?.status !== 'draft'}>提交审批</button>
+        </div>
       </form>
+
+      <section className="detail-section">
+        <h3>Diff / approval</h3>
+        {activeRevision ? (
+          <>
+            <div className="badge-row">
+              <Badge tone={activeRevision.status === 'pending_review' ? 'warning' : 'neutral'}>{activeRevision.status}</Badge>
+              <span className="muted">revision {activeRevision.id} · v{activeRevision.version} · base effective v{activeRevision.baseVersion}</span>
+            </div>
+            <QuestionOverrideDiff revision={activeRevision} />
+            {activeRevision.status === 'pending_review' ? (
+              <>
+                <label>审批意见
+                  <textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={2} disabled={!canApprove || submitting} />
+                </label>
+                <div className="button-row">
+                  <button type="button" onClick={() => void approveOverrideRevision()} disabled={!canApprove || submitting}>批准并生效</button>
+                  <button className="ghost danger" type="button" onClick={() => void rejectOverrideRevision()} disabled={!canApprove || submitting}>驳回修订</button>
+                </div>
+                {!canApprove ? <p className="muted">当前账号可编辑但没有审批权限。</p> : null}
+              </>
+            ) : null}
+          </>
+        ) : <p className="muted">当前没有 draft / pending revision。</p>}
+      </section>
+
+      <section className="detail-section">
+        <h3>Revision history / rollback</h3>
+        <label>回滚说明
+          <textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={2} disabled={!canApprove || submitting} placeholder="回滚时会创建一条新的 approved revision，不删除历史。" />
+        </label>
+        {revisionHistory.length > 0 ? (
+          <ul className="revision-list">
+            {revisionHistory.map((revision) => (
+              <li key={revision.id}>
+                <div className="card-heading">
+                  <div>
+                    <strong>{revision.status} · effective {revision.appliedVersion ?? '-'}</strong>
+                    <p className="muted">{revision.id} · {formatAdminDate(revision.createdAt)} · {revision.createdBy?.displayName ?? '-'}</p>
+                  </div>
+                  <button className="ghost" type="button" disabled={!canApprove || submitting || revision.status !== 'approved' || Boolean(activeRevision)} onClick={() => void rollbackOverrideRevision(revision)}>回滚到此版本</button>
+                </div>
+                <p>{revision.note || '-'}</p>
+                {revision.reviewNote ? <p className="muted">审批：{revision.reviewNote}</p> : null}
+                <QuestionOverrideDiff revision={revision} />
+              </li>
+            ))}
+          </ul>
+        ) : <p className="muted">暂无修订历史。</p>}
+      </section>
 
       <section className="detail-section">
         <h3>Practice exclusion</h3>
@@ -2371,6 +2607,27 @@ function QuestionReviewFlagItem({
         </div>
       ) : null}
     </li>
+  );
+}
+
+function QuestionOverrideDiff({ revision }: { revision: AdminQuestionOverrideRevisionV1 }) {
+  if (revision.diff.length === 0) {
+    return <p className="muted">该修订相对基线没有内容差异。</p>;
+  }
+
+  return (
+    <div className="diff-list">
+      {revision.diff.map((entry) => (
+        <article key={entry.field}>
+          <strong>{entry.label}</strong>
+          <div className="diff-values">
+            <pre className="diff-before">{entry.before ?? '∅'}</pre>
+            <span aria-hidden="true">→</span>
+            <pre className="diff-after">{entry.after ?? '∅'}</pre>
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }
 

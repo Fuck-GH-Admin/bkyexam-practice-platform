@@ -11,6 +11,8 @@
 > **文档一致性刷新：** 2026-07-16 已完成 route/config/migration/link 与真实 staging 的文档—代码审计，并新增可重复 `npm run docs:audit`。人工核查入口见 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 >
 > **B9.35 安全与运维真相收口：** runtime commit `2fbaec1` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
+>
+> **B9.36–B9.38 工作流与容量收口：** Question Review 已补齐字段级 diff、草稿提交、审批/驳回和可审计回滚；Import Jobs 已增加 durable event log、SSE 断线续传和阶段级批次进度；importer 已改为 change-aware prefilter/upsert，并通过完整题库三轮连续非 reset 容量 profile。完整记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
 ## Executive Summary
 
@@ -20,8 +22,8 @@
 - **真实题库 + PostgreSQL + 浏览器闭环：已跑通。**
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记；学生 Web 当前没有 Learning 路由、页面或 API 调用。**
-- **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report API、受 `ADMIN_IMPORT_ENABLE_WRITE=true` 保护的 true import mode、受 `ADMIN_IMPORT_ENABLE_RESET=true` 独立维护门禁保护的 reset、cancel/retry、durable worker/heartbeat/stuck recovery、Question Review Flags/Detail/Override、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；override diff/审批/回滚、实时 progress 事件流和最终视觉后置。**
-- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 进一步加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor。全量导入已被明确限制为维护窗口操作；公开生产仍缺外部告警、持续容量测试、PR human approval/merge 和正式用户验收。**
+- **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat/SSE realtime progress、Question Review Flags/Detail/Override/Diff/Approval/Rollback、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；批量复核、复杂通知和最终视觉后置。**
+- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor；B9.38 又补充 change-aware importer 与持续容量 profile。全量导入仍被明确限制为维护窗口操作；公开生产仍缺外部告警、PR human approval/merge 和正式用户验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -29,8 +31,8 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练可用；Learning 仅后端 API 可用；首次改密已由前端和服务端双重门禁；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
-| 当前 HEAD 公开生产就绪度 | **约 92–94%** | B9.35 current HEAD、migration ledger/checksum、独立 Admin、Question Review override、Import worker、Nginx/static routing、首次改密服务端门禁、reset gate、双份 checksum dump 和资源 monitor 已在真实 staging 通过；仍缺外部告警、持续容量验证、正式发布审批与真实用户验收 |
-| 完整产品愿景 | **约 90%** | 学生信息架构、学习概览/趋势/目标/长期复习标记 API、管理端后端 contract、Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import gate/reset/cancel/retry/worker heartbeat、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API、super_admin bootstrap CLI、学生身份安全数据模型、学生密码登录 enforcement、旧账号迁移 CLI、生产 gate runbook、部署证据校验 CLI、真实 staging 验收、B9.15 运维基线、管理平台 IA 初稿、B9.16 前端开工前审查包、B9.17 学生账号启用最小 UI、B9.18 Admin 静态 wireframe 审查包、B9.19 Admin Operational MVP、B9.20 Admin P1 工作流缺口审查、B9.21 Bank Mappings P1 UI、B9.22 Import Jobs dry-run/history UI、B9.23 Question Review preview UI、B9.24 Audit Logs read-only UI、B9.25 Admin Users management UI、B9.26 Question Review override 最小闭环、B9.27 Import Jobs reset/cancel/retry、B9.28 durable worker/heartbeat、B9.29 Import Jobs repository split 和 B9.30 Learning repository split 已落地，但分母仍包含最终学生前端、Learning 前端、全题型、运营与生产能力 |
+| 当前 HEAD 公开生产就绪度 | **约 94–95%** | B9.35 staging 基线之上，B9.36–B9.38 已在本地完成审批工作流、realtime events 和连续容量验证；仍需完成本阶段 current HEAD 的真实 staging 复验，并补外部告警、正式发布审批与真实用户验收 |
+| 完整产品愿景 | **约 91%** | 学生信息架构、Learning 后端、管理端主工作流、Question Review 审批回滚、Import Jobs realtime progress、身份安全、运维门禁和持续容量 profile 已落地，但分母仍包含 Learning/最终学生前端、全题型、复杂运营、外部告警和正式生产发布 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
 
@@ -47,10 +49,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 59 | 453 |
+| `apps/api` | 59 | 456 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **64** | **523** |
+| **Total** | **64** | **526** |
 
 仓库内 Playwright smoke：
 
@@ -68,9 +70,9 @@ Playwright 实际报告为 `5 passed`；project 通过 tag 过滤，因此每个
 
 | Database | Test files | Tests |
 | --- | ---: | ---: |
-| 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 1 |
+| 临时 PostgreSQL 16 / `bkyexam_test` | 1 | 2 |
 
-该测试从空数据库执行十三份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成 readiness/DB health、metrics smoke、学生身份安全字段、无密码默认失败、密码登录、临时密码登录、学生改密、Admin Auth/RBAC/audit、管理员登录失败锁定字段、Admin bootstrap、Admin Audit Log read、Admin User manage list/detail/create/update/last-super-admin guard/audit、Admin Student Manage list/detail/create/bulk-create/update/reset-password/revoke-session/audit、Admin Bank Mapping list/detail/update/bulk-status、Admin System Status、Admin Import Jobs dry-run/create-import/list/detail/error-report/audit/status summary、true import mode 写入/幂等/失败回滚/reset success/cancel-retry/worker queue-heartbeat-stuck recovery contract、Admin Question Review detail/override/flag/exclusion/status summary、题库、多 active session、草稿/断点、会话集合、整卷提交、历史结果、错题、`origin=wrongbook`、学习概览统计、学习趋势/streak、学习目标与错题复习反馈、题目收藏/长期复习标记、所有权隔离和退出闭环。Docker runner 在测试后自动删除临时数据库容器。
+该测试从空数据库执行十五份 migration，装载最小 fixture，并通过真实 PostgreSQL repository 与 Fastify route 完成 readiness/DB health、identity、学生练习、Wrongbook、Learning、Admin Auth/RBAC/Audit、Student/Admin Users、Bank Mappings、Import Jobs worker/events、Question Review revision workflow 等组合闭环；另验证 importer 首次写入、unchanged 零写入与 changed row 正确更新。Docker runner 在测试后自动删除临时数据库容器。
 
 隔离 backup/restore drill：
 
@@ -78,7 +80,7 @@ Playwright 实际报告为 `5 passed`；project 通过 tag 过滤，因此每个
 npm run ops:backup-restore:docker  PASS
 ```
 
-该演练在临时 PostgreSQL 16 上执行十一份 migration，写入覆盖核心业务表的最小 fixture，使用 `pg_dump` 生成 backup，恢复到 `bkyexam_restore_test`，并比较源库/恢复库关键表计数一致。
+该演练在临时 PostgreSQL 16 上执行全部十五份 migration，写入覆盖核心业务表的最小 fixture，使用 `pg_dump` 生成 backup，恢复到 `bkyexam_restore_test`，并比较源库/恢复库关键表计数一致。
 
 生产 gate dry-run：
 
@@ -210,8 +212,8 @@ B9.20 admin P1 workflow gap review：
 ```text
 review packet = docs/admin-p1-workflow-gap-review.md
 Bank Mappings P1 UI = recommended next
-Import Jobs = dry-run/history/error-report UI 已在 B9.22 完成；reset/cancel/retry control backend + minimal UI 已在 B9.27 完成；durable worker/heartbeat/stuck recovery 已在 B9.28 完成；实时 progress 事件流仍后置
-Question Review = preview-level flag/exclusion UI 已在 B9.23 完成；detail/override 最小闭环已在 B9.26 完成
+Import Jobs = dry-run/history/error-report UI 已在 B9.22 完成；reset/cancel/retry control backend + minimal UI 已在 B9.27 完成；durable worker/heartbeat/stuck recovery 已在 B9.28 完成；durable events/SSE realtime progress 已在 B9.37 完成
+Question Review = preview-level flag/exclusion UI 已在 B9.23 完成；detail/override 最小闭环已在 B9.26 完成；diff/审批/驳回/回滚已在 B9.36 完成
 System Status = keep health-oriented; ops summary should be separate if needed
 ```
 
@@ -238,7 +240,7 @@ list/filter/page = implemented
 create dry-run = implemented
 import job detail = implemented
 error report = implemented
-true import reset/cancel/retry = implemented in B9.27; durable worker/heartbeat = implemented in B9.28; realtime progress deferred
+true import reset/cancel/retry = implemented in B9.27; durable worker/heartbeat = implemented in B9.28; durable events/SSE realtime progress = implemented in B9.37
 visual polish = deferred
 ```
 
@@ -296,11 +298,11 @@ question_overrides / question_option_overrides = implemented
 practice effective content/answer/options = implemented
 wrongbook/learning effective preview = implemented
 override audit = implemented
-diff/approval/rollback UI = deferred
+diff/approval/reject/rollback UI = implemented in B9.36
 visual polish = deferred
 ```
 
-B9.26 新增后端 contract 与 migration `0012_question_review_overrides.sql`；当前完成的是不直接修改导入原表的题目修订最小闭环，不声明富文本/图片题编辑器、批量操作、审批流或最终视觉完成。详见 [`question-review-override-layer.md`](question-review-override-layer.md)。
+B9.26 新增后端 contract 与 migration `0012_question_review_overrides.sql`；B9.36 继续新增 `0014_question_review_workflow.sql` 和完整 revision workflow。当前不声明富文本/图片题编辑器、批量审批、通知或最终视觉完成。详见 [`question-review-override-layer.md`](question-review-override-layer.md)。
 
 全量题库慢速 smoke：
 
@@ -319,6 +321,25 @@ npm run smoke:import:full:docker -- <questionbank-dir>  PASS
 | 本地 Docker 总耗时 | 约 142.1 秒 |
 
 慢速 profile 会把解析结果与 `currentCorpusBaseline.ts` 固定基线逐项比较，并在隔离数据库连续执行两次导入。它依赖仓库外的完整题库，因此不放入每次提交的 CI。
+
+连续容量 profile：
+
+```text
+npm run smoke:import:capacity:docker -- <questionbank-dir> --cycles=3 --batch-size=1000  PASS
+```
+
+2026-07-16 本地 Docker 完整题库结果：
+
+| Metric | Result |
+| --- | ---: |
+| 初次导入 | 24.69 s |
+| 三轮 unchanged non-reset import | 9.32 / 9.41 / 9.79 s |
+| 三轮 logical writes | 全部为 0 |
+| 三轮 WAL | 1,177,512 / 168 / 244,424 bytes |
+| updated/dead tuples | 0 / 0 |
+| 最终数据库计数 | 2,941 / 89,922 / 154,899 / 2,662 |
+
+优化前 unchanged repeat 约 13.9–14.6 秒且每轮产生约 14–15 MiB WAL；incoming-row prefilter 后平均约 9.51 秒，WAL 最大约 1.12 MiB。真实 PostgreSQL integration 另验证“首次插入 -> unchanged 零写入 -> changed row 正确更新”。
 
 生产构建结果：
 

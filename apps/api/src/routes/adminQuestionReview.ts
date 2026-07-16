@@ -6,6 +6,9 @@ import {
   ApiErrorResponseV1Schema,
   CaseInsensitiveUuidV1Schema,
   ListAdminQuestionReviewsRequestV1Schema,
+  ReviewAdminQuestionOverrideRequestV1Schema,
+  RollbackAdminQuestionOverrideRequestV1Schema,
+  SubmitAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionOverrideRequestV1Schema,
   UpdateAdminQuestionReviewRequestV1Schema,
   type AdminPermissionV1,
@@ -134,25 +137,29 @@ export function createAdminQuestionReviewRoutes(options: AdminQuestionReviewRout
       if (result.status === 'version_conflict') {
         return reply.status(409).send(errorResponse('Question override version conflict'));
       }
+      if (result.status === 'draft_version_conflict') {
+        return reply.status(409).send(errorResponse('Question override draft version conflict'));
+      }
+      if (result.status === 'revision_not_editable') {
+        return reply.status(409).send(errorResponse('Question override revision is not editable'));
+      }
 
       await auditService.record({
         actorAdminId: required.session.admin.id,
-        action: 'question_review.override_update',
-        resourceType: 'question',
-        resourceId: result.after.questionId,
+        action: 'question_review.override_draft_save',
+        resourceType: 'question_override_revision',
+        resourceId: result.revision.id,
         before: {
-          overrideVersion: result.before.overrideVersion,
-          contentPreview: result.before.contentPreview,
-          answerPreview: result.before.answerPreview,
-          optionOverrideCount: result.before.options.filter((option) => option.overrideContent !== null).length,
+          effectiveVersion: result.before.overrideVersion,
+          draftVersion: parsedBody.data.expectedDraftVersion,
         },
         after: {
-          overrideVersion: result.after.overrideVersion,
-          contentPreview: result.after.contentPreview,
-          answerPreview: result.after.answerPreview,
-          optionOverrideCount: result.after.options.filter((option) => option.overrideContent !== null).length,
+          revisionStatus: result.revision.status,
+          revisionVersion: result.revision.version,
+          diffCount: result.revision.diff.length,
         },
         metadata: {
+          questionId: result.after.questionId,
           bankId: result.after.bankId,
           changedOptionCount: parsedBody.data.optionContentOverrides.length,
           note: parsedBody.data.note,
@@ -160,6 +167,151 @@ export function createAdminQuestionReviewRoutes(options: AdminQuestionReviewRout
         result: 'success',
       });
 
+      return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
+    });
+
+    app.post('/api/admin/question-review/:questionId/override/submit', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:write');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+      const parsedQuestionId = parseQuestionId(request.params);
+      if (!parsedQuestionId) return reply.status(400).send(errorResponse('Invalid question id'));
+      const parsedBody = SubmitAdminQuestionOverrideRequestV1Schema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(errorResponse('Invalid question override submit request'));
+      }
+
+      const result = await repository.submitQuestionOverride({
+        questionId: parsedQuestionId,
+        request: parsedBody.data,
+        actor: toActor(required.session),
+      });
+      const failure = workflowFailure(result);
+      if (failure) return reply.status(failure.statusCode).send(errorResponse(failure.error));
+      if (result.status !== 'updated') throw new Error('Unreachable question override submit result');
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'question_review.override_submit',
+        resourceType: 'question_override_revision',
+        resourceId: result.revision.id,
+        before: { status: 'draft', version: parsedBody.data.expectedDraftVersion },
+        after: { status: result.revision.status, version: result.revision.version },
+        metadata: { questionId: result.after.questionId, diffCount: result.revision.diff.length },
+        result: 'success',
+      });
+      return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
+    });
+
+    app.post('/api/admin/question-review/:questionId/override/approve', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:approve');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+      const parsedQuestionId = parseQuestionId(request.params);
+      if (!parsedQuestionId) return reply.status(400).send(errorResponse('Invalid question id'));
+      const parsedBody = ReviewAdminQuestionOverrideRequestV1Schema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(errorResponse('Invalid question override approval request'));
+      }
+      const result = await repository.approveQuestionOverride({
+        questionId: parsedQuestionId,
+        request: parsedBody.data,
+        actor: toActor(required.session),
+      });
+      const failure = workflowFailure(result);
+      if (failure) return reply.status(failure.statusCode).send(errorResponse(failure.error));
+      if (result.status !== 'updated') throw new Error('Unreachable question override approval result');
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'question_review.override_approve',
+        resourceType: 'question_override_revision',
+        resourceId: result.revision.id,
+        before: { effectiveVersion: result.before.overrideVersion, status: 'pending_review' },
+        after: { effectiveVersion: result.after.overrideVersion, status: result.revision.status },
+        metadata: {
+          questionId: result.after.questionId,
+          reviewNote: parsedBody.data.reviewNote,
+          diffCount: result.revision.diff.length,
+        },
+        result: 'success',
+      });
+      return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
+    });
+
+    app.post('/api/admin/question-review/:questionId/override/reject', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:approve');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+      const parsedQuestionId = parseQuestionId(request.params);
+      if (!parsedQuestionId) return reply.status(400).send(errorResponse('Invalid question id'));
+      const parsedBody = ReviewAdminQuestionOverrideRequestV1Schema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(errorResponse('Invalid question override rejection request'));
+      }
+      const result = await repository.rejectQuestionOverride({
+        questionId: parsedQuestionId,
+        request: parsedBody.data,
+        actor: toActor(required.session),
+      });
+      const failure = workflowFailure(result);
+      if (failure) return reply.status(failure.statusCode).send(errorResponse(failure.error));
+      if (result.status !== 'updated') throw new Error('Unreachable question override rejection result');
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'question_review.override_reject',
+        resourceType: 'question_override_revision',
+        resourceId: result.revision.id,
+        before: { status: 'pending_review' },
+        after: { status: result.revision.status },
+        metadata: { questionId: result.after.questionId, reviewNote: parsedBody.data.reviewNote },
+        result: 'success',
+      });
+      return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
+    });
+
+    app.post('/api/admin/question-review/:questionId/override/rollback', async (request, reply) => {
+      const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
+      const required = requireAdminPermission(session, 'question_review:approve');
+      if (!required.ok) {
+        return reply.status(required.statusCode).send(errorResponse(required.error));
+      }
+      const parsedQuestionId = parseQuestionId(request.params);
+      if (!parsedQuestionId) return reply.status(400).send(errorResponse('Invalid question id'));
+      const parsedBody = RollbackAdminQuestionOverrideRequestV1Schema.safeParse(request.body);
+      if (!parsedBody.success) {
+        return reply.status(400).send(errorResponse('Invalid question override rollback request'));
+      }
+      const result = await repository.rollbackQuestionOverride({
+        questionId: parsedQuestionId,
+        request: parsedBody.data,
+        actor: toActor(required.session),
+      });
+      const failure = workflowFailure(result);
+      if (failure) return reply.status(failure.statusCode).send(errorResponse(failure.error));
+      if (result.status !== 'updated') throw new Error('Unreachable question override rollback result');
+
+      await auditService.record({
+        actorAdminId: required.session.admin.id,
+        action: 'question_review.override_rollback',
+        resourceType: 'question_override_revision',
+        resourceId: result.revision.id,
+        before: { effectiveVersion: result.before.overrideVersion },
+        after: { effectiveVersion: result.after.overrideVersion },
+        metadata: {
+          questionId: result.after.questionId,
+          rollbackFromRevisionId: parsedBody.data.revisionId,
+          note: parsedBody.data.note,
+        },
+        result: 'success',
+      });
       return AdminQuestionOverrideResponseV1Schema.parse({ question: result.after });
     });
 
@@ -244,4 +396,36 @@ export function createAdminQuestionReviewRoutes(options: AdminQuestionReviewRout
       return AdminQuestionReviewDetailResponseV1Schema.parse({ question: result.after });
     });
   };
+}
+
+function parseQuestionId(params: unknown): string | null {
+  const value = (params as { questionId?: unknown }).questionId;
+  const parsed = CaseInsensitiveUuidV1Schema.safeParse(value);
+  return parsed.success ? parsed.data.toLocaleLowerCase() : null;
+}
+
+function toActor(session: ResolvedAdminSession) {
+  return {
+    id: session.admin.id,
+    displayName: session.admin.displayName,
+  };
+}
+
+function workflowFailure(result: Awaited<
+  ReturnType<AdminQuestionReviewRepository['submitQuestionOverride']>
+>): { statusCode: 404 | 409; error: string } | null {
+  switch (result.status) {
+    case 'question_not_found':
+      return { statusCode: 404, error: 'Question not found' };
+    case 'revision_not_found':
+      return { statusCode: 404, error: 'Question override revision not found' };
+    case 'version_conflict':
+      return { statusCode: 409, error: 'Question override version conflict' };
+    case 'draft_version_conflict':
+      return { statusCode: 409, error: 'Question override draft version conflict' };
+    case 'revision_not_editable':
+      return { statusCode: 409, error: 'Question override revision is not editable' };
+    case 'updated':
+      return null;
+  }
 }

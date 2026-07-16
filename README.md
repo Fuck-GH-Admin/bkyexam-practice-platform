@@ -14,7 +14,7 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 学习概览、趋势、目标与长期复习标记后端 API：练习次数、正确率、最近题库、题型统计、错题掌握摘要、7..90 日趋势、activity streak、学习目标、错题复习反馈信号、题目收藏和长期复习标记。学生 Web 尚无 Learning 路由和页面。
 - 独立学生首页、多个进行中练习、练习历史和可恢复页面 URL。
 - Practice/Wrongbook/Learning/Auth/Catalog/Admin v1 共享 Zod contract，并在关键 API 输出与 Web/API 输入侧运行时校验。
-- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset maintenance gate/cancel/retry/worker heartbeat API、Question Review Flags/Detail/Override API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
+- Admin Auth/RBAC/session/audit foundation，包括独立 `bky_admin_session`、管理员登录失败锁定、`/api/admin/auth/*`、Admin Bank Mapping read/write API、Admin System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat/SSE realtime API、Question Review Flags/Detail/Diff/Approval/Rollback API、Audit Log read API、Admin User manage API、Admin Student Manage API 和 `super_admin` bootstrap CLI。
 - 独立 `apps/admin` Operational MVP：Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs、Question Review、Audit Logs、Admin Users 均已有功能性页面或最小操作闭环。
 - 生产 gate 与旧账号迁移工具：`npm run ops:production-gate`、`npm run ops:legacy-student-password-migration`。
 - 服务端首次改密门禁：临时密码学生在完成改密前不能直接调用 Practice/Wrongbook/Learning API。
@@ -29,9 +29,9 @@ BKYExam 是一个基于现有题库导出数据构建的练习平台。目前已
 - 正式学生账户、完整档案前端、推荐策略和 active session 归档。
 - 填空、简答、编程、Office 操作等非客观题流程。
 - PR review / merge 决策、外部监控告警、持续性能压测和正式生产发布验收。
-- **当前 staging 已重新验收：** 2026-07-16 已部署 B9.35 runtime commit `2fbaec1`。migration ledger 为 13 条、System Status 返回真实 `0013`、首次改密服务端门禁和 reset production gate 已实机通过。当前剩余的是正式发布审批、真实用户验收、外部告警和持续容量治理。
+- **当前 staging 基线：** 2026-07-16 已部署 B9.35 runtime commit `2fbaec1`。本地 current HEAD 已继续完成 migration `0014/0015`、Question Review 审批工作流、Import SSE 和持续容量 profile；本阶段收尾会把该 HEAD 再部署到 staging 复验。当前剩余的是正式发布审批、真实用户验收和外部告警。
 
-文档阅读入口见 [文档索引与真相源](docs/README.md)。当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，真实 current-HEAD 部署与容量结论见 [B9.34 staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
+文档阅读入口见 [文档索引与真相源](docs/README.md)。当前完整度、验证证据和风险先看 [当前进度总览](docs/project-progress-overview.md)，本阶段工作流/realtime/capacity 见 [B9.36–B9.38 closure](docs/b9.36-b9.38-workflow-realtime-capacity.md)，再看 [系统状态](docs/status.md)；产品边界与目录目标见 [产品与模块边界](docs/product-boundaries.md)。
 
 ## Workspace
 
@@ -225,6 +225,7 @@ npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
 - [系统状态与完整度](docs/status.md)
 - [B9.34 current-HEAD staging re-baseline](docs/b9.34-current-head-staging-rebaseline.md)
 - [B9.35 安全与运维真相收口](docs/b9.35-security-operational-truth-closure.md)
+- [B9.36–B9.38 工作流、实时进度与容量收口](docs/b9.36-b9.38-workflow-realtime-capacity.md)
 - [产品与模块边界](docs/product-boundaries.md)
 - [学生信息架构 v1](docs/student-information-architecture.md)
 - [架构](docs/architecture.md)

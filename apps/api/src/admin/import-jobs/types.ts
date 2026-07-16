@@ -1,5 +1,7 @@
 import type {
   AdminImportJobModeV1,
+  AdminImportJobEventTypeV1,
+  AdminImportJobEventV1,
   AdminImportJobOptionsV1,
   AdminImportJobProgressV1,
   AdminImportJobStatusV1,
@@ -69,6 +71,15 @@ export interface AdminImportJobRepository {
   cancelImportJob(input: { jobId: string }): Promise<AdminImportJobV1 | null>;
   claimNextImportJob(input: { workerId: string }): Promise<AdminImportJobV1 | null>;
   heartbeatImportJob(input: { jobId: string; workerId: string }): Promise<AdminImportJobV1 | null>;
+  updateImportJobProgress(input: {
+    jobId: string;
+    progress: AdminImportJobProgressV1;
+  }): Promise<AdminImportJobV1 | null>;
+  listImportJobEvents(input: {
+    jobId: string;
+    afterEventId: string;
+    limit: number;
+  }): Promise<AdminImportJobEventV1[]>;
   recoverStaleImportJobs(input: { staleAfterMs: number; now?: Date; message?: string }): Promise<AdminImportJobV1[]>;
 }
 
@@ -96,6 +107,7 @@ export interface AdminImportJobService {
 export interface AdminImportJobRunContext {
   jobId: string;
   shouldAbort: () => boolean | Promise<boolean>;
+  reportProgress?: (progress: AdminImportJobProgressV1) => void | Promise<void>;
 }
 
 export type AdminImportJobRunner = (
@@ -134,6 +146,14 @@ export interface AdminImportJobRow {
   finished_at: Date | string | null;
   worker_id?: string | null;
   heartbeat_at?: Date | string | null;
+}
+
+export interface AdminImportJobEventRow {
+  id: string | number;
+  job_id: string;
+  event_type: AdminImportJobEventTypeV1;
+  payload: unknown;
+  created_at: Date | string;
 }
 
 export function initialProgress(phase: 'queued' | 'running' = 'running'): AdminImportJobProgressV1 {
