@@ -1,6 +1,6 @@
 # BKYExam 当前进度总览
 
-状态日期：**2026-07-16**
+状态日期：**2026-07-17**
 
 关联状态页：
 
@@ -15,7 +15,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 
 当前最准确的定位是：
 
-> **学生客观题练习主链路已经可用；后端主功能已基本成型；管理平台具备账号、题库、导入、质检、审计的运营能力；B9.36–B9.38 已补齐 Question Review diff/审批/回滚、Import Jobs durable events/SSE realtime progress，以及 change-aware importer 和完整题库连续容量 profile。Learning 仍是后端能力，学生前端尚未交付。**
+> **学生客观题练习主链路与管理运营后端已经进入 feature freeze；B9.40 已关闭 Admin 登录顺序、Import 权限粒度、worker failed 中止和冗余索引问题。Learning 后端已就绪，下一步应按信息架构文档审核学生端和管理端功能流程，而不是继续扩大底层范围。**
 
 文档阅读顺序与本轮代码一致性结果见 [`README.md`](README.md) 和 [`documentation-code-consistency-audit-2026-07-16.md`](documentation-code-consistency-audit-2026-07-16.md)。
 
@@ -29,7 +29,7 @@ BKYExam 已经不是“原型”阶段，而是进入了 **内部试用 + 管理
 | 后端模块化 | 正在改善 | **约 66–70%** | Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students、Bank Mappings 已拆分；剩余 routes validation/error mapping、submit service 等仍偏大。 |
 | 管理平台功能 | Operational MVP+ | **约 82–85%** | Admin Login、System Status、Student Accounts、Bank Mappings、Import Jobs realtime、Question Review diff/审批/回滚、Audit Logs、Admin Users 已有功能页；缺最终视觉、完整 dashboard、批量质检和复杂安全策略 UI。 |
 | 学生前端 | 可试用但未最终设计 | **约 60–70%** | 练习台、提交检查、历史、错题、临时密码改密最小 UI 已通过 smoke；缺 Learning 正式页面、信息架构打磨、视觉系统、完整移动端体验。 |
-| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、Question Review/Import realtime 功能复验、non-reset true import、资源监控和 pre/post checksum；仍需外部告警、PR human approval/merge、正式发布审批和真实用户验收。 |
+| 当前 HEAD 公开生产就绪 | staging-ready，尚未正式公开发布 | **约 97–98%** | PR merge、生产同步、migration、Nginx SSE、production gate 和负载基线已闭环；仍需外部告警接收端、正式发布审批和真实用户验收。 |
 | 完整产品愿景 | 主体完成但未收口 | **约 91%** | 分母包含最终学生端、Learning 前端、全题型、复杂运营能力和正式生产发布，所以仍不能称为完整产品。 |
 
 这些百分比是工程判断，用来辅助排优先级，不等于测试覆盖率。
@@ -242,10 +242,9 @@ B9.36–B9.38 已完成 current-HEAD staging 复验。真实验收确认：
 
 剩余 P0：
 
-1. PR human review/merge 与正式发布审批。
-2. 接入第三方告警目标并验证告警送达。
-3. 完成真实管理员/学生 UAT。
-4. 若要支持在线导入，升级硬件并建立跨硬件容量阈值。
+1. 接入第三方告警目标并验证告警送达。
+2. 完成真实管理员/学生 UAT 与正式发布审批。
+3. 若要支持在线导入，升级硬件并建立跨硬件容量阈值。
 
 完整证据见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 
@@ -325,8 +324,8 @@ Learning 后端已具备，但学生端还没有完整学习中心。
 
 我们现在需要决定下一步走哪条：
 
-1. **发布治理路线：人工 UAT、PR review/merge、外部告警和正式发布审批。**
-   这是当前唯一 P0，不再需要补本阶段部署证据。
+1. **发布治理路线：真实用户 UAT、外部告警和正式发布审批。**
+   PR review/merge 与本阶段部署证据已经完成。
 
 2. **学生产品路线：Learning 前端 IA。**
    后端已就绪，适合在用户审核后定义学习中心，而不是先做最终视觉。
@@ -338,4 +337,4 @@ Learning 后端已具备，但学生端还没有完整学习中心。
    属于明确技术债，但可根据后续功能开发的阻塞程度安排。
 
 我的建议是：
-**先停止继续扩大底层能力，保留 `da89292` + migration `0015` 作为可审核 staging 基线。下一步先做人工 UAT 和发布治理；通过后，再根据审核反馈选择 Learning 前端 IA 或批量运营能力。最终视觉仍后置。**
+**按 [`student-information-architecture-and-flows.md`](student-information-architecture-and-flows.md) 和 [`admin-information-architecture-and-flows.md`](admin-information-architecture-and-flows.md) 先审核页面对象、导航和功能流程；确认后再进入正式视觉。后端保持 feature freeze，只接受 bug、安全、可观测性和已批准的新 contract。**

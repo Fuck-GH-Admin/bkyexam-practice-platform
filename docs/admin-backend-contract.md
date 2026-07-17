@@ -71,6 +71,8 @@ B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route�
 | `question_review:write` | 标记/关闭题目质量问题。 |
 | `import_job:read` | 查看导入任务。 |
 | `import_job:create` | 创建导入任务。 |
+| `import_job:cancel` | 取消 queued/running 导入任务。 |
+| `import_job:retry` | 从 failed/cancelled 任务创建重试任务。 |
 | `system_status:read` | 查看系统状态。 |
 | `audit_log:read` | 查看审计日志。 |
 | `admin_user:manage` | 管理管理员账号。第一版可只保留权限，不实现 UI。 |
@@ -80,7 +82,7 @@ B4 初稿只做设计，不创建 `apps/admin`，不实现 `/api/admin/*` route�
 | Role | Permissions |
 | --- | --- |
 | `content_editor` | `admin:self:read`, `bank_mapping:read`, `bank_mapping:write`, `bank_mapping:publish`, `question_review:read`, `question_review:write` |
-| `operator` | `admin:self:read`, `bank_mapping:read`, `import_job:read`, `import_job:create`, `system_status:read` |
+| `operator` | `admin:self:read`, `bank_mapping:read`, `import_job:read`, `import_job:create`, `import_job:cancel`, `import_job:retry`, `system_status:read` |
 | `super_admin` | all permissions |
 
 ### 2.4 Session
@@ -240,7 +242,7 @@ Response：
     "loginName": "operator@example.com",
     "displayName": "运营管理员",
     "roles": ["operator"],
-    "permissions": ["admin:self:read", "import_job:read", "import_job:create", "system_status:read"]
+    "permissions": ["admin:self:read", "import_job:read", "import_job:create", "import_job:cancel", "import_job:retry", "system_status:read"]
   },
   "expiresAt": "2026-07-13T18:00:00.000Z"
 }
@@ -652,7 +654,7 @@ import_job.create
 
 ### 6.3.1 `POST /api/admin/import-jobs/:id/cancel`
 
-Permission：`import_job:create`
+Permission：`import_job:cancel`
 
 Rules：
 
@@ -663,7 +665,7 @@ Rules：
 
 ### 6.3.2 `POST /api/admin/import-jobs/:id/retry`
 
-Permission：`import_job:create`
+Permission：`import_job:retry`
 
 Rules：
 

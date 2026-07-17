@@ -1,6 +1,6 @@
 # Documentation Index And Sources Of Truth
 
-状态日期：**2026-07-16**
+状态日期：**2026-07-17**
 
 本目录同时保存“当前真相源”和“阶段历史记录”。人工核查时不要把旧阶段文档中的当时结论当成当前状态；发生冲突时按以下优先级判断。
 
@@ -8,14 +8,14 @@
 
 建议按顺序阅读：
 
-1. [B9.36–B9.38 工作流、实时进度与容量收口](b9.36-b9.38-workflow-realtime-capacity.md)：Question Review 审批回滚、Import SSE 和 importer 持续容量证据。
-2. [B9.35 安全与运维真相收口](b9.35-security-operational-truth-closure.md)：首次改密服务端门禁、migration ledger、真实 System Status、checksum、导入资源监控与 Learning 交付边界。
-3. [文档—代码一致性审计](documentation-code-consistency-audit-2026-07-16.md)：自动比对、已修复漂移、剩余人工核查点；其中被后续阶段修复的缺口以后续 closure 为准。
-4. [当前进度总览](project-progress-overview.md)：当前完整度、模块完成度和主要缺口。
-5. [系统状态](status.md)：测试数量、功能边界、已完成阶段和当前风险。
-6. [B9.34 staging re-baseline](b9.34-current-head-staging-rebaseline.md)：B9.35 前的真实服务器部署、恢复演练、导入风险和容量证据。
+1. [Backend Final Closure](backend-final-closure.md)：当前客观题与运营后端冻结边界、B9.40 安全/权限/worker/migration 收尾。
+2. [PR Review / Merge Decision](pr-review-merge-decision.md)：PR #2 合并、生产同步和 Nginx SSE 闭环。
+3. [B9.36–B9.38 工作流、实时进度与容量收口](b9.36-b9.38-workflow-realtime-capacity.md)：Question Review 审批回滚、Import SSE 和 importer 持续容量证据。
+4. [B9.35 安全与运维真相收口](b9.35-security-operational-truth-closure.md)：首次改密服务端门禁、migration ledger、真实 System Status、checksum、导入资源监控与 Learning 交付边界。
+5. [当前进度总览](project-progress-overview.md)：当前完整度、模块完成度和主要缺口。
+6. [系统状态](status.md)：测试数量、功能边界、已完成阶段和当前风险。
 7. [后端完整度与后续规划](backend-completeness-plan.md)：后端范围、阶段历史和剩余后端债务。
-8. [下一优先级复核](next-priority-review-b9.34.md)：B9.34 决策依据；其“部署前基线”段落是历史输入。
+8. [文档—代码一致性审计](documentation-code-consistency-audit-2026-07-16.md)：自动比对、已修复漂移和人工核查入口。
 
 ## 2. 规范类文档
 
@@ -38,7 +38,9 @@
 ## 3. 学生端与管理端设计/实现文档
 
 - [Student Information Architecture](student-information-architecture.md)
+- [Student Information Architecture And Functional Flows](student-information-architecture-and-flows.md)
 - [Admin Console IA](admin-console-ia.md)
+- [Admin Information Architecture And Functional Flows](admin-information-architecture-and-flows.md)
 - [Admin Backend Contract](admin-backend-contract.md)
 - [Admin Operational MVP](admin-operational-mvp.md)
 - [Admin Bank Mappings P1 UI](admin-bank-mappings-p1-ui.md)
@@ -85,16 +87,16 @@ npm run docs:audit
 
 ## 6. 当前版本辨识
 
-截至 2026-07-16：
+截至 Backend Final Closure release candidate：
 
 ```text
-staging runtime commit = da89292e3851001f9a3ac7dd6ad801ca9c2ccf29
-database schema = migrations 0001..0015
-migration ledger = 15 rows, current 0015_import_job_events.sql
+PR #2 runtime baseline = 5dbc9d858aa850fed8fd2ebd1703365c640d4461
+repository main before B9.40 = 3719d6ea5e5959d3b113612234f5b7469127275e
+B9.40 database release = migrations 0001..0016
 student entry = /
 admin entry = /admin/
 ADMIN_IMPORT_ENABLE_WRITE = false
 ADMIN_IMPORT_ENABLE_RESET = false
 ```
 
-B9.34 的 `c8b310e`、B9.35 的 `2fbaec1` 与审计开始时的 `5ddbead` 均为历史基线；B9.36–B9.38 已把审批工作流、Import realtime events 和 importer 性能收口部署到 runtime commit `da89292`。
+B9.34 的 `c8b310e`、B9.35 的 `2fbaec1`、B9.36–B9.38 的 `da89292` 和 PR #2 runtime baseline `5dbc9d8` 均保留为历史/运行证据。B9.40 以 [`backend-final-closure.md`](backend-final-closure.md) 定义当前后端冻结边界。

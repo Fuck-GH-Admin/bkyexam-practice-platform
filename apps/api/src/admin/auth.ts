@@ -235,6 +235,10 @@ export function createAdminAuthService(
         throw new AdminAuthError('invalid_credentials', 'Invalid admin credentials');
       }
 
+      if (admin.status !== 'active') {
+        throw new AdminAuthError('disabled', 'Admin user disabled');
+      }
+
       if (isAdminLocked(admin, now)) {
         throw new AdminAuthError('locked', 'Admin user temporarily locked');
       }
@@ -244,10 +248,6 @@ export function createAdminAuthService(
         const failure = nextFailureState(admin, now, policy);
         await repository.recordFailedLogin(admin.id, failure, now);
         throw new AdminAuthError('invalid_credentials', 'Invalid admin credentials');
-      }
-
-      if (admin.status !== 'active') {
-        throw new AdminAuthError('disabled', 'Admin user disabled');
       }
 
       await repository.recordSuccessfulLogin(admin.id, now);

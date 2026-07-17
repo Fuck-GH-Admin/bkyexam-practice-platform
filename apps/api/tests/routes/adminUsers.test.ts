@@ -63,6 +63,8 @@ function adminUserFixture(overrides: Partial<AdminManagedUserV1> = {}): AdminMan
       'question_review:write',
       'import_job:read',
       'import_job:create',
+      'import_job:cancel',
+      'import_job:retry',
       'system_status:read',
       'audit_log:read',
       'admin_user:manage',

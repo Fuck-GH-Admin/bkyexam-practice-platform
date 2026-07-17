@@ -192,7 +192,7 @@ describe('PostgreSQL-backed API integration', () => {
     expect(adminSystemStatus.statusCode).toBe(200);
     expect(adminSystemStatus.json()).toMatchObject({
       api: { ok: true, service: 'bkyexam-practice-api', version: '0.1.0' },
-      database: { ok: true, migrationCount: 15, currentMigration: '0015_import_job_events.sql' },
+      database: { ok: true, migrationCount: 16, currentMigration: '0016_import_job_index_cleanup.sql' },
       corpus: {
         classifications: 3,
         questions: 5,

@@ -62,6 +62,8 @@ describe('admin auth service', () => {
         'bank_mapping:read',
         'import_job:read',
         'import_job:create',
+        'import_job:cancel',
+        'import_job:retry',
         'system_status:read',
         'student_account:read',
         'student_account:write',
@@ -81,23 +83,29 @@ describe('admin auth service', () => {
 
   it('rejects invalid credentials and disabled admin users with stable error codes', async () => {
     const passwordHash = await hashPassword('secret');
-    const service = createAdminAuthService(createMemoryAdminAuthRepository([{
+    const repository = createMemoryAdminAuthRepository([{
       id: 'admin-1',
       loginName: 'operator@example.com',
       displayName: 'Operator',
       passwordHash,
       status: 'disabled',
       roles: ['operator'],
-    }]));
+    }]);
+    const service = createAdminAuthService(repository);
 
     await expect(service.login({ loginName: 'missing@example.com', password: 'secret' }))
       .rejects.toMatchObject({ code: 'invalid_credentials' });
     await expect(service.login({ loginName: 'operator@example.com', password: 'wrong' }))
-      .rejects.toMatchObject({ code: 'invalid_credentials' });
+      .rejects.toMatchObject({ code: 'disabled' });
     await expect(service.login({ loginName: 'operator@example.com', password: 'secret' }))
       .rejects.toBeInstanceOf(AdminAuthError);
     await expect(service.login({ loginName: 'operator@example.com', password: 'secret' }))
       .rejects.toMatchObject({ code: 'disabled' });
+    await expect(repository.findByLoginName('operator@example.com')).resolves.toMatchObject({
+      failedLoginCount: 0,
+      failedLoginWindowStartedAt: null,
+      lockedUntil: null,
+    });
   });
 
   it('records failed attempts, locks temporarily, and refuses locked admins', async () => {

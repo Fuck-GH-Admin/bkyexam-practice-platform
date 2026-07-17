@@ -34,6 +34,8 @@ const admin = {
     'bank_mapping:read',
     'import_job:read',
     'import_job:create',
+    'import_job:cancel',
+    'import_job:retry',
     'system_status:read',
   ] as const,
 };

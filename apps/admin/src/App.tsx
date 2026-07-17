@@ -1478,6 +1478,8 @@ function ImportJobsPage({
           ) : route.jobId ? (
             <ImportJobDetailPanel
               jobId={route.jobId}
+              canCancel={admin.permissions.includes('import_job:cancel')}
+              canRetry={admin.permissions.includes('import_job:retry')}
               onSessionExpired={onSessionExpired}
               onOpenJob={(nextJobId) => navigate(`/admin/import-jobs/${nextJobId}`)}
             />
@@ -1646,10 +1648,14 @@ function CreateImportJobPanel({
 
 function ImportJobDetailPanel({
   jobId,
+  canCancel,
+  canRetry,
   onSessionExpired,
   onOpenJob,
 }: {
   jobId: string;
+  canCancel: boolean;
+  canRetry: boolean;
   onSessionExpired: () => void;
   onOpenJob: (jobId: string) => void;
 }) {
@@ -1812,8 +1818,8 @@ function ImportJobDetailPanel({
       <div className="button-row">
         <button className="ghost" type="button" onClick={() => void load()}>刷新详情</button>
         <button className="ghost" type="button" onClick={() => void loadErrors()} disabled={loadingErrors}>{loadingErrors ? '读取中…' : '查看 error report'}</button>
-        <button className="ghost danger" type="button" onClick={() => void cancelJob()} disabled={acting || !['queued', 'running'].includes(job.status)}>取消任务</button>
-        <button className="ghost" type="button" onClick={() => void retryJob()} disabled={acting || !['failed', 'cancelled'].includes(job.status)}>重试任务</button>
+        <button className="ghost danger" type="button" onClick={() => void cancelJob()} disabled={!canCancel || acting || !['queued', 'running'].includes(job.status)}>取消任务</button>
+        <button className="ghost" type="button" onClick={() => void retryJob()} disabled={!canRetry || acting || !['failed', 'cancelled'].includes(job.status)}>重试任务</button>
       </div>
 
       <section className="detail-section">

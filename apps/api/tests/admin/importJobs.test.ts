@@ -428,6 +428,46 @@ describe('admin import job service', () => {
       summary: {},
     });
   });
+
+  it('aborts a claimed worker job after external stale recovery marks it failed', async () => {
+    const repository = createMemoryAdminImportJobRepository();
+    const service = createAdminImportJobService(repository, {
+      allowedRoots: [allowedRoot],
+      executionMode: 'queued',
+    });
+
+    const created = await service.createImportJob({
+      request: {
+        kind: 'full_corpus_import',
+        mode: 'dry_run',
+        sourceDir,
+        options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      },
+      actor: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    });
+    if (created.status !== 'created') throw new Error('Expected queued job.');
+
+    const worker = createAdminImportJobWorker(repository, {
+      workerId: 'test-worker-stale-recovery',
+      dryRun: async (_receivedSourceDir, _receivedOptions, context) => {
+        if (!context) throw new Error('Expected import job run context.');
+        await repository.failImportJob({
+          jobId: context.jobId,
+          message: 'Import job heartbeat timed out',
+        });
+        expect(await context.shouldAbort()).toBe(true);
+        await throwIfImportCancelled(context.shouldAbort);
+        return { questions: 99 };
+      },
+    });
+
+    await expect(worker.runOnce()).resolves.toMatchObject({
+      id: created.job.id,
+      status: 'failed',
+      progress: { phase: 'failed' },
+      errorSummary: [{ message: 'Import job heartbeat timed out' }],
+    });
+  });
 });
 
 describe('PostgreSQL question bank import runner', () => {

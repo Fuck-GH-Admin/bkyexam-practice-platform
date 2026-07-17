@@ -152,7 +152,7 @@ async function executeClaimedImportJob(
     shouldAbort: async () => {
       if (heartbeatLost) return true;
       const current = await repository.findImportJobById(job.id);
-      return current?.status === 'cancelled';
+      return current?.status === 'cancelled' || current?.status === 'failed';
     },
     reportProgress: async (progress) => {
       const current = await repository.updateImportJobProgress({ jobId: job.id, progress });

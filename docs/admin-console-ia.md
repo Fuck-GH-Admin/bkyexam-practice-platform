@@ -58,7 +58,7 @@ Admin Console
 | --- | --- | --- | --- |
 | Self session | `admin:self:read` | logout self | all admin roles |
 | Bank Mapping | `bank_mapping:read` | `bank_mapping:write`, `bank_mapping:publish` | content_editor, super_admin |
-| Import Jobs | `import_job:read` | `import_job:create` | operator, super_admin |
+| Import Jobs | `import_job:read` | `import_job:create`, `import_job:cancel`, `import_job:retry` | operator, super_admin |
 | Question Review | `question_review:read` | `question_review:write` | content_editor, super_admin |
 | System Status | `system_status:read` | none | operator, super_admin |
 | Audit Logs | `audit_log:read` | none | super_admin |
