@@ -108,13 +108,37 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   await expect(questionDetail.locator('.diff-list').first()).toContainText('1 + 1 的正确答案是什么？（已复核）');
   await page.getByRole('button', { name: '提交审批' }).click();
   await expect(page.getByText('修订已提交审批。')).toBeVisible();
+  await questionDetail.getByLabel('审批意见').fill('首版修订需要驳回');
+  await page.getByRole('button', { name: '驳回修订' }).click();
+  await expect(page.getByText('修订已驳回。')).toBeVisible();
+  await expect(questionDetail.getByText('1 + 1 的正确答案是什么？').first()).toBeVisible();
+
+  await questionDetail.getByLabel('题干 content override').fill('1 + 1 的正确答案是什么？（已复核）');
+  await questionDetail.getByLabel('answerRaw override').fill('B');
+  await questionDetail.getByLabel('option 2').fill('2（正确）');
+  await questionDetail.getByLabel('override note').fill('驳回后重新提交正确修订');
+  await page.getByRole('button', { name: '保存修订草稿' }).click();
+  await expect(page.getByText(/修订草稿已保存；draft version = 1/)).toBeVisible();
+  await page.getByRole('button', { name: '提交审批' }).click();
+  await expect(page.getByText('修订已提交审批。')).toBeVisible();
   await questionDetail.getByLabel('审批意见').fill('题干与选项已人工复核');
   await page.getByRole('button', { name: '批准并生效' }).click();
   await expect(page.getByText('修订已批准并生效。')).toBeVisible();
   await expect(questionDetail.getByText('1 + 1 的正确答案是什么？（已复核）').first()).toBeVisible();
+
+  await questionDetail.getByLabel('题干 content override').fill('1 + 1 的正确答案是什么？（第二次复核）');
+  await questionDetail.getByLabel('override note').fill('创建第二个 approved revision 以验证非冗余回滚');
+  await page.getByRole('button', { name: '保存修订草稿' }).click();
+  await expect(page.getByText(/修订草稿已保存；draft version = 1/)).toBeVisible();
+  await page.getByRole('button', { name: '提交审批' }).click();
+  await questionDetail.getByLabel('审批意见').fill('第二版修订已复核');
+  await page.getByRole('button', { name: '批准并生效' }).click();
+  await expect(questionDetail.getByText('1 + 1 的正确答案是什么？（第二次复核）').first()).toBeVisible();
+
   await questionDetail.getByLabel('回滚说明').fill('回滚链路 smoke');
-  await page.getByRole('button', { name: '回滚到此版本' }).click();
+  await page.getByRole('button', { name: '回滚到此版本' }).nth(1).click();
   await expect(page.getByText(/已回滚到修订/)).toBeVisible();
+  await expect(questionDetail.getByText('1 + 1 的正确答案是什么？（已复核）').first()).toBeVisible();
   await page.getByRole('button', { name: '排除出练习' }).click();
   await expect(page.getByText('该题已排除出练习选题。')).toBeVisible();
   await questionDetail.getByLabel('Flag type').selectOption('needs_manual_review');
@@ -166,6 +190,7 @@ test('admin operational MVP covers login, system status, student accounts, bank 
   expect(state.calls).toContain('GET /api/admin/question-review/77777777-7777-4777-8777-777777777777');
   expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777/override');
   expect(state.calls).toContain('POST /api/admin/question-review/77777777-7777-4777-8777-777777777777/override/submit');
+  expect(state.calls).toContain('POST /api/admin/question-review/77777777-7777-4777-8777-777777777777/override/reject');
   expect(state.calls).toContain('POST /api/admin/question-review/77777777-7777-4777-8777-777777777777/override/approve');
   expect(state.calls).toContain('POST /api/admin/question-review/77777777-7777-4777-8777-777777777777/override/rollback');
   expect(state.calls).toContain('PATCH /api/admin/question-review/77777777-7777-4777-8777-777777777777');

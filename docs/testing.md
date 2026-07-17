@@ -1,6 +1,6 @@
 # Testing Strategy
 
-状态日期：**2026-07-16**
+状态日期：**2026-07-17**
 
 测试按失败定位和外部依赖分层。任何一层通过都不能替代其他层。
 
@@ -83,12 +83,12 @@ npm run test:e2e
 - 临时密码 session 对 Practice/Wrongbook/Learning 的服务端 `PASSWORD_CHANGE_REQUIRED` 门禁，以及 Auth/Catalog 允许访问边界。
 - readiness、request id、结构化未捕获错误、安全 headers、可配置 rate limit/CSRF origin check、HTTP metrics smoke endpoint、production gate CLI/env/student migration summary、legacy student password migration CLI、管理员登录失败锁定。
 - Web 练习 model 与关键状态转换。
-- Admin route、RBAC nav、student query、bulk-create parser、Bank Mapping query/status badge、Import Job query/status badge/realtime event contract、Question Review query/status badge、Question Review revision/diff/approval/rollback contract、Audit Log query/status badge、Admin User query/badge 与状态 helper。
+- Admin route、RBAC nav、student query、bulk-create parser、Bank Mapping query/status badge、Import Job query/status badge/realtime event contract、Question Review query/status badge、Question Review revision/diff/approval/reject/rollback contract、Audit Log query/status badge、Admin User query/badge 与状态 helper。
 - 学生端 URL parser/builder。
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery/realtime event boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override/revision approval boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-其中 shared 26 项、API 456 项、Web 33 项、Admin 11 项，共 526 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+截至 2026-07-17，shared 26 项、API 460 项、Web 33 项、Admin 11 项，共 530 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
@@ -329,6 +329,34 @@ readiness latency = 68.61 ms
 ```
 
 窗口后 iowait 降至 0.8%、磁盘利用率降至 1.84%，没有饱和信号。服务器证据保存在 `/srv/bkyexam-backups/b9.36-20260716T182355Z/`，完整说明见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
+
+### B9.39 Workflow And Realtime Coverage Closure
+
+2026-07-17 针对人工核查发现的薄弱分支补充以下自动化覆盖：
+
+- Question Review `pending_review -> rejected` 正向流转。
+- reject 不改变 effective override，且 rejected 后可以创建新 draft。
+- Admin Playwright 覆盖驳回 UI、驳回后重新提交审批，以及回滚到较旧 approved revision。
+- draft version conflict、effective version conflict、missing revision。
+- rollback 当前相同 effective snapshot 返回 409，不产生冗余 approved history。
+- rollback 到旧 revision 后可继续保存、提交并审批新 revision。
+- Question Review workflow 的 403/404/409 尝试写入 `result=failure` 审计。
+- Import Jobs SSE 响应头、event framing 和终态自动关闭。
+- `Last-Event-ID` replay，并固定 header 优先于 query cursor。
+- `cancelled` 与 stale-job `recovered` 事件通过 SSE 送达。
+- dry-run 只包含 `loading_source/dry_run_summary/done`；import 模式覆盖写入批次阶段。
+- Admin EventSource 生命周期依赖 active/terminal 布尔状态，避免 queued -> running 时无意义重建连接。
+
+完整 `npm run verify:docker` 结果：
+
+```text
+docs audit = 56 Markdown / 187 links / 64 routes / 15 migrations
+Vitest = 64 files / 530 tests
+typecheck = PASS
+build = PASS
+Playwright = 5 passed
+PostgreSQL integration = 1 file / 2 tests passed
+```
 
 完整真实题库的验证链包括：
 

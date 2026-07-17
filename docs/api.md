@@ -1023,8 +1023,7 @@ Query：
       "createdAt": "2026-07-16T10:00:00.000Z"
     }
   ],
-  "lastEventId": "42",
-  "hasMore": false
+  "lastEventId": "42"
 }
 ```
 
@@ -1040,10 +1039,15 @@ Rules：
 
 - 事件类型包含 `queued/running/progress/succeeded/failed/cancelled/recovered`。
 - 事件保存在 `import_job_events`，不是进程内临时消息。
-- 客户端可通过 `Last-Event-ID` header 或 `afterEventId` query 恢复；两者同时存在时使用更大的 event id。
+- 客户端可通过 `Last-Event-ID` header 或 `afterEventId` query 恢复；两者同时存在时以合法的 `Last-Event-ID` header 为准。
 - 服务端发送 keepalive，并设置 `X-Accel-Buffering: no`。
 - job 到达终态且已发送全部事件后关闭 SSE。
 - `404` 表示 job 不存在；`400` 表示 event cursor/query 无效。
+
+阶段语义按执行模式区分：
+
+- `mode=dry_run`：报告 `loading_source`、`dry_run_summary`、`done`；它只解析并汇总源数据，不进入 classifications/questions/options/bank_mappings 的数据库写入批次。
+- `mode=import`：报告 `loading_source`、`classifications`、`questions`、`options`、`bank_mappings`、`done`。
 
 ### `POST /api/admin/import-jobs/:jobId/cancel`
 
@@ -1288,7 +1292,7 @@ Permission：`question_review:approve`
 }
 ```
 
-以目标 approved revision 的 snapshot 创建新的 approved revision 并应用；历史 revision 不删除、不改写。成功写 `question_review.override_rollback` audit log。目标不是 approved revision、effective version 冲突或存在 active draft/pending revision时返回 `409`。
+以目标 approved revision 的 snapshot 创建新的 approved revision 并应用；历史 revision 不删除、不改写。成功写 `question_review.override_rollback` audit log。目标不是 approved revision、effective version 冲突、存在 active draft/pending revision，或目标 snapshot 与当前 effective 内容完全相同时返回 `409`，后者不会创建冗余 revision。Question Review workflow 的权限拒绝、资源缺失和版本冲突会写入同 action、`result=failure` 的 audit log。
 
 ### `PATCH /api/admin/question-review/:questionId`
 

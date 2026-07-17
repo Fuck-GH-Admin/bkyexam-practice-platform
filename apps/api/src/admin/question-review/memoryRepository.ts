@@ -287,6 +287,10 @@ export function createMemoryAdminQuestionReviewRepository(
       }
       const now = new Date().toISOString();
       const snapshot = revisionSnapshot(target);
+      const diff = buildOverrideDiff(before, snapshot);
+      if (diff.length === 0) {
+        return { status: 'no_change', current: before };
+      }
       const effective = applyMemorySnapshot(before, snapshot, {
         actor: input.actor,
         note: input.request.note,
@@ -300,7 +304,7 @@ export function createMemoryAdminQuestionReviewRepository(
         status: 'approved',
         ...snapshot,
         note: input.request.note,
-        diff: buildOverrideDiff(before, snapshot),
+        diff,
         createdBy: { id: input.actor.id, displayName: input.actor.displayName },
         createdAt: now,
         updatedAt: now,

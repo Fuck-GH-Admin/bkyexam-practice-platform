@@ -45,6 +45,21 @@ server {
     root /srv/bkyexam-practice-platform/apps/web/dist;
     index index.html;
 
+    # Import Jobs realtime progress. The application also returns
+    # X-Accel-Buffering: no, but Nginx buffering is disabled explicitly here
+    # so SSE events are flushed immediately through the reverse proxy.
+    location ~ ^/api/admin/import-jobs/[0-9a-fA-F-]+/events$ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:3000/api/;
         proxy_http_version 1.1;
@@ -59,6 +74,14 @@ server {
     }
 }
 ```
+
+SSE 部署验收至少应确认：
+
+1. `Content-Type` 为 `text/event-stream`。
+2. 响应包含 `X-Accel-Buffering: no`。
+3. Nginx 对 events endpoint 显式设置 `proxy_buffering off`。
+4. `Last-Event-ID` 重连只返回该 cursor 之后的事件。
+5. `cancelled`、`recovered` 和成功/失败终态事件均能在连接关闭前送达。
 
 Docker is optional. It may become useful when deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
 

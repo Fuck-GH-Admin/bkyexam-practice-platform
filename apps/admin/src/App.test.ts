@@ -26,6 +26,7 @@ import {
   buildVisibleAdminNavigation,
   parseAdminRoute,
   parseBulkStudentInput,
+  shouldStreamImportJobEvents,
 } from './App';
 
 describe('admin route helpers', () => {
@@ -182,6 +183,14 @@ describe('import job helpers', () => {
       'reset-requested',
       'has-errors',
     ]);
+    expect(shouldStreamImportJobEvents(job)).toBe(false);
+    expect(shouldStreamImportJobEvents({
+      ...job,
+      status: 'running',
+      progress: { phase: 'questions', current: 1, total: 10 },
+      finishedAt: null,
+    })).toBe(true);
+    expect(shouldStreamImportJobEvents(null)).toBe(false);
   });
 });
 

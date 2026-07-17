@@ -271,7 +271,7 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
       );
       for (const override of body.optionContentOverrides ?? []) optionOverrides.set(override.optionId, override.content);
       const revision: AdminQuestionOverrideRevisionV1 = {
-        id: active?.id ?? '77777777-7777-4777-8777-100000000001',
+        id: active?.id ?? nextQuestionRevisionId((question.workflow?.revisions.length ?? 0) + 1),
         questionId,
         version: (active?.version ?? 0) + 1,
         baseVersion: question.overrideVersion,
@@ -340,7 +340,7 @@ export async function installMockAdminApi(page: Page, state: MockAdminState) {
       } else {
         const rollback: AdminQuestionOverrideRevisionV1 = {
           ...structuredClone(revision),
-          id: '77777777-7777-4777-8777-100000000002',
+          id: nextQuestionRevisionId((question.workflow?.revisions.length ?? 0) + 1),
           version: 1,
           baseVersion: question.overrideVersion,
           status: 'approved',
@@ -1194,6 +1194,10 @@ function nextImportJobId(index: number) {
 
 function nextQuestionFlagId(index: number) {
   return `cccccccc-cccc-4ccc-8ccc-${String(index).padStart(12, '0')}`;
+}
+
+function nextQuestionRevisionId(index: number) {
+  return `77777777-7777-4777-8777-${String(index).padStart(12, '0')}`;
 }
 
 function readBody<T>(route: Route): T {

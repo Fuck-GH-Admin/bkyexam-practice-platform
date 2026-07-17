@@ -127,6 +127,11 @@ describe('admin import job routes', () => {
       expect.objectContaining({ jobId, type: 'succeeded', job: expect.objectContaining({ status: 'succeeded' }) }),
     ]));
     expect(Number(events.json().lastEventId)).toBeGreaterThan(0);
+    expect([
+      ...new Set((events.json().events as Array<{ type: string; job: AdminImportJobV1 }>)
+        .filter((event) => event.type === 'progress' || event.type === 'succeeded')
+        .map((event) => event.job.progress.phase)),
+    ]).toEqual(['loading_source', 'dry_run_summary', 'done']);
 
     const errors = await app.inject({
       method: 'GET',
@@ -367,8 +372,11 @@ describe('admin import job routes', () => {
       adminImportJobRepository: repository,
       adminImportAllowedRoots: [fixtureDir],
       adminImportModeEnabled: true,
-      adminImportRunner: async (sourceDir, options) => {
+      adminImportRunner: async (sourceDir, options, context) => {
         calls.push({ sourceDir, options });
+        for (const phase of ['classifications', 'questions', 'options', 'bank_mappings'] as const) {
+          await context?.reportProgress?.({ phase, current: 1, total: 1 });
+        }
         return {
           classifications: 1,
           questions: 2,
@@ -423,6 +431,17 @@ describe('admin import job routes', () => {
       action: 'import_job.create',
       after: { kind: 'full_corpus_import', mode: 'import', status: 'succeeded' },
     });
+
+    const events = await repository.listImportJobEvents({
+      jobId: response.json().job.id,
+      afterEventId: '0',
+      limit: 100,
+    });
+    expect([
+      ...new Set(events
+        .filter((event) => event.type === 'progress' || event.type === 'succeeded')
+        .map((event) => event.job.progress.phase)),
+    ]).toEqual(['classifications', 'questions', 'options', 'bank_mappings', 'done']);
   });
 
   it('allows resetBeforeImport for enabled import mode and super_admin', async () => {
@@ -568,5 +587,143 @@ describe('admin import job routes', () => {
         sourceStatus: 'cancelled',
       },
     });
+  });
+
+  it('streams SSE events, sets no-buffer headers, and gives Last-Event-ID header priority', async () => {
+    const repository = createMemoryAdminImportJobRepository();
+    const created = await repository.createQueuedImportJob({
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      createdBy: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    });
+    if (created.status !== 'created') throw new Error('Expected queued import job');
+    const running = await repository.claimNextImportJob({ workerId: 'sse-worker' });
+    if (!running) throw new Error('Expected running import job');
+    await repository.updateImportJobProgress({
+      jobId: running.id,
+      progress: { phase: 'questions', current: 1, total: 2 },
+    });
+    await repository.completeImportJob({
+      jobId: running.id,
+      progress: { phase: 'done', current: 2, total: 2 },
+      summary: { questions: 2 },
+    });
+    const allEvents = await repository.listImportJobEvents({
+      jobId: running.id,
+      afterEventId: '0',
+      limit: 100,
+    });
+    expect(allEvents.map((event) => event.type)).toEqual(['queued', 'running', 'progress', 'succeeded']);
+
+    const app = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: repository,
+    });
+    const cookie = await loginAdmin(app);
+    const baseUrl = await app.listen({ host: '127.0.0.1', port: 0 });
+
+    try {
+      const response = await fetch(
+        `${baseUrl}/api/admin/import-jobs/${running.id}/events?afterEventId=0`,
+        {
+          headers: {
+            accept: 'text/event-stream',
+            cookie,
+            'last-event-id': allEvents[0].id,
+          },
+        },
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+      expect(response.headers.get('x-accel-buffering')).toBe('no');
+      expect(response.headers.get('cache-control')).toContain('no-transform');
+
+      const body = await response.text();
+      expect(body).not.toContain(`id: ${allEvents[0].id}\n`);
+      for (const event of allEvents.slice(1)) {
+        expect(body).toContain(`id: ${event.id}\n`);
+        expect(body).toContain(`event: ${event.type}\n`);
+      }
+      expect(body).toContain('"phase":"questions"');
+      expect(body).toContain('"status":"succeeded"');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('streams cancelled and recovered terminal events over SSE', async () => {
+    const cancelledRepository = createMemoryAdminImportJobRepository();
+    const created = await cancelledRepository.createQueuedImportJob({
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      createdBy: { id: adminId, displayName: 'Operator', roles: ['operator'] },
+    });
+    if (created.status !== 'created') throw new Error('Expected queued import job');
+    await cancelledRepository.cancelImportJob({ jobId: created.job.id });
+
+    const cancelledApp = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: cancelledRepository,
+    });
+    const cancelledCookie = await loginAdmin(cancelledApp);
+    const cancelledBaseUrl = await cancelledApp.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const response = await fetch(
+        `${cancelledBaseUrl}/api/admin/import-jobs/${created.job.id}/events`,
+        { headers: { accept: 'text/event-stream', cookie: cancelledCookie } },
+      );
+      const body = await response.text();
+      expect(body).toContain('event: queued');
+      expect(body).toContain('event: cancelled');
+      expect(body).toContain('"status":"cancelled"');
+    } finally {
+      await cancelledApp.close();
+    }
+
+    const staleJob: AdminImportJobV1 = {
+      id: '60000000-0000-4000-8000-000000000010',
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'running',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      progress: { phase: 'questions', current: 1, total: 2 },
+      summary: {},
+      errorSummary: [],
+      createdBy: { id: adminId, displayName: 'Operator' },
+      createdAt: '2026-07-17T01:00:00.000Z',
+      startedAt: '2026-07-17T01:00:00.000Z',
+      finishedAt: null,
+      workerId: 'dead-worker',
+      heartbeatAt: '2026-07-17T01:00:00.000Z',
+    };
+    const recoveredRepository = createMemoryAdminImportJobRepository([staleJob]);
+    await expect(recoveredRepository.recoverStaleImportJobs({
+      staleAfterMs: 60_000,
+      now: new Date('2026-07-17T01:10:00.000Z'),
+    })).resolves.toMatchObject([{ id: staleJob.id, status: 'failed' }]);
+
+    const recoveredApp = buildApp({
+      adminAuthRepository: await adminAuthRepository(['operator']),
+      adminImportJobRepository: recoveredRepository,
+    });
+    const recoveredCookie = await loginAdmin(recoveredApp);
+    const recoveredBaseUrl = await recoveredApp.listen({ host: '127.0.0.1', port: 0 });
+    try {
+      const response = await fetch(
+        `${recoveredBaseUrl}/api/admin/import-jobs/${staleJob.id}/events`,
+        { headers: { accept: 'text/event-stream', cookie: recoveredCookie } },
+      );
+      const body = await response.text();
+      expect(body).toContain('event: recovered');
+      expect(body).toContain('"status":"failed"');
+      expect(body).toContain('Import job heartbeat timed out');
+    } finally {
+      await recoveredApp.close();
+    }
   });
 });

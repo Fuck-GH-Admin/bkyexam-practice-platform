@@ -76,7 +76,8 @@ export type QuestionOverrideWorkflowResult =
   | { status: 'revision_not_found' }
   | { status: 'version_conflict'; current: AdminQuestionReviewDetailV1 }
   | { status: 'draft_version_conflict'; current: AdminQuestionReviewDetailV1 }
-  | { status: 'revision_not_editable'; current: AdminQuestionReviewDetailV1 };
+  | { status: 'revision_not_editable'; current: AdminQuestionReviewDetailV1 }
+  | { status: 'no_change'; current: AdminQuestionReviewDetailV1 };
 
 export interface AdminQuestionReviewRepository {
   listQuestionReviews(filters: AdminQuestionReviewListFilters): Promise<AdminQuestionReviewPage>;

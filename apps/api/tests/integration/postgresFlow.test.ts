@@ -937,6 +937,72 @@ describe('PostgreSQL-backed API integration', () => {
         },
       },
     });
+
+    const redundantRollback = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override/rollback`,
+      headers: { cookie: superAdminCookie },
+      payload: {
+        revisionId: unansweredRevisionId,
+        expectedVersion: 1,
+        note: 'Current effective snapshot must not create redundant history.',
+      },
+    });
+    expect(redundantRollback.statusCode).toBe(409);
+    expect(redundantRollback.json()).toEqual({
+      error: 'Question override rollback would not change effective content',
+    });
+
+    const rejectedDraft = await app.inject({
+      method: 'PATCH',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override`,
+      headers: { cookie: editorCookie },
+      payload: {
+        expectedVersion: 1,
+        expectedDraftVersion: 0,
+        content: 'This PostgreSQL-backed revision must be rejected.',
+        answerRaw: fixtureIds.options.unansweredWrong,
+        optionContentOverrides: [],
+        note: 'PostgreSQL reject coverage',
+      },
+    });
+    expect(rejectedDraft.statusCode).toBe(200);
+    const rejectedRevisionId = rejectedDraft.json().question.workflow.activeRevision.id as string;
+    expect((await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override/submit`,
+      headers: { cookie: editorCookie },
+      payload: { revisionId: rejectedRevisionId, expectedDraftVersion: 1 },
+    })).statusCode).toBe(200);
+    const rejectedOverride = await app.inject({
+      method: 'POST',
+      url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override/reject`,
+      headers: { cookie: superAdminCookie },
+      payload: {
+        revisionId: rejectedRevisionId,
+        expectedVersion: 1,
+        reviewNote: 'Incorrect answer change',
+      },
+    });
+    expect(rejectedOverride.statusCode).toBe(200);
+    expect(rejectedOverride.json()).toMatchObject({
+      question: {
+        content: '哪一个端口是 PostgreSQL 的默认监听端口？',
+        answerRaw: fixtureIds.options.unansweredCorrect,
+        overrideVersion: 1,
+        workflow: {
+          activeRevision: null,
+          revisions: expect.arrayContaining([
+            expect.objectContaining({
+              id: rejectedRevisionId,
+              status: 'rejected',
+              appliedVersion: null,
+            }),
+          ]),
+        },
+      },
+    });
+
     const staleUnansweredOverride = await app.inject({
       method: 'PATCH',
       url: `/api/admin/question-review/${fixtureIds.questions.unanswered}/override`,

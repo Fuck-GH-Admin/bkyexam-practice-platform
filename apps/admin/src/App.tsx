@@ -1742,8 +1742,10 @@ function ImportJobDetailPanel({
     setLiveEvents([]);
   }, [jobId]);
 
+  const liveStreamEnabled = shouldStreamImportJobEvents(job);
+
   useEffect(() => {
-    if (!job || isTerminalImportJob(job) || typeof EventSource === 'undefined') {
+    if (!liveStreamEnabled || typeof EventSource === 'undefined') {
       setLiveState('idle');
       return;
     }
@@ -1792,7 +1794,7 @@ function ImportJobDetailPanel({
       }
       source.close();
     };
-  }, [jobId, job?.status]);
+  }, [jobId, liveStreamEnabled]);
 
   if (loading) return <InfoPanel title="正在加载导入任务详情…" />;
   if (error && !job) return <ErrorPanel message={error} onRetry={() => void load()} />;
@@ -1886,6 +1888,10 @@ function ImportJobErrorReport({ errors }: { errors: AdminImportJobErrorSummaryV1
 
 function isTerminalImportJob(job: AdminImportJobV1): boolean {
   return job.status === 'succeeded' || job.status === 'failed' || job.status === 'cancelled';
+}
+
+export function shouldStreamImportJobEvents(job: AdminImportJobV1 | null): boolean {
+  return Boolean(job && !isTerminalImportJob(job));
 }
 
 function QuestionReviewPage({

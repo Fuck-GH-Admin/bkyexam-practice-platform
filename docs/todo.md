@@ -1,5 +1,20 @@
 # Roadmap
 
+## Completed B9.39 Workflow and realtime test coverage closure — 2026-07-17
+
+- [x] 补 Question Review reject 正向流：pending -> rejected、effective 不变、reject 后重新编辑。
+- [x] Admin Playwright 覆盖驳回 UI、驳回后重新提交审批和非冗余历史回滚。
+- [x] 补 draft/effective version conflict、missing revision 和 403/404/409 failure audit。
+- [x] 禁止 rollback 到当前相同 effective snapshot，避免冗余 approved history。
+- [x] 覆盖 rollback 到旧 revision 后继续保存、提交和审批。
+- [x] PostgreSQL integration 覆盖 reject 不写 effective 表和 no-op rollback 409。
+- [x] 补 Import Jobs SSE framing、no-buffer header、`Last-Event-ID` replay。
+- [x] 补 cancelled/recovered SSE 终态事件。
+- [x] 自动断言 dry-run 三阶段与 import 写入批次阶段。
+- [x] Admin EventSource 改为按 active/terminal 布尔状态管理，避免 queued -> running 重连抖动。
+- [x] 修正 API JSON/cursor/阶段文档，并在 deployment 文档显式配置 `proxy_buffering off`。
+- [x] `npm run verify:docker` 通过：64 files / 530 Vitest、5 Playwright、2 PostgreSQL integration。
+
 ## Completed B9.36–B9.38 Question Review workflow, Import realtime progress, and importer capacity — 2026-07-16
 
 - [x] 新增 `0014_question_review_workflow.sql` 与 `question_override_revisions`。

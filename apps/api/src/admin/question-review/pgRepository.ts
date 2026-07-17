@@ -476,6 +476,9 @@ export function createPgAdminQuestionReviewRepository(client: QueryClient): Admi
 
         const snapshot = revisionSnapshot(target);
         const diff = buildOverrideDiff(before, snapshot);
+        if (diff.length === 0) {
+          return { status: 'no_change' as const, current: before };
+        }
         const appliedVersion = await applyOverrideSnapshot(
           transactionClient,
           input.questionId,
