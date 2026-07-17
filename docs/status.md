@@ -14,7 +14,7 @@
 >
 > **B9.36–B9.38 工作流与容量收口：** runtime commit `da89292` 已部署到真实服务器，数据库 ledger 为 15 个 migration、current `0015_import_job_events.sql`。Question Review 字段级 diff、草稿提交、审批/驳回和可审计回滚，Import Jobs durable event log、SSE/JSON 断线续传和阶段级批次进度均已实机通过；change-aware importer 的完整题库 non-reset true import 用时 11.81 秒、WAL 443,864 bytes，corpus 表 update/dead tuple 均为 0，维护窗口无 readiness failure，write/reset gate 已恢复关闭。完整记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
 >
-> **B9.40 Backend Final Closure：** Admin disabled 状态改为密码验证前检查；Import cancel/retry 拆为独立权限；worker 直接识别 externally-failed job；新增 `0016_import_job_index_cleanup.sql` 删除冗余 running-only 索引。当前范围后端进入 feature freeze，详见 [`backend-final-closure.md`](backend-final-closure.md)。学生端和管理端后续设计真相源分别为 [`student-information-architecture-and-flows.md`](student-information-architecture-and-flows.md) 与 [`admin-information-architecture-and-flows.md`](admin-information-architecture-and-flows.md)。
+> **B9.40 Backend Final Closure：** PR #5 已合并，runtime commit `6a441a3` 已部署到真实服务器；Admin disabled 状态改为密码验证前检查，Import cancel/retry 拆为独立权限，worker 直接识别 externally-failed job，`0016_import_job_index_cleanup.sql` 已应用且二次执行全部 skipped。production gate、health/readiness、Nginx、学生/Admin 静态入口和 no-auth load baseline 均通过，证据目录为 `/srv/bkyexam-backups/b9.40-20260717T144606Z/`。当前范围后端进入 feature freeze，详见 [`backend-final-closure.md`](backend-final-closure.md)。学生端和管理端后续设计真相源分别为 [`student-information-architecture-and-flows.md`](student-information-architecture-and-flows.md) 与 [`admin-information-architecture-and-flows.md`](admin-information-architecture-and-flows.md)。
 
 ## Executive Summary
 
@@ -560,7 +560,7 @@ PracticeSessionService
 | Student product shell | 功能性 | 80% | 密码登录、首次改密、账号身份显示、首页、题库、练习、错题、历史、稳定 URL | 档案、首屏之外分页操作、统一空/错/加载状态、最终视觉 |
 | Admin console | Operational MVP+ | 94% | 数据字段、自动 mapping、后端 contract、Admin Auth/RBAC/session/audit、管理员登录失败锁定、Admin User/Student Manage、Bank Mapping、System Status、Import Jobs 完整控制/worker/realtime、Question Review diff/审批/驳回/回滚、Audit Log、super_admin bootstrap、独立 `apps/admin`、Playwright 与真实 staging smoke | 批量质检、审批通知、文件级 import error 下载、dashboard、正式视觉与可用性验收 |
 | Subjective/complex grading | 早期 | 10% | 类型已导入，grader 可返回 self-review 语义 | 填空、简答、编程、Office、材料题完整流程 |
-| Operations | 可重复验证，维护窗口边界已量化 | 96% | 配置、15 migration ledger/checksum、change-aware importer、完整题库持续容量 profile、真实服务器 non-reset true import、before/during/after 资源采样、pre/post custom dump checksum、Playwright、PostgreSQL integration、CI/required checks、readiness、metrics、production gate、synthetic healthcheck、deployment evidence 和负载基线 | PR human approval/merge、第三方告警通知接入、跨硬件容量阈值、事件保留策略和正式生产发布验收 |
+| Operations | 可重复验证，维护窗口边界已量化 | 97% | 配置、16 migration ledger/checksum、change-aware importer、完整题库持续容量 profile、真实服务器 non-reset true import、before/during/after 资源采样、pre/post custom dump checksum、Playwright、PostgreSQL integration、CI/required checks、readiness、metrics、production gate、synthetic healthcheck、deployment evidence 和负载基线 | 第三方告警通知接入、跨硬件容量阈值、事件保留策略和正式生产发布验收 |
 
 ## Known Product And Technical Risks
 
@@ -569,7 +569,7 @@ PracticeSessionService
 - B9.36–B9.38 current HEAD 已完成真实 staging 复验；当前运行基线为 commit `da89292`、15 个 migration、current `0015_import_job_events.sql`，证据目录为 `/srv/bkyexam-backups/b9.36-20260716T182355Z/`。
 - `ADMIN_IMPORT_ENABLE_WRITE=false` 与 `ADMIN_IMPORT_ENABLE_RESET=false` 必须保持默认关闭；全量 import 仅允许在维护窗口临时开启 write gate，reset gate 在数据保留/版本化设计完成前不得日常启用。
 - 历史连续全量 upsert 曾让 2 vCPU / 1.6 GiB 主机出现 60% iowait、load average 96 和 blocked tasks；change-aware importer 后单轮 unchanged true import 为 11.81 秒、WAL 443,864 bytes，峰值 iowait 15.12%、磁盘利用率 36.88%、队列 4，且 readiness failure 为 0。尽管风险显著下降，公开生产仍必须保持“导入维护窗口”限制，除非升级硬件并重新建立在线导入阈值。
-- 学生密码登录 enforcement、首次改密前后端门禁、旧账号迁移审计/写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks 和目标环境迁移证据已落地；公开生产前仍需 PR human approval/merge、第三方告警通知接入和最终发布参数验收。
+- 学生密码登录 enforcement、首次改密前后端门禁、旧账号迁移审计/写入 CLI、部署证据校验 CLI、PR CI、`main` branch protection/required checks、PR #5 合并和目标环境 `0016` 迁移证据已落地；公开生产前仍需第三方告警通知接入和最终发布参数验收。
 - Admin Auth/RBAC/session/audit、题库整理、System Status、Import Jobs 完整控制/worker/realtime、Question Review diff/审批/驳回/回滚、Audit Log、Admin User/Student Manage 与 super_admin bootstrap 均已落地并完成真实 staging 功能验证；仍缺批量复核、审批通知、文件/行级错误下载、dashboard 和最终可用性验收。
 - 已有 readiness、request id、安全 headers、可配置 rate limit/CSRF origin check、可校验 backup/restore、结构化日志、metrics、synthetic healthcheck、真实 import resource monitor 和轻量 staging load baseline；仍没有第三方告警通知目标、跨硬件持续容量阈值和正式生产数据量级恢复演练。
 - 已对 `https://exam.acgbot.cc.cd` 的 current HEAD 做 staging smoke、production gate、worker recovery、reset safety、轻量 load baseline、最终 restore drill 和 deployment evidence；仍未声明正式公开生产发布完成。

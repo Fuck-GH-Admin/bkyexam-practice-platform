@@ -87,16 +87,17 @@ npm run docs:audit
 
 ## 6. 当前版本辨识
 
-截至 Backend Final Closure release candidate：
+截至 Backend Final Closure 已合并并部署：
 
 ```text
 PR #2 runtime baseline = 5dbc9d858aa850fed8fd2ebd1703365c640d4461
-repository main before B9.40 = 3719d6ea5e5959d3b113612234f5b7469127275e
+PR #5 merge/runtime = 6a441a3718367fc5c1576c63f24d4c21ae7d216c
 B9.40 database release = migrations 0001..0016
+current migration = 0016_import_job_index_cleanup.sql
 student entry = /
 admin entry = /admin/
 ADMIN_IMPORT_ENABLE_WRITE = false
 ADMIN_IMPORT_ENABLE_RESET = false
 ```
 
-B9.34 的 `c8b310e`、B9.35 的 `2fbaec1`、B9.36–B9.38 的 `da89292` 和 PR #2 runtime baseline `5dbc9d8` 均保留为历史/运行证据。B9.40 以 [`backend-final-closure.md`](backend-final-closure.md) 定义当前后端冻结边界。
+B9.34 的 `c8b310e`、B9.35 的 `2fbaec1`、B9.36–B9.38 的 `da89292` 和 PR #2 runtime baseline `5dbc9d8` 均保留为历史/运行证据。B9.40 的真实服务器证据目录为 `/srv/bkyexam-backups/b9.40-20260717T144606Z/`，并以 [`backend-final-closure.md`](backend-final-closure.md) 定义当前后端冻结边界。

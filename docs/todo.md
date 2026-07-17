@@ -13,6 +13,10 @@
 - [x] 新增学生端和管理端信息架构/功能流程文档及 Mermaid 图。
 - [x] `docs:audit`：59 Markdown / 200 links / 64 routes / 16 migrations。
 - [x] Vitest：64 files / 533 tests；Playwright：5 passed；PostgreSQL integration：2 passed。
+- [x] PR #5 的 `quality` 与 `postgres-integration` required checks 通过并完成合并。
+- [x] runtime commit `6a441a3` 已部署，`0016` 首次 applied、二次全部 skipped。
+- [x] production gate、health/readiness、Nginx、学生/Admin 静态入口和 12 项 no-auth load baseline 通过。
+- [x] 部署证据写入 `/srv/bkyexam-backups/b9.40-20260717T144606Z/`。
 
 ## Completed B9.39 Workflow and realtime test coverage closure — 2026-07-17
 

@@ -387,6 +387,21 @@ Playwright = 5 passed
 PostgreSQL integration = 1 file / 2 tests passed
 ```
 
+远端和真实服务器结果：
+
+```text
+PR #5 required checks = quality / postgres-integration PASS
+runtime commit = 6a441a3718367fc5c1576c63f24d4c21ae7d216c
+schema_migrations = 16 / current 0016_import_job_index_cleanup.sql
+second migration run = all skipped
+production gate = ok=true
+health/readiness = PASS
+student/admin static entry = 200/200
+no-auth load baseline = 12 checks / 0 failures
+```
+
+服务器证据目录：`/srv/bkyexam-backups/b9.40-20260717T144606Z/`。
+
 最小 fixture integration 已固化为每次 CI 可运行的快速门；完整 89922 题导入已固化为可选慢速 profile，但不会加入每次提交的 CI。
 
 ## Change Acceptance

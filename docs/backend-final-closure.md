@@ -149,7 +149,42 @@ flowchart LR
 
 验证结果在本阶段提交前写入 [`testing.md`](testing.md)、[`status.md`](status.md) 和 [`todo.md`](todo.md)。
 
-## 6. 最终判断
+## 6. 合并与真实服务器证据
+
+2026-07-17 已完成：
+
+```text
+PR = #5
+merge/runtime commit = 6a441a3718367fc5c1576c63f24d4c21ae7d216c
+required checks = quality / postgres-integration PASS
+schema_migrations = 16
+current migration = 0016_import_job_index_cleanup.sql
+second migration run = all skipped
+old running-only index = absent
+queued/running active index = present
+production gate = ok=true
+health/readiness = ok
+student/admin static entry = 200/200
+no-auth load baseline = 12 checks / 0 failures
+```
+
+运行门禁保持：
+
+```text
+ADMIN_IMPORT_ENABLE_WRITE=false
+ADMIN_IMPORT_ENABLE_RESET=false
+COOKIE_SECURE=true
+```
+
+服务器证据目录：
+
+```text
+/srv/bkyexam-backups/b9.40-20260717T144606Z/
+```
+
+`main` 的 required review 临时单协作者例外已在合并后撤销，保护规则恢复为 1 个 approving review，并继续要求 strict `quality`、`postgres-integration`、conversation resolution 和 enforce admins。
+
+## 7. 最终判断
 
 完成本轮后，当前范围的后端状态定义为：
 
@@ -167,4 +202,3 @@ flowchart LR
 - 将未设计清楚的复杂题型塞入 objective grader；
 - 绕过 override/revision 直接修改导入原题表；
 - 把 reset import 当作日常运营操作。
-
