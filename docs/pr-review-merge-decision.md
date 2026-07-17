@@ -211,7 +211,7 @@ state = MERGED
 mergedAt = 2026-07-17T13:42:49Z
 merge strategy = squash
 merged commit = 5dbc9d858aa850fed8fd2ebd1703365c640d4461
-main HEAD = 5dbc9d858aa850fed8fd2ebd1703365c640d4461
+PR #2 runtime baseline = 5dbc9d858aa850fed8fd2ebd1703365c640d4461
 ```
 
 首次执行 `gh pr merge --squash --admin` 时，GitHub 仍返回：
@@ -371,8 +371,10 @@ nginx service = active
 
 ### 10.6 最终判定
 
-PR #2 的 review、merge、生产同步、migration 幂等验证、readiness、生产门禁、无认证负载基线和 Nginx SSE 配置均已闭环。B9.36-B9.39 当前 merged/deployed 真相源为：
+PR #2 的 review、merge、生产同步、migration 幂等验证、readiness、生产门禁、无认证负载基线和 Nginx SSE 配置均已闭环。B9.36-B9.39 的 merged/deployed **运行时代码基线**为：
 
 ```text
-main@5dbc9d858aa850fed8fd2ebd1703365c640d4461
+PR #2 squash commit 5dbc9d858aa850fed8fd2ebd1703365c640d4461
 ```
+
+闭环记录随后通过 docs-only PR #3 合入，服务器也已 fast-forward 到包含该记录的 `main`；docs-only commit 不改变上述运行时代码、构建产物、数据库 migration 或服务配置。需要查询任一时刻的仓库 `main` HEAD 时，应读取 Git 远端，而不是把本节的 PR #2 runtime baseline 当作永久分支指针。
