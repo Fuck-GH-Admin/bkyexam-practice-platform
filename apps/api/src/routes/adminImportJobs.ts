@@ -283,7 +283,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
 
     app.post('/api/admin/import-jobs/:jobId/cancel', async (request, reply) => {
       const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
-      const required = requireAdminPermission(session, 'import_job:create');
+      const required = requireAdminPermission(session, 'import_job:cancel');
       if (!required.ok) {
         return reply.status(required.statusCode).send(errorResponse(required.error));
       }
@@ -323,7 +323,7 @@ export function createAdminImportJobRoutes(options: AdminImportJobRoutesOptions 
 
     app.post('/api/admin/import-jobs/:jobId/retry', async (request, reply) => {
       const session = await sessionService.resolveAdmin(request.cookies[adminSessionCookieName]);
-      const required = requireAdminPermission(session, 'import_job:create');
+      const required = requireAdminPermission(session, 'import_job:retry');
       if (!required.ok) {
         return reply.status(required.statusCode).send(errorResponse(required.error));
       }

@@ -1,5 +1,19 @@
 # Roadmap
 
+## Completed B9.40 Backend Final Closure — 2026-07-17
+
+- [x] Admin disabled 状态在密码验证前返回，不再验证禁用账号密码或累计失败次数。
+- [x] Import Jobs 拆分 `import_job:create`、`import_job:cancel`、`import_job:retry` 权限。
+- [x] Admin UI 按独立 cancel/retry permission 控制操作按钮。
+- [x] Import worker `shouldAbort` 直接识别 `failed` 与 `cancelled`。
+- [x] 新增 `0016_import_job_index_cleanup.sql`，删除冗余 `import_jobs_one_running_kind_idx`。
+- [x] Drizzle schema 只保留 queued/running active-job unique index。
+- [x] 新增 disabled/no-failure-state、worker external failure、权限守卫和 migration 测试。
+- [x] 新增 [`backend-final-closure.md`](backend-final-closure.md)。
+- [x] 新增学生端和管理端信息架构/功能流程文档及 Mermaid 图。
+- [x] `docs:audit`：59 Markdown / 200 links / 64 routes / 16 migrations。
+- [x] Vitest：64 files / 533 tests；Playwright：5 passed；PostgreSQL integration：2 passed。
+
 ## Completed B9.39 Workflow and realtime test coverage closure — 2026-07-17
 
 - [x] 补 Question Review reject 正向流：pending -> rejected、effective 不变、reject 后重新编辑。

@@ -1,6 +1,6 @@
 # System Status
 
-状态日期：**2026-07-16**
+状态日期：**2026-07-17**
 
 本文记录“已经被代码和真实环境证明的能力”，不是愿望清单。后续每个里程碑完成后应更新本页。
 
@@ -13,6 +13,8 @@
 > **B9.35 安全与运维真相收口：** runtime commit `2fbaec1` 已部署到真实服务器；首次改密服务端 API 门禁、production reset blocking gate、`schema_migrations` checksum ledger、真实 System Status migration summary、custom dump checksum/report、导入维护窗口资源监控均已实机通过。Learning 当前明确为后端 MVP+，学生 Web 尚未实现。完整证据见 [`b9.35-security-operational-truth-closure.md`](b9.35-security-operational-truth-closure.md)。
 >
 > **B9.36–B9.38 工作流与容量收口：** runtime commit `da89292` 已部署到真实服务器，数据库 ledger 为 15 个 migration、current `0015_import_job_events.sql`。Question Review 字段级 diff、草稿提交、审批/驳回和可审计回滚，Import Jobs durable event log、SSE/JSON 断线续传和阶段级批次进度均已实机通过；change-aware importer 的完整题库 non-reset true import 用时 11.81 秒、WAL 443,864 bytes，corpus 表 update/dead tuple 均为 0，维护窗口无 readiness failure，write/reset gate 已恢复关闭。完整记录见 [`b9.36-b9.38-workflow-realtime-capacity.md`](b9.36-b9.38-workflow-realtime-capacity.md)。
+>
+> **B9.40 Backend Final Closure：** Admin disabled 状态改为密码验证前检查；Import cancel/retry 拆为独立权限；worker 直接识别 externally-failed job；新增 `0016_import_job_index_cleanup.sql` 删除冗余 running-only 索引。当前范围后端进入 feature freeze，详见 [`backend-final-closure.md`](backend-final-closure.md)。学生端和管理端后续设计真相源分别为 [`student-information-architecture-and-flows.md`](student-information-architecture-and-flows.md) 与 [`admin-information-architecture-and-flows.md`](admin-information-architecture-and-flows.md)。
 
 ## Executive Summary
 
@@ -23,7 +25,7 @@
 - **Practice 后端模块化第一步：已完成无行为变化拆分。**
 - **学习后端：Learning Dashboard/Trends/Goals/Review Marks 已形成后端 MVP+，支持学习概览、趋势、目标反馈、题目收藏和长期复习标记；学生 Web 当前没有 Learning 路由、页面或 API 调用。**
 - **管理平台：Admin Auth/RBAC/Audit foundation、管理员登录失败锁定、Bank Mapping read/write API、System Status API、Import Jobs dry-run/Error Report/true import/reset/cancel/retry/worker heartbeat/SSE realtime progress、Question Review Flags/Detail/Override/Diff/Approval/Rollback、Audit Log read、Admin User manage、Admin Student Manage 与 super_admin bootstrap CLI 已实现；独立 `apps/admin` 已在真实 `/admin/` 部署；批量复核、复杂通知和最终视觉后置。**
-- **生产就绪前置：B9.34 已完成 current-HEAD staging re-baseline；B9.35 加入 migration ledger/checksum、真实 System Status、reset blocking gate、可校验 backup drill 和导入资源 monitor；B9.36–B9.38 的 workflow、realtime events 和 change-aware importer 已完成真实服务器复验。全量导入仍被明确限制为维护窗口操作；公开生产仍缺外部告警、PR human approval/merge 和正式用户验收。**
+- **生产就绪前置：PR #2 已合并并部署；B9.34–B9.39 的 staging、workflow、realtime、capacity、测试覆盖和 Nginx SSE 已闭环。全量导入仍被明确限制为维护窗口操作；公开生产仍缺外部告警接收端和正式真实用户验收。**
 - **完整生产产品：尚未达到。**
 
 完整度需要按不同口径理解：
@@ -31,7 +33,7 @@
 | Scope | 估算完整度 | 说明 |
 | --- | ---: | --- |
 | 学生客观题核心闭环 | **约 95%** | 登录、首页、多会话、真实题库、练习、断点、整卷提交、结果、历史、错题再练可用；Learning 仅后端 API 可用；首次改密已由前端和服务端双重门禁；归档、Learning 前端、部分 UX 和最终视觉仍未完成 |
-| 当前 HEAD 公开生产就绪度 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、功能复验、non-reset true import、资源监控和 pre/post checksum；仍需外部告警、正式发布审批、PR human review/merge 与真实用户验收 |
+| 当前 HEAD 公开生产就绪度 | **约 97–98%** | PR merge、部署、production gate、migration、Nginx SSE 和负载基线均已闭环；仍需外部告警接收端、正式发布审批和真实用户验收 |
 | 完整产品愿景 | **约 91%** | 学生信息架构、Learning 后端、管理端主工作流、Question Review 审批回滚、Import Jobs realtime progress、身份安全、运维门禁和持续容量 profile 已落地，但分母仍包含 Learning/最终学生前端、全题型、复杂运营、外部告警和正式生产发布 |
 
 这些百分比是工程评估，不是测试覆盖率。它们用于讨论下一步优先级，不能替代验收标准。
@@ -49,10 +51,10 @@ npm run verify:docker  PASS
 | Workspace | Test files | Tests |
 | --- | ---: | ---: |
 | `packages/shared` | 2 | 26 |
-| `apps/api` | 59 | 456 |
+| `apps/api` | 59 | 463 |
 | `apps/web` | 2 | 33 |
 | `apps/admin` | 1 | 11 |
-| **Total** | **64** | **526** |
+| **Total** | **64** | **533** |
 
 仓库内 Playwright smoke：
 

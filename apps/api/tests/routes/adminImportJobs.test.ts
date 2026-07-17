@@ -6,7 +6,7 @@ import { createMemoryAdminAuthRepository } from '../../src/admin/auth';
 import { createMemoryAdminImportJobRepository } from '../../src/admin/importJobs';
 import { hashPassword } from '../../src/auth/password';
 import { buildApp } from '../../src/app';
-import type { AdminImportJobV1 } from '@bkyexam-practice/shared';
+import type { AdminImportJobV1, AdminPermissionV1 } from '@bkyexam-practice/shared';
 
 const fixtureDir = resolve(fileURLToPath(new URL('../import/fixtures/compact-qtype/', import.meta.url)));
 const adminId = '50000000-0000-4000-8000-000000000001';
@@ -40,6 +40,76 @@ describe('admin import job routes', () => {
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toEqual({ error: 'Unauthenticated' });
+  });
+
+  it('requires dedicated cancel and retry permissions instead of import_job:create', async () => {
+    const runningJob: AdminImportJobV1 = {
+      id: '60000000-0000-4000-8000-000000000021',
+      kind: 'full_corpus_import',
+      mode: 'dry_run',
+      status: 'running',
+      sourceDir: fixtureDir,
+      options: { batchSize: 1000, resetBeforeImport: false, generateMappings: true },
+      progress: { phase: 'questions', current: 1, total: 2 },
+      summary: {},
+      errorSummary: [],
+      createdBy: { id: adminId, displayName: 'Operator' },
+      createdAt: '2026-07-17T10:00:00.000Z',
+      startedAt: '2026-07-17T10:00:01.000Z',
+      finishedAt: null,
+    };
+    const failedJob: AdminImportJobV1 = {
+      ...runningJob,
+      id: '60000000-0000-4000-8000-000000000022',
+      status: 'failed',
+      progress: { phase: 'failed', current: 0, total: 0 },
+      errorSummary: [{ message: 'failed' }],
+      finishedAt: '2026-07-17T10:00:02.000Z',
+    };
+    const permissions: AdminPermissionV1[] = [
+      'admin:self:read',
+      'import_job:read',
+      'import_job:create',
+    ];
+    const app = buildApp({
+      adminImportJobRepository: createMemoryAdminImportJobRepository([runningJob, failedJob]),
+      adminSessionService: {
+        async createSession() {
+          return { token: 'limited-token', expiresAt: new Date('2030-01-01T00:00:00.000Z') };
+        },
+        async resolveAdmin(token) {
+          if (!token) return null;
+          return {
+            admin: {
+              id: adminId,
+              loginName: 'limited@example.com',
+              displayName: 'Limited operator',
+              roles: ['operator'],
+              permissions,
+            },
+            expiresAt: new Date('2030-01-01T00:00:00.000Z'),
+          };
+        },
+        async revokeSession() {},
+      },
+    });
+    const headers = { cookie: 'bky_admin_session=limited-token' };
+
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/admin/import-jobs/${runningJob.id}/cancel`,
+      headers,
+    });
+    const retry = await app.inject({
+      method: 'POST',
+      url: `/api/admin/import-jobs/${failedJob.id}/retry`,
+      headers,
+    });
+
+    expect(cancel.statusCode).toBe(403);
+    expect(cancel.json()).toEqual({ error: 'Forbidden' });
+    expect(retry.statusCode).toBe(403);
+    expect(retry.json()).toEqual({ error: 'Forbidden' });
   });
 
   it('creates a dry-run import job, writes audit, and reads it back', async () => {

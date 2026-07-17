@@ -80,6 +80,12 @@ describe('initial database migration', () => {
     expect(sql).toContain("WHERE status IN ('queued', 'running')");
   });
 
+  it('removes the redundant running-only import job index', async () => {
+    const sql = await readFile(join(process.cwd(), 'src/db/migrations/0016_import_job_index_cleanup.sql'), 'utf8');
+
+    expect(sql).toContain('DROP INDEX IF EXISTS import_jobs_one_running_kind_idx');
+  });
+
   it('creates question quality flags for admin review', async () => {
     const sql = await readFile(join(process.cwd(), 'src/db/migrations/0007_question_quality_flags.sql'), 'utf8');
 

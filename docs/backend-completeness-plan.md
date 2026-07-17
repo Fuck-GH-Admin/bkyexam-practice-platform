@@ -1,7 +1,7 @@
 # Backend Completeness And Next Plan
 
-状态日期：**2026-07-16**
-最近完整验证：**2026-07-16 `npm run verify:docker` PASS**
+状态日期：**2026-07-17**
+最近完整验证：**2026-07-17 `npm run verify:docker` PASS**
 本轮初始基线提交：`cae6657 feat: add student session home and history`
 
 本文专门从后端视角回答两个问题：
@@ -11,7 +11,7 @@
 
 ## 1. 总体判断
 
-后端已经完成的是：**学生客观题内部试用版的主闭环**。B9.34 已在真实服务器完成 current-HEAD staging production gate / deployment smoke / worker / backup-restore / deployment evidence 验收；B9.35 补齐首次改密服务端门禁、migration ledger/checksum、真实 System Status、reset blocking gate、custom backup evidence 和导入资源 monitor；B9.36–B9.38 又把 Question Review 审批回滚、Import realtime events 和 change-aware importer 部署到真实服务器并完成维护窗口复验。
+后端已经完成的是：**学生客观题与管理运营范围的可冻结主闭环**。B9.34–B9.39 已完成真实服务器 staging、production gate、workflow、realtime、capacity、覆盖率和 PR merge/deployment；B9.40 进一步关闭 Admin disabled 登录顺序、Import cancel/retry 权限粒度、worker failed 中止和冗余索引问题。冻结定义见 [`backend-final-closure.md`](backend-final-closure.md)。
 
 真实验收还发现并关闭了一个重要风险：`resetBeforeImport=true` 会通过 corpus 外键级联删除 practice/attempt/wrongbook 数据。当前已新增独立 `ADMIN_IMPORT_ENABLE_RESET=false` 维护门禁，routine true import 只允许 non-reset。连续全量 upsert 后的主机挂起经 SAR/journal 确认为磁盘 I/O 饱和，而不是 OOM 或公网网络。
 
@@ -23,7 +23,7 @@
 | 后端工程可验证性 | **约 97%** | 单元、路由、PostgreSQL integration、Playwright、完整题库双次导入、三轮持续容量 profile、production gate、真实 current-HEAD staging、worker、migration ledger/checksum、可校验 restore 和 deployment evidence 已覆盖；剩余主要是跨硬件容量阈值与外部告警。 |
 | 后端模块化程度 | **约 66–70%** | 业务上下文已清楚；Practice、Import Jobs、Learning repository、Admin Question Review、Admin Students 与 Bank Mappings 已完成第一轮拆分；Import Jobs repository 已拆成 memory/pg/mapper，Learning 已拆成 facade/types/memory/pg/utils，Question Review 已拆成 facade/types/memory/pg/mappers，Admin Students 已拆成 facade/types/service/memory/pg/mappers/utils，Bank Mappings 已拆成 facade/types/memory/pg/mappers/rules；route validation/error mapping 等仍存在边界混杂。 |
 | 完整平台后端 | **约 91–92%** | 学生客观题稳了；管理端已落地 Auth/RBAC/Audit、题库整理、状态、Import Jobs realtime、Question Review diff/审批/回滚、Admin User/Student Manage；Learning 后端、身份安全、production gate、staging 验收和持续容量 profile 已落地，但全题型、推荐策略、外部监控和正式生产运营能力仍未完成。 |
-| 当前 HEAD 公开生产后端就绪 | **约 95–96%** | B9.36–B9.38 current HEAD 已完成真实 staging 部署、功能复验、non-reset true import、资源采样与 pre/post checksum；仍需外部告警、PR human review/merge、发布审批与真实用户验收。 |
+| 当前 HEAD 公开生产后端就绪 | **约 97–98%** | PR merge/deployment、production gate、migration、SSE proxy 和负载基线已闭环；仍需外部告警接收端、发布审批与真实用户验收。 |
 
 这些百分比是工程判断，不是测试覆盖率。
 

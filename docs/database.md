@@ -129,6 +129,7 @@ Indexes and constraints:
 - `import_jobs_created_by_idx` on `(created_by_admin_id, created_at DESC)`.
 - `import_jobs_worker_scan_idx` supports queued claim and stale heartbeat scans.
 - `import_jobs_one_active_kind_idx` allows only one `queued` or `running` job for each `kind`.
+- Migration `0016_import_job_index_cleanup.sql` removes the superseded running-only index after the active-job index is available.
 
 ### `import_job_events`
 
@@ -434,11 +435,13 @@ runner 在单一 transaction 中创建/锁定 ledger、核对 release 文件和 
 
 `apps/api/src/db/migrations/0012_question_review_overrides.sql` adds the question-review override layer. It creates `question_overrides` and `question_option_overrides` so content editors can revise effective content without mutating imported raw question rows. These tables stay separate from the import upsert path and are read by Practice/Wrongbook/Learning as effective overrides.
 
-`apps/api/src/db/migrations/0013_import_job_worker.sql` adds durable Import Job worker state. It adds nullable `worker_id` and `heartbeat_at`, creates the worker scan index, and replaces the running-only lock with a partial unique index that allows only one queued/running job per kind.
+`apps/api/src/db/migrations/0013_import_job_worker.sql` adds durable Import Job worker state. It adds nullable `worker_id` and `heartbeat_at`, creates the worker scan index, and adds a partial unique index that allows only one queued/running job per kind.
 
 `apps/api/src/db/migrations/0014_question_review_workflow.sql` adds revision workflow state for Question Review. It creates `question_override_revisions`, the one-active-revision constraint, history/pending indexes, immutable snapshot/diff fields, reviewer attribution, applied version, and rollback source.
 
 `apps/api/src/db/migrations/0015_import_job_events.sql` adds durable Import Job events. It creates `import_job_events` and the `(job_id, id)` stream index used by JSON pagination and SSE `Last-Event-ID` replay.
+
+`apps/api/src/db/migrations/0016_import_job_index_cleanup.sql` removes the now-redundant `import_jobs_one_running_kind_idx`. The queued/running `import_jobs_one_active_kind_idx` remains the single same-kind active-job constraint.
 
 B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
 
@@ -456,7 +459,7 @@ DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:migrate 
 
 The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, calculates SHA-256, and handles them in filename order inside a single transaction. It prints the complete file list, newly applied files, and skipped files. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
 
-旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十五份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十五份全部 skipped。
+旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十六份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十六份全部 skipped。
 
 On PowerShell, set `DATABASE_URL` before running migration commands:
 
@@ -465,7 +468,7 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all fifteen migrations, including Question Review workflow revisions and durable Import Job events, passed the same empty-database integration profile; staging verification for `0014/0015` is recorded in the B9.36–B9.38 closure evidence.
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all fifteen migrations, including Question Review workflow revisions and durable Import Job events, passed the same empty-database integration profile; staging verification for `0014/0015` is recorded in the B9.36–B9.38 closure evidence. On 2026-07-17 migration `0016` was added as a forward-only redundant-index cleanup and is covered by the same empty-database profile.
 
 ## Isolated Integration Profile
 

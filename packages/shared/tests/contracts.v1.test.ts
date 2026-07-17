@@ -420,6 +420,8 @@ describe('v1 auth/catalog/error/health contracts', () => {
         'bank_mapping:read',
         'import_job:read',
         'import_job:create',
+        'import_job:cancel',
+        'import_job:retry',
         'system_status:read',
         'student_account:read',
         'student_account:write',

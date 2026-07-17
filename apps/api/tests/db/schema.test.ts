@@ -176,10 +176,10 @@ describe('database schema', () => {
     expect(indexNames).toEqual(expect.arrayContaining([
       'import_jobs_status_created_at_idx',
       'import_jobs_created_by_idx',
-      'import_jobs_one_running_kind_idx',
       'import_jobs_worker_scan_idx',
       'import_jobs_one_active_kind_idx',
     ]));
+    expect(indexNames).not.toContain('import_jobs_one_running_kind_idx');
   });
 
   it('defines question quality flags for admin review and practice exclusion', () => {

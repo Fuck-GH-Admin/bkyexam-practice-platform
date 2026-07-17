@@ -88,7 +88,7 @@ npm run test:e2e
 - Practice/Wrongbook/Learning/Auth/Admin Auth/Admin User/Admin Student/Admin Bank Mapping/Admin System Status/Admin Import Job/Admin Question Review/Admin Audit Log v1 schema 的计数不变量、学习统计边界、学习目标/复习标记边界、学生身份字段边界、密码登录/改密边界、写入版本边界、导入任务 summary/error/cancel/retry/worker heartbeat/stuck recovery/realtime event boundary、true import gate/reset boundary、管理员账号边界、题目质检 flag/exclusion/override/revision approval boundary、审计查询 boundary、`false`、legacy UUID、角色/权限和 strict response boundary。
 - session card/page contract 的来源、timestamp、计数和分页边界。
 
-截至 2026-07-17，shared 26 项、API 460 项、Web 33 项、Admin 11 项，共 530 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
+截至 2026-07-17，shared 26 项、API 463 项、Web 33 项、Admin 11 项，共 533 项。Practice/Wrongbook/Learning/Admin/Auth route 还会故意注入不合法 repository payload，确认 runtime schema 不会把错误数据伪装成 `200`。
 
 B9.30 局部验证额外覆盖：`npm run typecheck -w @bkyexam-practice/api` 与 `npm run test -w @bkyexam-practice/api -- tests/learning/repository.test.ts tests/routes/learning.test.ts`；阶段最终 `npm run verify:docker` 已通过。
 
@@ -134,7 +134,7 @@ npm run test:integration:db:docker
 
 1. 通过 Compose 在 `127.0.0.1:55432` 启动临时 `postgres:16-alpine`。
 2. 等待数据库 healthcheck。
-3. 对空的 `bkyexam_test` 执行全部十五份 migration。
+3. 对空的 `bkyexam_test` 执行全部十六份 migration。
 4. 装载只含可见/隐藏题库、父子分类和客观题的最小 fixture。
 5. 运行真实 PostgreSQL repository + Fastify API integration test。
 6. 无论成功或失败都停止并删除临时容器。
@@ -365,6 +365,27 @@ PostgreSQL integration = 1 file / 2 tests passed
 - `db:smoke`。
 - PostgreSQL repository + Fastify API 全练习闭环。
 - Vite + Fastify + PostgreSQL 的真实 Chrome smoke。
+
+### B9.40 Backend Final Closure
+
+2026-07-17 Backend Final Closure 增加：
+
+- disabled Admin 在密码验证前返回 `403`，且错误密码不会增加失败次数；
+- `import_job:create/cancel/retry` 独立权限 contract、RBAC、route 和 Admin UI；
+- worker 在 job 被外部标记为 `failed` 后 cooperative abort；
+- migration `0016_import_job_index_cleanup.sql` 删除冗余 running-only unique index；
+- PostgreSQL System Status 期望 migration count `16`、current `0016_import_job_index_cleanup.sql`。
+
+完整结果：
+
+```text
+docs audit = 59 Markdown / 200 links / 64 routes / 16 migrations
+Vitest = 64 files / 533 tests
+typecheck = PASS
+build = PASS
+Playwright = 5 passed
+PostgreSQL integration = 1 file / 2 tests passed
+```
 
 最小 fixture integration 已固化为每次 CI 可运行的快速门；完整 89922 题导入已固化为可选慢速 profile，但不会加入每次提交的 CI。
 

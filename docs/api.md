@@ -338,7 +338,7 @@ Response：
     "loginName": "operator@example.com",
     "displayName": "Operator",
     "roles": ["operator"],
-    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"]
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "import_job:cancel", "import_job:retry", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"]
   },
   "expiresAt": "2026-07-13T18:00:00.000Z"
 }
@@ -403,7 +403,7 @@ Response：
       "displayName": "Operator",
       "status": "active",
       "roles": ["operator"],
-      "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
+      "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "import_job:cancel", "import_job:retry", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
       "createdAt": "2026-07-14T10:00:00.000Z",
       "updatedAt": "2026-07-14T10:00:00.000Z",
       "lastLoginAt": null
@@ -427,7 +427,7 @@ Response：
     "displayName": "Operator",
     "status": "active",
     "roles": ["operator"],
-    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
+    "permissions": ["admin:self:read", "bank_mapping:read", "import_job:read", "import_job:create", "import_job:cancel", "import_job:retry", "system_status:read", "student_account:read", "student_account:write", "student_account:reset_password", "student_account:revoke_session"],
     "createdAt": "2026-07-14T10:00:00.000Z",
     "updatedAt": "2026-07-14T10:00:00.000Z",
     "lastLoginAt": null
@@ -1051,7 +1051,7 @@ Rules：
 
 ### `POST /api/admin/import-jobs/:jobId/cancel`
 
-Permission：`import_job:create`
+Permission：`import_job:cancel`
 
 Response：
 
@@ -1074,7 +1074,7 @@ Rules：
 
 ### `POST /api/admin/import-jobs/:jobId/retry`
 
-Permission：`import_job:create`
+Permission：`import_job:retry`
 
 Response：
 
