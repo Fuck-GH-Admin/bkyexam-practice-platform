@@ -5,6 +5,9 @@ export interface SessionStudent {
   id: string;
   loginName: string;
   displayName: string;
+  className?: string | null;
+  groupName?: string | null;
+  passwordResetRequired?: boolean;
 }
 
 export interface StudentSessionRepository {
@@ -98,6 +101,9 @@ interface SessionStudentRow {
   id: string;
   login_name: string;
   display_name: string;
+  class_name: string | null;
+  group_name: string | null;
+  password_reset_required: boolean;
 }
 
 export function createPgStudentSessionRepository(client: QueryClient): StudentSessionRepository {
@@ -118,12 +124,16 @@ export function createPgStudentSessionRepository(client: QueryClient): StudentSe
           SELECT
             students.id,
             students.login_name,
-            students.display_name
+            students.display_name,
+            students.class_name,
+            students.group_name,
+            students.password_reset_required
           FROM student_sessions
           JOIN students ON students.id = student_sessions.student_id
           WHERE student_sessions.token_hash = $1
             AND student_sessions.revoked_at IS NULL
             AND student_sessions.expires_at > $2
+            AND students.status = 'active'
           LIMIT 1
         `,
         [tokenHash, now],
@@ -135,6 +145,9 @@ export function createPgStudentSessionRepository(client: QueryClient): StudentSe
         id: row.id,
         loginName: row.login_name,
         displayName: row.display_name,
+        className: row.class_name,
+        groupName: row.group_name,
+        passwordResetRequired: row.password_reset_required,
       };
     },
 

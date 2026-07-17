@@ -1,6 +1,6 @@
 # Database
 
-Phase 1 defines the PostgreSQL schema in `apps/api/src/db/schema.ts` using Drizzle ORM. These definitions are the contract for later migrations and importer loading.
+The PostgreSQL schema is defined in `apps/api/src/db/schema.ts` with Drizzle ORM and materialized through ordered SQL migrations in `apps/api/src/db/migrations`.
 
 ## Core Tables
 
@@ -77,6 +77,137 @@ Indexes:
 - `bank_mappings_subject_category_idx` on `subject_category`.
 - `bank_mappings_visible_idx` on `visible`.
 
+### `admin_users`, `admin_sessions`, `admin_user_roles`
+
+Store administrator identity, server-side sessions, and role membership.
+
+- `admin_users`: login name, display name, password hash, active/disabled status, timestamps, last login timestamp, password change timestamp, failed-login count/window, and temporary lock timestamp.
+- `admin_sessions`: token hash, expiry, revocation timestamp, and `admin_user_id` FK.
+- `admin_user_roles`: `(admin_user_id, role)` membership for `content_editor`, `operator`, and `super_admin`.
+
+Indexes:
+
+- `admin_sessions_admin_user_id_idx` on `admin_user_id`.
+- `admin_sessions_expires_at_idx` on `expires_at`.
+- `admin_users_locked_until_idx` on non-null admin lock timestamps.
+- `admin_user_roles_role_idx` on `role`.
+
+### `audit_logs`
+
+Stores admin-side business audit events.
+
+- `actor_admin_id`: nullable FK to `admin_users`.
+- `action`: event name such as `admin.auth.login`, `bank_mapping.update`, or `import_job.create`.
+- `resource_type` / `resource_id`: audited resource identity.
+- `before`, `after`, `metadata`: JSON payloads.
+- `result`: `success` or `failure`.
+- `created_at`: event timestamp.
+
+Indexes:
+
+- `audit_logs_actor_created_at_idx` on `(actor_admin_id, created_at DESC)`.
+- `audit_logs_resource_idx` on `(resource_type, resource_id, created_at DESC)`.
+- `audit_logs_action_created_at_idx` on `(action, created_at DESC)`.
+
+### `import_jobs`
+
+Stores admin-triggered import task state.
+
+- `id`: UUID primary key.
+- `kind`: currently `full_corpus_import`.
+- `mode`: `dry_run` or `import`.
+- `status`: `queued`, `running`, `succeeded`, `failed`, or `cancelled`.
+- `source_dir`: normalized source directory.
+- `options`, `progress`, `summary`, `error_summary`: JSON payloads for task execution.
+- `created_by_admin_id`: nullable FK to `admin_users`.
+- `worker_id`, `heartbeat_at`: queued worker ownership and liveness.
+- `created_at`, `started_at`, `finished_at`: task timestamps.
+
+Indexes and constraints:
+
+- `import_jobs_status_created_at_idx` on `(status, created_at DESC)`.
+- `import_jobs_created_by_idx` on `(created_by_admin_id, created_at DESC)`.
+- `import_jobs_worker_scan_idx` supports queued claim and stale heartbeat scans.
+- `import_jobs_one_active_kind_idx` allows only one `queued` or `running` job for each `kind`.
+
+### `import_job_events`
+
+Stores durable Import Job state/progress events used by JSON history and SSE reconnect.
+
+- `id`: monotonic `bigserial` event id.
+- `job_id`: FK to `import_jobs.id`, deleted with the job.
+- `event_type`: `queued`, `running`, `progress`, `succeeded`, `failed`, `cancelled`, or `recovered`.
+- `payload`: complete Admin Import Job snapshot as JSONB.
+- `created_at`: event timestamp.
+
+Index:
+
+- `import_job_events_job_stream_idx` on `(job_id, id)` for `Last-Event-ID` replay.
+
+### `question_quality_flags`
+
+Stores admin-side question quality flags and practice-exclusion overrides without editing imported source question rows.
+
+- `id`: UUID primary key.
+- `question_id`: FK to `questions.id`.
+- `bank_id`: nearest mapped bank/classification for filtering.
+- `flag_type`: quality reason such as `bad_answer`, `missing_option`, `bad_option`, `garbled_content`, `duplicate_question`, `wrong_type`, or `needs_manual_review`.
+- `severity`: `low`, `medium`, `high`, or `blocking`.
+- `status`: `open`, `resolved`, or `ignored`.
+- `note`: admin note.
+- `excluded_from_practice`: when true on an open flag, new practice sessions exclude the question from automatic bank selection.
+- `created_by_admin_id` / `resolved_by_admin_id`: admin attribution.
+- `created_at`, `updated_at`, `resolved_at`: review timestamps.
+
+Indexes:
+
+- `question_quality_flags_question_id_idx` on `question_id`.
+- `question_quality_flags_bank_status_idx` on `(bank_id, status)`.
+- `question_quality_flags_type_status_idx` on `(flag_type, status)`.
+- `question_quality_flags_excluded_open_idx` on excluded open flags used by practice selection.
+
+### `question_overrides`
+
+Stores the currently approved effective question-level override without changing imported `questions`.
+
+- `question_id`: PK/FK to `questions.id`.
+- `content_override`, `answer_raw_override`, `analyze_raw_override`: nullable approved values.
+- `note`: approved revision note.
+- `version`: positive optimistic-concurrency version.
+- `updated_by_admin_id`, `updated_at`: approval attribution.
+
+### `question_option_overrides`
+
+Stores currently approved option text overrides.
+
+- `option_id`: PK/FK to `question_options.id`.
+- `question_id`: FK to `questions.id`.
+- `content_override`: approved option text.
+- `updated_by_admin_id`, `updated_at`: approval attribution.
+
+### `question_override_revisions`
+
+Stores immutable/auditable Question Review workflow revisions.
+
+- `id`: UUID primary key.
+- `question_id`: FK to `questions.id`.
+- `version`: per-revision draft version.
+- `base_version`: effective override version used to create the revision.
+- `status`: `draft`, `pending_review`, `approved`, or `rejected`.
+- `content_override`, `answer_raw_override`, `analyze_raw_override`, `option_content_overrides`: revision snapshot.
+- `diff`: field-level before/after JSON.
+- `note`, `review_note`: editor/reviewer notes.
+- `created_by_admin_id`, `reviewed_by_admin_id`: actor attribution.
+- `submitted_at`, `reviewed_at`, `created_at`, `updated_at`: workflow timestamps.
+- `applied_version`: effective override version produced by approval/rollback.
+- `rollback_from_revision_id`: historical approved revision used as rollback source.
+
+Indexes and constraints:
+
+- one partial unique active revision per question for `draft/pending_review`.
+- question history ordered by creation time.
+- pending-review queue and actor lookup indexes.
+
 ### `students`
 
 Stores student identities.
@@ -84,8 +215,18 @@ Stores student identities.
 - `id`: UUID primary key.
 - `login_name`: unique login identifier.
 - `display_name`: visible name.
-- `password_hash`: nullable password hash placeholder for later auth work.
+- `password_hash`: nullable hash; formal login requires it unless the explicit legacy passwordless migration flag is enabled.
+- `class_name`, `group_name`: lightweight text organization fields.
+- `status`: `active` or `disabled`.
+- `password_reset_required`: whether the student must change password after login.
+- `password_changed_at`: last password change timestamp.
+- `failed_login_count`, `failed_login_window_started_at`, `locked_until`: relaxed login failure/temporary lock state.
+- `last_login_at`: last successful login timestamp, updated on successful formal login.
+- `updated_at`: account update timestamp.
+- `created_by_admin_id`: nullable FK to `admin_users`; populated by Admin Student Manage create/bulk-create APIs.
 - `created_at`: creation timestamp.
+
+正式身份策略已冻结在 [`identity-security-strategy.md`](identity-security-strategy.md)。B9.5 在保留旧账号的前提下扩展 `students`，B9.7 默认强制学生密码登录并启用失败计数/临时锁定；已知运营规则：`202502040201` 到 `202502040230` 属于 `2班`，其余学生班级/分组暂未定。
 
 ### `practice_attempts`
 
@@ -131,10 +272,11 @@ Stores one student's practice run for one bank.
 - `mode`: `random` or `sequential`.
 - `question_limit`: requested question count, default `70`.
 - `question_count`: selected question count.
-- `completed_count`: answered question count.
+- `completed_count`: answered/graded question count.
 - `correct_count`: auto-graded correct answer count.
 - `current_sort`: last saved 1-based question position for resume, default `1`.
 - `status`: `active` or `completed`.
+- `origin`: `bank` for normal bank practice or `wrongbook` for wrong-question review.
 - `created_at`, `updated_at`, `completed_at`: lifecycle timestamps.
 
 Indexes:
@@ -142,6 +284,10 @@ Indexes:
 - `practice_sessions_student_id_idx` on `student_id`.
 - `practice_sessions_bank_id_idx` on `bank_id`.
 - `practice_sessions_status_idx` on `status`.
+- `practice_sessions_student_status_updated_at_idx` on `(student_id, status, updated_at DESC, id DESC)` for stable active-session paging.
+- Partial `practice_sessions_student_completed_at_idx` on `(student_id, completed_at DESC, id DESC)` for completed history.
+
+Saving/clearing a draft, changing a review flag, or saving `current_sort` also updates the parent session's `updated_at`; the student home can therefore order sessions by actual recent activity instead of creation time.
 
 ### `practice_session_questions`
 
@@ -169,7 +315,7 @@ Stores unsubmitted practice answers and review flags for active sessions. Draft 
 - `student_id`: FK to `students.id`, deleted when the student is deleted.
 - `session_id`: FK to `practice_sessions.id`, deleted when the session is deleted.
 - `question_id`: FK to `questions.id`.
-- `answer`: nullable draft answer payload as text.
+- `draft_answer`: non-null text payload. An empty string means “no answer”; a row may still exist to preserve `marked_for_review=true`.
 - `marked_for_review`: whether the student flagged the question for later review.
 - `updated_at`: last draft/review update timestamp.
 
@@ -203,13 +349,102 @@ Indexes:
 
 The unique wrong-question index keeps one notebook row per student, question, and bank, while allowing later attempts to update `wrong_count`, `last_answer`, and `last_wrong_at`.
 
+Wrong-question review screens do not duplicate question content into `wrong_questions`. List summaries join `questions` and `bank_mappings` for bank labels, normalized type, and content preview. Detail review joins `questions` and `question_options` on demand to return full content, options, correct answer, and analysis for the selected row.
+
+Wrong-question review sessions reuse the existing practice session tables. Creating a review session inserts an active `practice_sessions` row with `mode = 'sequential'` and `origin = 'wrongbook'`, locks the selected wrong-question IDs into `practice_session_questions`, and then serves the session through the normal practice retrieval route. A separate practice mode is not required; origin records the creation purpose without changing grading behavior.
+
+### `student_learning_goals`
+
+Stores per-student learning goal settings used by Learning goals API.
+
+- `student_id`: PK and FK to `students.id`, deleted when the student is deleted.
+- `daily_attempts_target`: nullable target for today's attempt count, constrained to `1..500`.
+- `weekly_active_days_target`: nullable target for active days in the current 7-day window, constrained to `1..7`.
+- `wrong_questions_review_target`: nullable target for wrong-question review count, constrained to `1..100`.
+- `created_at`, `updated_at`: goal setting timestamps.
+
+Indexes:
+
+- `student_learning_goals_updated_at_idx` on `updated_at DESC`.
+
+Learning goal progress is not precomputed into this table. The API combines saved targets with current facts from `practice_sessions`, `practice_attempts`, and `wrong_questions`.
+
+### `question_bookmarks`
+
+Stores student-owned question review marks for favorites and long-term review.
+
+- `id`: UUID primary key.
+- `student_id`: FK to `students.id`, deleted when the student is deleted.
+- `question_id`: FK to `questions.id`.
+- `bank_id`: FK to `classifications.id`.
+- `favorite`: whether the student explicitly saved the question as a favorite.
+- `long_term_review`: whether the student wants the question in a long-term review queue.
+- `note`: optional student note.
+- `source`: `manual`, `practice_review`, or `wrongbook`.
+- `created_at`, `updated_at`: mark timestamps.
+
+Indexes and constraints:
+
+- Unique `(student_id, question_id, bank_id)` so one student has one mark row per question/bank pair.
+- `CHECK (favorite = true OR long_term_review = true)` prevents empty mark rows.
+- `question_bookmarks_student_updated_at_idx` on `(student_id, updated_at DESC, id DESC)` for stable recent mark lists.
+- `question_bookmarks_student_bank_idx` on `(student_id, bank_id, updated_at DESC, id DESC)` for bank-scoped lists.
+- `question_bookmarks_question_id_idx` on `question_id`.
+
+Review mark list screens join `questions` and `bank_mappings` to return question type, content preview, and bank labels without duplicating full question content into `question_bookmarks`.
+
 ## Migrations
 
-`apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the Drizzle schema in `apps/api/src/db/schema.ts`. It creates the core tables and indexes needed by Phase 1 while preserving the same defaults, nullable columns, foreign keys, and wrong-question uniqueness constraint.
+### Runner-managed `schema_migrations`
+
+`schema_migrations` 是 migration runner 管理的系统表，不对应新的编号 SQL 文件：
+
+- `filename`: migration 文件名，主键。
+- `checksum`: SQL 文件内容的 SHA-256。
+- `applied_at`: 成功执行并写入 ledger 的时间。
+
+runner 在单一 transaction 中创建/锁定 ledger、核对 release 文件和 checksum、跳过已应用 migration，并在新 migration 成功后记录历史。以下情况会 fail closed：
+
+- 已应用 migration 的 SQL 内容发生变化。
+- 数据库 ledger 中存在 migration，但当前 release 缺少对应文件。
+
+因此已发布的 migration 不得原地修改；修复必须新增 forward migration。
+
+`apps/api/src/db/migrations/0001_initial.sql` is the initial PostgreSQL migration and mirrors the initial Drizzle schema. It creates imported content, mapping, student, attempt, and wrong-question tables.
 
 `apps/api/src/db/migrations/0002_practice_sessions.sql` adds cookie session storage and practice session tables. It creates `student_sessions`, `practice_sessions`, and `practice_session_questions`, plus indexes for student lookup, session expiry, bank/status filtering, and locked session question lookup. It includes check constraints for valid practice modes, positive question limits, nonnegative counters, active/completed status, positive session question order, token hash uniqueness, and uniqueness for each session's question membership and sort order.
 
 `apps/api/src/db/migrations/0003_practice_drafts.sql` adds resumable practice progress. It adds `practice_sessions.current_sort` with a positive-order check and creates `practice_session_drafts` for unsubmitted answers and review flags. The unique `(session_id, question_id)` constraint keeps one draft row per locked session question.
+
+`apps/api/src/db/migrations/0004_practice_session_history.sql` adds `practice_sessions.origin`, backfills existing sessions as `bank`, repairs missing completion timestamps on existing completed rows, adds the origin check, and creates the composite active/history paging indexes.
+
+`apps/api/src/db/migrations/0005_admin_foundation.sql` adds administrator identity/session/audit foundations. It creates `admin_users`, `admin_sessions`, `admin_user_roles`, and `audit_logs`, and extends `bank_mappings` with `version`, `updated_at`, and `updated_by_admin_id` for optimistic concurrency and audit ownership.
+
+`apps/api/src/db/migrations/0006_import_jobs.sql` adds Admin Import Jobs. It creates `import_jobs`, indexes status/creator paging, and enforces a partial unique lock so only one same-kind job can be `running` at a time.
+
+`apps/api/src/db/migrations/0007_question_quality_flags.sql` adds Admin Question Review flags. It creates `question_quality_flags`, quality filter indexes, and the excluded-open index used by new practice session selection.
+
+`apps/api/src/db/migrations/0008_student_learning_goals.sql` adds per-student learning goal settings. It creates `student_learning_goals` with bounded nullable targets for daily attempts, weekly active days, and wrong-question review goals.
+
+`apps/api/src/db/migrations/0009_question_bookmarks.sql` adds per-question learning review marks. It creates `question_bookmarks` with favorite/long-term-review flags, source/note metadata, per-student uniqueness, and indexes for recent and bank-scoped review mark lists.
+
+`apps/api/src/db/migrations/0010_student_identity_security.sql` extends `students` for formal identity security. It adds lightweight `class_name` / `group_name`, account `status`, `password_reset_required`, password-change timestamp, relaxed failed-login/lockout fields, `last_login_at`, `updated_at`, and nullable `created_by_admin_id`. It backfills `202502040201` through `202502040230` to `class_name = '2班'` and adds status/class/group/locked indexes.
+
+`apps/api/src/db/migrations/0011_admin_identity_security.sql` extends `admin_users` for administrator login security. It adds `password_changed_at`, `failed_login_count`, `failed_login_window_started_at`, and `locked_until`, backfills `password_changed_at` from `created_at`, adds a nonnegative failed-count check, and indexes non-null admin locks.
+
+`apps/api/src/db/migrations/0012_question_review_overrides.sql` adds the question-review override layer. It creates `question_overrides` and `question_option_overrides` so content editors can revise effective content without mutating imported raw question rows. These tables stay separate from the import upsert path and are read by Practice/Wrongbook/Learning as effective overrides.
+
+`apps/api/src/db/migrations/0013_import_job_worker.sql` adds durable Import Job worker state. It adds nullable `worker_id` and `heartbeat_at`, creates the worker scan index, and replaces the running-only lock with a partial unique index that allows only one queued/running job per kind.
+
+`apps/api/src/db/migrations/0014_question_review_workflow.sql` adds revision workflow state for Question Review. It creates `question_override_revisions`, the one-active-revision constraint, history/pending indexes, immutable snapshot/diff fields, reviewer attribution, applied version, and rollback source.
+
+`apps/api/src/db/migrations/0015_import_job_events.sql` adds durable Import Job events. It creates `import_job_events` and the `(job_id, id)` stream index used by JSON pagination and SSE `Last-Event-ID` replay.
+
+B9.6 Admin Student Manage API now writes `created_by_admin_id` on single and bulk creation, updates `class_name/group_name/status/display_name`, resets `password_hash` with `password_reset_required = true`, clears failed-login/lockout state on password reset, and revokes active `student_sessions` by setting `revoked_at`.
+
+B9.7 Password Login Enforcement now updates `failed_login_count`, `failed_login_window_started_at`, `locked_until`, and `last_login_at` during student login, and clears `password_reset_required` plus failure/lockout state on successful `POST /api/auth/password/change`.
+
+B9.10 Admin Login Security now updates the admin failed-login fields on bad credentials, returns `423` while `locked_until` is active, and clears admin failure/lockout state on successful login or admin password reset.
 
 The migration intentionally avoids a B-tree index on `questions.searchable_text`. That column stores denormalized raw search text, and full-text or trigram search indexing belongs in a later dedicated migration.
 
@@ -219,7 +454,9 @@ Run API migrations with:
 DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:migrate -w @bkyexam-practice/api
 ```
 
-The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, applies them in filename order inside a single transaction, and prints the applied file names. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
+The `db:migrate` script reads `.sql` files from `apps/api/src/db/migrations`, calculates SHA-256, and handles them in filename order inside a single transaction. It prints the complete file list, newly applied files, and skipped files. `DATABASE_URL` is required and should point at the PostgreSQL database to migrate.
+
+旧数据库在 B9.35 前没有 ledger。第一次使用新 runner 时会重放当前十五份幂等 migration 并建立历史；执行前必须备份和停写。紧接着第二次执行应显示十五份全部 skipped。
 
 On PowerShell, set `DATABASE_URL` before running migration commands:
 
@@ -228,14 +465,32 @@ $env:DATABASE_URL="postgres://bkyexam:bkyexam@127.0.0.1:5432/bkyexam_practice"
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-Phase 3C live migration check on this workstation could not start PostgreSQL because Docker Desktop's Linux engine was unavailable:
+On 2026-07-10 the first three migrations were applied successfully to a real PostgreSQL 14 instance before importing the full corpus and running the API/browser smoke flow. On 2026-07-11 the first four migrations, including the history/origin migration, were applied from an empty database by the PostgreSQL 16 integration profile. On 2026-07-15 all eleven migrations through Admin Identity Security were applied from an empty database by the Docker PostgreSQL 16 integration profile. On 2026-07-16 all fifteen migrations, including Question Review workflow revisions and durable Import Job events, passed the same empty-database integration profile; staging verification for `0014/0015` is recorded in the B9.36–B9.38 closure evidence.
 
-```text
-docker compose up -d postgres
-unable to get image 'postgres:16-alpine': error during connect: ... open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+## Isolated Integration Profile
+
+仓库内的最小 PostgreSQL integration profile 会在空数据库上重新执行全部 migration，并验证真实 repository 与 Fastify API wiring：
+
+```sh
+npm run test:integration:db:docker
 ```
 
-Because the container could not be started, `npm run db:migrate -w @bkyexam-practice/api` and `npm run db:smoke -w @bkyexam-practice/api` were not run against the requested Docker PostgreSQL database in this check. The automated migration tests still pass and cover applying migrations in filename order.
+该命令使用 Compose profile `test` 在本地临时启动 `bkyexam_test`，完成后自动删除容器。若直接连接已有测试数据库：
+
+```powershell
+$env:TEST_DATABASE_URL="postgres://user:password@127.0.0.1:5432/bkyexam_test"
+npm run test:integration:db
+```
+
+integration fixture 会清空目标数据库业务表，因此测试代码只接受名称为 `test`、以 `test_`/`test-` 开头或以 `_test`/`-test` 结尾的数据库。
+
+完整外部题库的双重导入与幂等检查使用同一安全数据库规则：
+
+```powershell
+npm run smoke:import:full:docker -- C:\path\to\BKYExam\Monitor\questionbank
+```
+
+该命令执行 migration、清空隔离测试库、按固定 corpus baseline 校验解析结果、连续导入两次并核对最终表计数。
 
 ## Post-Import Smoke Check
 
@@ -247,7 +502,7 @@ DATABASE_URL=postgres://user:password@localhost:5432/bkyexam npm run db:smoke -w
 
 The command prints pretty JSON with row counts for `classifications`, `questions`, `question_options`, and `bank_mappings`. It exits nonzero when `DATABASE_URL` is missing or the smoke query fails.
 
-Latest local Docker PostgreSQL smoke result after importing the real corpus:
+Latest real PostgreSQL smoke result after importing the full corpus:
 
 ```json
 {

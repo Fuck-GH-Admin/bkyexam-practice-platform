@@ -1,5 +1,7 @@
 # Practice Sections And Unified Submission Implementation Plan
 
+> Historical implementation plan. The feature is implemented; unchecked boxes below are not the current project tracker. Use `docs/todo.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build sectioned practice for `单选题`, `多选题`, and `判断题` with draft autosave, `标记存疑`, resumable sessions, and whole-session grading.

@@ -2,13 +2,23 @@ import { describe, expect, it } from 'vitest';
 import { getTableName } from 'drizzle-orm';
 import { getTableConfig } from 'drizzle-orm/pg-core';
 import {
+  adminSessions,
+  adminUserRoles,
+  adminUsers,
+  auditLogs,
   bankMappings,
   classifications,
+  importJobs,
+  importJobEvents,
   practiceAttempts,
   practiceSessionDrafts,
   practiceSessionQuestions,
   practiceSessions,
+  questionOptionOverrides,
+  questionOverrideRevisions,
+  questionQualityFlags,
   questionOptions,
+  questionOverrides,
   questions,
   studentSessions,
   students,
@@ -20,6 +30,16 @@ describe('database schema', () => {
     expect(getTableName(classifications)).toBe('classifications');
     expect(getTableName(questions)).toBe('questions');
     expect(getTableName(questionOptions)).toBe('question_options');
+    expect(getTableName(adminUsers)).toBe('admin_users');
+    expect(getTableName(adminSessions)).toBe('admin_sessions');
+    expect(getTableName(adminUserRoles)).toBe('admin_user_roles');
+    expect(getTableName(auditLogs)).toBe('audit_logs');
+    expect(getTableName(importJobs)).toBe('import_jobs');
+    expect(getTableName(importJobEvents)).toBe('import_job_events');
+    expect(getTableName(questionQualityFlags)).toBe('question_quality_flags');
+    expect(getTableName(questionOverrides)).toBe('question_overrides');
+    expect(getTableName(questionOptionOverrides)).toBe('question_option_overrides');
+    expect(getTableName(questionOverrideRevisions)).toBe('question_override_revisions');
     expect(getTableName(bankMappings)).toBe('bank_mappings');
     expect(getTableName(students)).toBe('students');
     expect(getTableName(studentSessions)).toBe('student_sessions');
@@ -34,6 +54,230 @@ describe('database schema', () => {
     expect(studentSessions).toBeDefined();
     expect(practiceSessions).toBeDefined();
     expect(practiceSessionQuestions).toBeDefined();
+  });
+
+  it('defines formal student identity security columns and indexes', () => {
+    const tableConfig = getTableConfig(students);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+    const checkNames = tableConfig.checks.map((tableCheck) => tableCheck.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'login_name',
+      'display_name',
+      'password_hash',
+      'class_name',
+      'group_name',
+      'status',
+      'password_reset_required',
+      'password_changed_at',
+      'failed_login_count',
+      'failed_login_window_started_at',
+      'locked_until',
+      'last_login_at',
+      'updated_at',
+      'created_by_admin_id',
+      'created_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'students_status_idx',
+      'students_class_name_idx',
+      'students_group_name_idx',
+      'students_locked_until_idx',
+    ]));
+    expect(checkNames).toEqual(expect.arrayContaining([
+      'students_status_check',
+      'students_failed_login_count_check',
+    ]));
+  });
+
+  it('defines admin identity, session, RBAC, and audit foundation tables', () => {
+    expect(adminUsers).toBeDefined();
+    expect(adminSessions).toBeDefined();
+    expect(adminUserRoles).toBeDefined();
+    expect(auditLogs).toBeDefined();
+
+    const adminUserColumnNames = getTableConfig(adminUsers).columns.map((column) => column.name);
+    const adminUserIndexNames = getTableConfig(adminUsers).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+    const adminUserCheckNames = getTableConfig(adminUsers).checks.map((tableCheck) => tableCheck.name);
+    const adminSessionIndexNames = getTableConfig(adminSessions).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+    const auditIndexNames = getTableConfig(auditLogs).indexes.map(
+      (tableIndex) => tableIndex.config.name,
+    );
+
+    expect(adminUserColumnNames).toEqual([
+      'id',
+      'login_name',
+      'display_name',
+      'password_hash',
+      'status',
+      'created_at',
+      'updated_at',
+      'last_login_at',
+      'password_changed_at',
+      'failed_login_count',
+      'failed_login_window_started_at',
+      'locked_until',
+    ]);
+    expect(adminUserIndexNames).toEqual(expect.arrayContaining([
+      'admin_users_locked_until_idx',
+    ]));
+    expect(adminUserCheckNames).toEqual(expect.arrayContaining([
+      'admin_users_failed_login_count_check',
+    ]));
+    expect(adminSessionIndexNames).toEqual(expect.arrayContaining([
+      'admin_sessions_admin_user_id_idx',
+      'admin_sessions_expires_at_idx',
+    ]));
+    expect(auditIndexNames).toEqual(expect.arrayContaining([
+      'audit_logs_actor_created_at_idx',
+      'audit_logs_resource_idx',
+      'audit_logs_action_created_at_idx',
+    ]));
+  });
+
+  it('adds admin ownership and optimistic concurrency fields to bank mappings', () => {
+    const columnNames = getTableConfig(bankMappings).columns.map((column) => column.name);
+
+    expect(columnNames).toEqual(expect.arrayContaining([
+      'version',
+      'updated_at',
+      'updated_by_admin_id',
+    ]));
+  });
+
+  it('defines import job tracking with a one-running-job index', () => {
+    const tableConfig = getTableConfig(importJobs);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'kind',
+      'mode',
+      'status',
+      'source_dir',
+      'options',
+      'progress',
+      'summary',
+      'error_summary',
+      'created_by_admin_id',
+      'created_at',
+      'started_at',
+      'finished_at',
+      'worker_id',
+      'heartbeat_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'import_jobs_status_created_at_idx',
+      'import_jobs_created_by_idx',
+      'import_jobs_one_running_kind_idx',
+      'import_jobs_worker_scan_idx',
+      'import_jobs_one_active_kind_idx',
+    ]));
+  });
+
+  it('defines question quality flags for admin review and practice exclusion', () => {
+    const tableConfig = getTableConfig(questionQualityFlags);
+    const columnNames = tableConfig.columns.map((column) => column.name);
+    const indexNames = tableConfig.indexes.map((tableIndex) => tableIndex.config.name);
+    const checkNames = tableConfig.checks.map((tableCheck) => tableCheck.name);
+
+    expect(columnNames).toEqual([
+      'id',
+      'question_id',
+      'bank_id',
+      'flag_type',
+      'severity',
+      'status',
+      'note',
+      'excluded_from_practice',
+      'created_by_admin_id',
+      'resolved_by_admin_id',
+      'created_at',
+      'updated_at',
+      'resolved_at',
+    ]);
+    expect(indexNames).toEqual(expect.arrayContaining([
+      'question_quality_flags_question_id_idx',
+      'question_quality_flags_bank_status_idx',
+      'question_quality_flags_type_status_idx',
+      'question_quality_flags_excluded_open_idx',
+    ]));
+    expect(checkNames).toEqual(expect.arrayContaining([
+      'question_quality_flags_type_check',
+      'question_quality_flags_severity_check',
+      'question_quality_flags_status_check',
+    ]));
+  });
+
+  it('defines question override tables outside imported raw question tables', () => {
+    const questionOverrideConfig = getTableConfig(questionOverrides);
+    const optionOverrideConfig = getTableConfig(questionOptionOverrides);
+
+    expect(questionOverrideConfig.columns.map((column) => column.name)).toEqual([
+      'question_id',
+      'content_override',
+      'answer_raw_override',
+      'analyze_raw_override',
+      'note',
+      'version',
+      'updated_by_admin_id',
+      'created_at',
+      'updated_at',
+    ]);
+    expect(questionOverrideConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_overrides_updated_by_admin_id_idx',
+      'question_overrides_updated_at_idx',
+    ]));
+    expect(optionOverrideConfig.columns.map((column) => column.name)).toEqual([
+      'option_id',
+      'question_id',
+      'content_override',
+      'updated_by_admin_id',
+      'updated_at',
+    ]);
+    expect(optionOverrideConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_option_overrides_question_id_idx',
+      'question_option_overrides_updated_by_admin_id_idx',
+    ]));
+  });
+
+  it('defines immutable question override revisions and import job event streams', () => {
+    const revisionConfig = getTableConfig(questionOverrideRevisions);
+    const eventConfig = getTableConfig(importJobEvents);
+
+    expect(revisionConfig.columns.map((column) => column.name)).toEqual(expect.arrayContaining([
+      'id',
+      'question_id',
+      'version',
+      'base_version',
+      'status',
+      'option_content_overrides',
+      'diff',
+      'applied_version',
+      'rollback_from_revision_id',
+    ]));
+    expect(revisionConfig.indexes.map((tableIndex) => tableIndex.config.name)).toEqual(expect.arrayContaining([
+      'question_override_revisions_one_active_idx',
+      'question_override_revisions_question_history_idx',
+      'question_override_revisions_pending_idx',
+    ]));
+    expect(eventConfig.columns.map((column) => column.name)).toEqual([
+      'id',
+      'job_id',
+      'event_type',
+      'payload',
+      'created_at',
+    ]);
+    expect(eventConfig.indexes.map((tableIndex) => tableIndex.config.name)).toContain(
+      'import_job_events_job_stream_idx',
+    );
   });
 
   it('tracks current practice position with a positive sort check', () => {

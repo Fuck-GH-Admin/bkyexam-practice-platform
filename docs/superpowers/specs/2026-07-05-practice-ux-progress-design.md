@@ -1,5 +1,7 @@
 # BKYExam Practice UX And Progress Design
 
+> Historical design record. The draft-first, resumable, sectioned, whole-session flow is implemented. For current behavior use `docs/api.md`, `docs/architecture.md`, and `docs/design/practice-desk-stabilized-2026-07-10.md`.
+
 ## Purpose
 
 BKYExam Practice Platform should feel like a small learning product, not a temporary single-page demo. This design keeps the current lightweight React single-page architecture, while giving students clear entry points, reliable resumable practice, mobile-friendly practice flows, and less confusing navigation.
@@ -17,13 +19,13 @@ BKYExam Practice Platform should feel like a small learning product, not a tempo
 - Support `标记存疑` for questions students want to review before submitting.
 - Record full URL routing as a future direction.
 
-## Current Behavior
+## Behavior At The Time Of This Design
 
 The web app is a React single-page application served from one Vite `index.html`. It switches between internal views with React state: bank list, practice, and wrong-question notebook.
 
 The current `退出` action logs the student out by clearing the server cookie and then returns to the unauthenticated login screen. It does not navigate to a separate homepage because there is no separate homepage route.
 
-Practice sessions are already persisted in PostgreSQL through `practice_sessions` and `practice_session_questions`. Current answer submission is single-question and immediate: each submitted answer updates progress, correctness, and wrong-question records. The target interaction changes this to draft-first practice and whole-session grading, so students can finish a sectioned paper before seeing scores.
+At the time this document was written, practice sessions were persisted in PostgreSQL through `practice_sessions` and `practice_session_questions`, while answer submission was single-question and immediate. The implemented system has since changed to draft-first practice and whole-session grading.
 
 ## Product Model
 

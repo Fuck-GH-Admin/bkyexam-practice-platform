@@ -1,10 +1,18 @@
 import { describe, expect, test } from 'vitest';
+import type { PracticeQuestion } from './features/practice/model';
 
 import {
+  buildPracticeCheckSummary,
+  buildQuestionStatus,
+  buildQuestionTypeLabel,
   buildSectionScores,
+  buildStudentIdentityMeta,
   buildResultsFromQuestions,
+  buildWrongbookStats,
   filterBanks,
   formatCorrectAnswer,
+  formatSavedAnswer,
+  formatStoredAnswer,
   getAnsweredCount,
   getFilterOptions,
   getFirstSectionType,
@@ -16,6 +24,7 @@ import {
   hasSubmittedAnswer,
   hydrateAnswersFromQuestions,
   hydrateReviewFlagsFromQuestions,
+  validatePasswordChangeForm,
 } from './App';
 
 describe('hasSubmittedAnswer', () => {
@@ -26,9 +35,13 @@ describe('hasSubmittedAnswer', () => {
   test('treats an undefined answer as not submitted', () => {
     expect(hasSubmittedAnswer(undefined)).toBe(false);
   });
-
   test('treats an empty multiple-choice answer as not submitted', () => {
     expect(hasSubmittedAnswer([])).toBe(false);
+  });
+
+  test('treats blank text as unanswered and non-blank text as submitted', () => {
+    expect(hasSubmittedAnswer('   ')).toBe(false);
+    expect(hasSubmittedAnswer('text answer')).toBe(true);
   });
 });
 
@@ -48,6 +61,11 @@ describe('formatCorrectAnswer', () => {
       ]),
     ).toBe('A. First option、C. Third option');
   });
+
+  test('renders yes/no reference answers in Chinese', () => {
+    expect(formatCorrectAnswer(true)).toBe('正确');
+    expect(formatCorrectAnswer(false)).toBe('错误');
+  });
 });
 
 const sampleBanks = [
@@ -56,6 +74,8 @@ const sampleBanks = [
     bankName: 'Python 期末题库',
     subjectCategory: '信息技术',
     subjectName: 'Python',
+    visible: true,
+    status: 'active',
     keywords: ['Python', '编程'],
     questionCount: 70,
     description: 'Python 自动映射',
@@ -65,6 +85,8 @@ const sampleBanks = [
     bankName: '大学英语阅读',
     subjectCategory: '英语',
     subjectName: '大学英语',
+    visible: true,
+    status: 'active',
     keywords: ['大学英语', '阅读'],
     questionCount: 120,
     description: '英语 自动映射',
@@ -74,6 +96,8 @@ const sampleBanks = [
     bankName: 'C++ 机试',
     subjectCategory: '信息技术',
     subjectName: 'C++',
+    visible: true,
+    status: 'active',
     keywords: ['C++'],
     questionCount: 30,
     description: 'C++ 自动映射',
@@ -96,7 +120,27 @@ describe('bank filtering helpers', () => {
   });
 });
 
-const sampleQuestions = [
+describe('student account activation helpers', () => {
+  test('validates password change form before calling the API', () => {
+    expect(validatePasswordChangeForm({ currentPassword: '', newPassword: 'newpass123', confirmPassword: 'newpass123' })).toBe('请输入当前密码。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'short', confirmPassword: 'short' })).toBe('新密码至少需要 8 位。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'newpass123', confirmPassword: 'newpass124' })).toBe('两次输入的新密码不一致。');
+    expect(validatePasswordChangeForm({ currentPassword: 'samepass123', newPassword: 'samepass123', confirmPassword: 'samepass123' })).toBe('新密码不能和当前密码相同。');
+    expect(validatePasswordChangeForm({ currentPassword: 'oldpass123', newPassword: 'newpass123', confirmPassword: 'newpass123' })).toBe('');
+  });
+
+  test('builds student identity metadata without leaking passwords', () => {
+    expect(buildStudentIdentityMeta({
+      id: 'student-id',
+      loginName: '202502040201',
+      displayName: '202502040201',
+      className: '2班',
+      groupName: null,
+    }, true)).toEqual(['账号：202502040201', '姓名：202502040201', '班级：2班', '状态：待首次改密']);
+  });
+});
+
+const sampleQuestions: PracticeQuestion[] = [
   {
     id: 'single-1',
     sort: 1,
@@ -104,6 +148,7 @@ const sampleQuestions = [
     content: 'Single choice',
     options: [],
     answered: false,
+    markedForReview: false,
   },
   {
     id: 'multiple-1',
@@ -112,6 +157,7 @@ const sampleQuestions = [
     content: 'Multiple choice',
     options: [],
     answered: false,
+    markedForReview: false,
   },
   {
     id: 'yes-no-1',
@@ -120,6 +166,7 @@ const sampleQuestions = [
     content: 'Yes/no',
     options: [],
     answered: false,
+    markedForReview: false,
   },
 ];
 
@@ -196,5 +243,85 @@ describe('sectioned practice helpers', () => {
     expect(getInitialQuestionIndex(sampleQuestions, 2)).toBe(1);
     expect(getInitialQuestionIndex(sampleQuestions, 999)).toBe(0);
     expect(getInitialQuestionIndex(sampleQuestions)).toBe(0);
+  });
+});
+
+describe('practice submit check helpers', () => {
+  test('renders known and unknown question type labels', () => {
+    expect(buildQuestionTypeLabel('single_choice')).toEqual({ short: '单选', long: '单选题' });
+    expect(buildQuestionTypeLabel('multiple_choice')).toEqual({ short: '多选', long: '多选题' });
+    expect(buildQuestionTypeLabel('yes_no')).toEqual({ short: '判断', long: '判断题' });
+    expect(buildQuestionTypeLabel('material')).toEqual({ short: 'material', long: 'material' });
+  });
+
+  test('formats saved answers and resolves option ids for the check list', () => {
+    expect(formatSavedAnswer(['B', 'D'])).toBe('B、D');
+    expect(formatSavedAnswer(false)).toBe('错误');
+    expect(formatSavedAnswer(undefined)).toBe('未答');
+    expect(formatSavedAnswer('  text answer  ')).toBe('text answer');
+    expect(formatSavedAnswer('   ')).toBe('未答');
+    expect(formatSavedAnswer(['option-a'], [
+      { id: 'option-a', sort: 1, content: 'First option' },
+    ])).toBe('1. First option');
+  });
+
+  test('classifies current, answered, unanswered, flagged, and mixed states', () => {
+    expect(buildQuestionStatus({ current: true, answered: true, flagged: true })).toBe('current');
+    expect(buildQuestionStatus({ current: false, answered: true, flagged: true })).toBe('mixed');
+    expect(buildQuestionStatus({ current: false, answered: false, flagged: true })).toBe('flagged');
+    expect(buildQuestionStatus({ current: false, answered: true, flagged: false })).toBe('answered');
+    expect(buildQuestionStatus({ current: false, answered: false, flagged: false })).toBe('unanswered');
+  });
+
+  test('builds ordered unanswered and server-backed review lists', () => {
+    const summary = buildPracticeCheckSummary(
+      sampleQuestions,
+      { 'single-1': ['option-a'], 'yes-no-1': false },
+      { 'single-1': true, 'multiple-1': true },
+    );
+
+    expect(summary).toMatchObject({
+      total: 3,
+      answeredCount: 2,
+      unansweredCount: 1,
+      flaggedCount: 2,
+    });
+    expect(summary.unanswered.map((question) => question.id)).toEqual(['multiple-1']);
+    expect(summary.flagged.map((question) => question.id)).toEqual(['single-1', 'multiple-1']);
+  });
+});
+
+describe('formatStoredAnswer', () => {
+  test('formats JSON array answers', () => {
+    expect(formatStoredAnswer('["B","D"]')).toBe('B、D');
+  });
+
+  test('renders persisted yes/no answers in Chinese', () => {
+    expect(formatStoredAnswer('true')).toBe('正确');
+    expect(formatStoredAnswer('false')).toBe('错误');
+  });
+
+  test('resolves persisted option ids when detail options are available', () => {
+    expect(formatStoredAnswer(
+      '["2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c"]',
+      [{ id: '2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c', sort: 2, content: '第二个选项' }],
+    )).toBe('第二个选项');
+  });
+
+  test('does not expose raw UUIDs in wrongbook list summaries', () => {
+    expect(formatStoredAnswer('["2efed6be-6bfc-4f06-8a1d-9c337ddb8d7c"]')).toBe('已选择 1 项');
+  });
+
+  test('returns plain legacy answers when they are not JSON', () => {
+    expect(formatStoredAnswer('B')).toBe('B');
+  });
+});
+
+describe('buildWrongbookStats', () => {
+  test('counts active and mastered wrong questions', () => {
+    expect(buildWrongbookStats([
+      { mastered: false, lastWrongAt: '2026-01-02T00:00:00.000Z' },
+      { mastered: true, lastWrongAt: '2026-01-03T00:00:00.000Z' },
+    ])).toEqual({ total: 2, active: 1, mastered: 1, latestWrongAt: '2026-01-03T00:00:00.000Z' });
   });
 });

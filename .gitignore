@@ -1,4 +1,4 @@
-node_modules/
+node_modules
 dist/
 apps/*/dist/
 packages/*/dist/
@@ -26,8 +26,12 @@ questionbank/
 data/
 corpus/
 exports/
+artifacts/
 
 # Tooling output
 coverage/
+playwright-report/
+test-results/
+blob-report/
 *.log
 npm-debug.log*

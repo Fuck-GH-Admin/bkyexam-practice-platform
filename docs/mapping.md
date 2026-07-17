@@ -64,6 +64,8 @@ Other generated defaults are intentionally conservative: `difficulty` is `unknow
 
 ## Admin-Editable Fields
 
+These fields are present in the data model, but the administrator UI and write API are not implemented yet.
+
 Admins should be able to edit these mapping fields:
 
 - Category, backed by `bank_mappings.subject_category`.

@@ -8,11 +8,18 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:integration:db": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.integration.json",
     "import:summary": "tsx src/import/loadQuestionBank.ts",
     "import:db": "tsx src/import/importQuestionBank.ts",
+    "smoke:import:full": "tsx src/import/fullImportSmoke.ts",
+    "smoke:import:capacity": "tsx src/import/importCapacityProfile.ts",
+    "admin:bootstrap": "tsx src/admin/bootstrapAdmin.ts",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:smoke": "tsx src/db/smoke.ts"
+    "db:smoke": "tsx src/db/smoke.ts",
+    "ops:production-gate": "tsx src/ops/productionGate.ts",
+    "ops:legacy-student-password-migration": "tsx src/ops/legacyStudentPasswordMigration.ts",
+    "ops:deployment-evidence": "tsx src/ops/deploymentEvidence.ts"
   },
   "dependencies": {
     "@bkyexam-practice/shared": "0.1.0",

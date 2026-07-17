@@ -1,8 +1,20 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import {
+  ListPracticeSessionsRequestV1Schema,
+  ObjectivePracticeQuestionTypesV1,
+  PracticePayloadV1Schema,
+  PracticeQuestionV1Schema,
+  PracticeSessionPageV1Schema,
+  PracticeSessionListV1Schema,
+  PracticeSessionV1Schema,
+  PracticeSubmitAnswerResponseV1Schema,
+  PracticeSubmitSessionResponseV1Schema,
+  type SubmittedAnswerV1,
+} from '@bkyexam-practice/shared';
 import type { SessionStudent } from '../auth/session.js';
 import { CompletedSessionError, type PracticeRepository } from '../practice/repository.js';
 
-const objectiveQuestionTypes = ['single_choice', 'multiple_choice', 'yes_no'];
+const objectiveQuestionTypes = [...ObjectivePracticeQuestionTypesV1];
 const canonicalUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const legacyUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,7 +41,25 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
         return reply.status(404).send({ error: 'Question bank not found' });
       }
 
-      return result;
+      return PracticePayloadV1Schema.parse(result);
+    });
+
+    app.get('/api/practice/sessions', async (request, reply) => {
+      const student = await requireStudent(request);
+      if (!student) {
+        return reply.status(401).send({ error: 'Unauthenticated' });
+      }
+
+      const validation = ListPracticeSessionsRequestV1Schema.safeParse(request.query);
+      if (!validation.success) {
+        return reply.status(400).send({ error: validation.error.issues[0]?.message ?? 'Invalid session list query' });
+      }
+
+      const result = await practiceRepository.listSessions({
+        studentId: student.id,
+        ...validation.data,
+      });
+      return PracticeSessionPageV1Schema.parse(result);
     });
 
     app.get('/api/practice/sessions/active', async (request, reply) => {
@@ -38,7 +68,8 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
         return reply.status(401).send({ error: 'Unauthenticated' });
       }
 
-      return practiceRepository.listActiveSessions({ studentId: student.id });
+      const sessions = await practiceRepository.listActiveSessions({ studentId: student.id });
+      return PracticeSessionListV1Schema.parse(sessions);
     });
 
     app.get('/api/practice/sessions/:sessionId', async (request, reply) => {
@@ -57,7 +88,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
         return reply.status(404).send({ error: 'Practice session not found' });
       }
 
-      return result;
+      return PracticePayloadV1Schema.parse(result);
     });
 
     app.patch('/api/practice/sessions/:sessionId/progress', async (request, reply) => {
@@ -86,7 +117,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
           return reply.status(404).send({ error: 'Practice session not found' });
         }
 
-        return result;
+        return PracticeSessionV1Schema.parse(result);
       } catch (error) {
         if (error instanceof CompletedSessionError) {
           return reply.status(409).send({ error: 'Practice session is completed' });
@@ -123,7 +154,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
           return reply.status(404).send({ error: 'Practice session question not found' });
         }
 
-        return result;
+        return PracticeQuestionV1Schema.parse(result);
       } catch (error) {
         if (error instanceof CompletedSessionError) {
           return reply.status(409).send({ error: 'Practice session is completed' });
@@ -191,7 +222,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
           return reply.status(404).send({ error: 'Practice session question not found' });
         }
 
-        return result;
+        return PracticeQuestionV1Schema.parse(result);
       } catch (error) {
         if (error instanceof CompletedSessionError) {
           return reply.status(409).send({ error: 'Practice session is completed' });
@@ -218,7 +249,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
           return reply.status(404).send({ error: 'Practice session not found' });
         }
 
-        return result;
+        return PracticeSubmitSessionResponseV1Schema.parse(result);
       } catch (error) {
         if (error instanceof CompletedSessionError) {
           return reply.status(409).send({ error: 'Practice session is completed' });
@@ -254,7 +285,7 @@ export function createPracticeRoutes({ practiceRepository, requireStudent }: Pra
           return reply.status(404).send({ error: 'Practice session question not found' });
         }
 
-        return result;
+        return PracticeSubmitAnswerResponseV1Schema.parse(result);
       } catch (error) {
         if (error instanceof CompletedSessionError) {
           return reply.status(409).send({ error: 'Practice session is completed' });
@@ -275,7 +306,7 @@ type CreateSessionRequest = {
 
 type SubmitAnswerRequest = {
   questionId: string;
-  answer: string[] | boolean | string;
+  answer: SubmittedAnswerV1;
 };
 
 type SaveProgressRequest = {
@@ -419,7 +450,7 @@ function parseSessionQuestionParams(params: unknown):
 function isSubmittedAnswer(answer: unknown): answer is SubmitAnswerRequest['answer'] {
   return typeof answer === 'string'
     || typeof answer === 'boolean'
-    || (Array.isArray(answer) && answer.every((value) => typeof value === 'string'));
+    || (Array.isArray(answer) && answer.every((value) => typeof value === 'string' && value.length > 0));
 }
 
 function isCanonicalUuid(value: unknown): value is string {

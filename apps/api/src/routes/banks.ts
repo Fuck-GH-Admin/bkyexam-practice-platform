@@ -1,16 +1,10 @@
 import type { FastifyInstance } from 'fastify';
+import {
+  CatalogBankListResponseV1Schema,
+  type CatalogBankV1,
+} from '@bkyexam-practice/shared';
 
-export interface BankListItem {
-  bankId: string;
-  bankName: string;
-  subjectCategory: string;
-  subjectName: string;
-  visible: boolean;
-  status: string;
-  keywords: string[];
-  questionCount: number;
-  description: string;
-}
+export type BankListItem = CatalogBankV1;
 
 export interface BankRepository {
   listBanks(filters: { category?: string; keyword?: string }): Promise<BankListItem[]>;
@@ -88,7 +82,7 @@ export function createBankRoutes(repository: BankRepository) {
       const keyword = typeof query.keyword === 'string' && query.keyword.trim() ? query.keyword : undefined;
 
       const banks = await repository.listBanks({ category, keyword });
-      return { banks };
+      return CatalogBankListResponseV1Schema.parse({ banks });
     });
   };
 }

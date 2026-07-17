@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -14,21 +15,71 @@ export interface RunMigrateCliOptions {
 export async function runMigrations(
   client: QueryClient,
   migrationsDir: string,
-): Promise<{ files: string[] }> {
+): Promise<{ files: string[]; appliedFiles: string[]; skippedFiles: string[] }> {
   const files = (await readdir(migrationsDir))
     .filter((fileName) => fileName.endsWith('.sql'))
     .sort();
+  const migrations = await Promise.all(files.map(async (fileName) => {
+    const sql = await readFile(join(migrationsDir, fileName), 'utf8');
+    return {
+      fileName,
+      sql,
+      checksum: createHash('sha256').update(sql).digest('hex'),
+    };
+  }));
 
   await client.query('BEGIN');
 
   try {
-    for (const fileName of files) {
-      const sql = await readFile(join(migrationsDir, fileName), 'utf8');
-      await client.query(sql);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename text PRIMARY KEY,
+        checksum text NOT NULL,
+        applied_at timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query('LOCK TABLE schema_migrations IN EXCLUSIVE MODE');
+
+    const ledgerResult = await client.query(
+      'SELECT filename, checksum FROM schema_migrations ORDER BY filename',
+    ) as { rows?: Array<{ filename: string; checksum: string }> };
+    const applied = new Map(
+      (ledgerResult.rows ?? []).map((row) => [row.filename, row.checksum]),
+    );
+    const availableFiles = new Set(files);
+
+    for (const [fileName] of applied) {
+      if (!availableFiles.has(fileName)) {
+        throw new Error(`Applied migration file is missing from this release: ${fileName}`);
+      }
+    }
+
+    const appliedFiles: string[] = [];
+    const skippedFiles: string[] = [];
+
+    for (const migration of migrations) {
+      const existingChecksum = applied.get(migration.fileName);
+      if (existingChecksum !== undefined) {
+        if (existingChecksum !== migration.checksum) {
+          throw new Error(`Migration checksum drift detected: ${migration.fileName}`);
+        }
+        skippedFiles.push(migration.fileName);
+        continue;
+      }
+
+      await client.query(migration.sql);
+      await client.query(
+        `
+          INSERT INTO schema_migrations (filename, checksum)
+          VALUES ($1, $2)
+        `,
+        [migration.fileName, migration.checksum],
+      );
+      appliedFiles.push(migration.fileName);
     }
 
     await client.query('COMMIT');
-    return { files };
+    return { files, appliedFiles, skippedFiles };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -59,8 +110,10 @@ export async function runMigrateCli({
     const client = await pool.connect();
 
     try {
-      const { files } = await runMigrations(client, migrationsDir);
-      log(`Applied migrations: ${files.length > 0 ? files.join(', ') : 'none'}`);
+      const { files, appliedFiles, skippedFiles } = await runMigrations(client, migrationsDir);
+      log(`Migration files: ${files.length > 0 ? files.join(', ') : 'none'}`);
+      log(`Applied migrations: ${appliedFiles.length > 0 ? appliedFiles.join(', ') : 'none'}`);
+      log(`Skipped migrations: ${skippedFiles.length > 0 ? skippedFiles.join(', ') : 'none'}`);
     } finally {
       client.release();
     }

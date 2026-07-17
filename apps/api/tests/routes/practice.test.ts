@@ -30,6 +30,7 @@ function sessionPayload(currentSessionId = sessionId) {
       questionCount: 1,
       completedCount: 0,
       correctCount: 0,
+      currentSort: 1,
       status: 'active' as const,
     },
     questions: [
@@ -40,8 +41,28 @@ function sessionPayload(currentSessionId = sessionId) {
         content: 'Question 1',
         options: [{ id: 'option-1', sort: 1, content: 'A' }],
         answered: false,
+        markedForReview: false,
       },
     ],
+  };
+}
+
+function sessionCard(status: 'active' | 'completed' = 'active') {
+  return {
+    id: sessionId,
+    bankId,
+    bankName: '测试题库',
+    origin: 'bank' as const,
+    mode: 'random' as const,
+    questionCount: 1,
+    answeredCount: 0,
+    correctCount: 0,
+    reviewCount: 0,
+    currentSort: 1,
+    status,
+    createdAt: '2026-07-11T08:00:00.000Z',
+    updatedAt: '2026-07-11T08:01:00.000Z',
+    completedAt: status === 'completed' ? '2026-07-11T08:02:00.000Z' : null,
   };
 }
 
@@ -54,10 +75,12 @@ function fakePracticeRepository(options: {
   missingReviewFlag?: boolean;
   missingSubmitSession?: boolean;
   completedSessionWrite?: boolean;
+  invalidSessionList?: boolean;
 } = {}) {
   const createdSessions: Parameters<PracticeRepository['createSession']>[0][] = [];
   const requestedSessions: Parameters<PracticeRepository['getSession']>[0][] = [];
   const requestedActiveSessions: Parameters<PracticeRepository['listActiveSessions']>[0][] = [];
+  const requestedSessionLists: Parameters<PracticeRepository['listSessions']>[0][] = [];
   const savedProgress: Parameters<PracticeRepository['saveProgress']>[0][] = [];
   const savedDrafts: Parameters<PracticeRepository['saveDraft']>[0][] = [];
   const clearedDrafts: Parameters<PracticeRepository['clearDraft']>[0][] = [];
@@ -77,6 +100,19 @@ function fakePracticeRepository(options: {
     async listActiveSessions(input) {
       requestedActiveSessions.push(input);
       return activeSessions;
+    },
+    async listSessions(input) {
+      requestedSessionLists.push(input);
+      if (options.invalidSessionList) {
+        return {
+          sessions: [{ ...sessionCard('completed'), completedAt: null }],
+          page: { limit: input.limit, offset: input.offset, hasMore: false },
+        } as never;
+      }
+      return {
+        sessions: [sessionCard(input.status)],
+        page: { limit: input.limit, offset: input.offset, hasMore: false },
+      };
     },
     async saveProgress(input) {
       savedProgress.push(input);
@@ -153,6 +189,7 @@ function fakePracticeRepository(options: {
     createdSessions,
     requestedSessions,
     requestedActiveSessions,
+    requestedSessionLists,
     savedProgress,
     savedDrafts,
     clearedDrafts,
@@ -199,6 +236,27 @@ describe('practice routes', () => {
         questionTypes: ['single_choice', 'multiple_choice', 'yes_no'],
       },
     ]);
+  });
+
+  it('fails closed when a repository returns a payload outside the v1 practice contract', async () => {
+    const { repository } = fakePracticeRepository();
+    repository.createSession = async () => ({
+      ...sessionPayload(),
+      session: {
+        ...sessionPayload().session,
+        completedCount: 2,
+      },
+    } as never);
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/practice/sessions',
+      headers: { cookie: 'bky_session=token' },
+      payload: { bankId },
+    });
+
+    expect(response.statusCode).toBe(500);
   });
 
   it('returns 400 when creating a practice session with a malformed bankId', async () => {
@@ -385,6 +443,84 @@ describe('practice routes', () => {
     expect(requestedSessions).toEqual([]);
   });
 
+  it('lists active and completed session cards with bounded paging for the current student', async () => {
+    const { repository, requestedSessionLists } = fakePracticeRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
+
+    const active = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active&limit=1&offset=2',
+      headers: { cookie: 'bky_session=token' },
+    });
+    const completed = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=completed',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(active.statusCode).toBe(200);
+    expect(active.json()).toEqual({
+      sessions: [sessionCard('active')],
+      page: { limit: 1, offset: 2, hasMore: false },
+    });
+    expect(completed.statusCode).toBe(200);
+    expect(completed.json()).toEqual({
+      sessions: [sessionCard('completed')],
+      page: { limit: 20, offset: 0, hasMore: false },
+    });
+    expect(requestedSessionLists).toEqual([
+      { studentId: 'student-1', status: 'active', limit: 1, offset: 2 },
+      { studentId: 'student-1', status: 'completed', limit: 20, offset: 0 },
+    ]);
+  });
+
+  it('rejects unauthenticated and invalid session-list queries before calling the repository', async () => {
+    const { repository, requestedSessionLists } = fakePracticeRepository();
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
+
+    const unauthenticated = await app.inject({ method: 'GET', url: '/api/practice/sessions?status=active' });
+    const missingStatus = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions',
+      headers: { cookie: 'bky_session=token' },
+    });
+    const invalidStatus = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=archived',
+      headers: { cookie: 'bky_session=token' },
+    });
+    const invalidLimit = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active&limit=51',
+      headers: { cookie: 'bky_session=token' },
+    });
+    const invalidOffset = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=active&offset=-1',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(unauthenticated.statusCode).toBe(401);
+    expect(missingStatus.statusCode).toBe(400);
+    expect(invalidStatus.statusCode).toBe(400);
+    expect(invalidLimit.statusCode).toBe(400);
+    expect(invalidOffset.statusCode).toBe(400);
+    expect(requestedSessionLists).toEqual([]);
+  });
+
+  it('fails closed when a repository returns an invalid session card', async () => {
+    const { repository } = fakePracticeRepository({ invalidSessionList: true });
+    const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/practice/sessions?status=completed',
+      headers: { cookie: 'bky_session=token' },
+    });
+
+    expect(response.statusCode).toBe(500);
+  });
+
   it('saves practice session progress for the current student', async () => {
     const { repository, savedProgress } = fakePracticeRepository();
     const app = buildApp({ sessionService: fakeLoggedInSessionService(), practiceRepository: repository });
@@ -519,6 +655,12 @@ describe('practice routes', () => {
       headers: { cookie: 'bky_session=token' },
       payload: { answer: { option: 'option-1' } },
     });
+    const emptyOptionId = await app.inject({
+      method: 'PUT',
+      url: `/api/practice/sessions/${sessionId}/drafts/${questionId}`,
+      headers: { cookie: 'bky_session=token' },
+      payload: { answer: [''] },
+    });
 
     expect(saved.statusCode).toBe(200);
     expect(saved.json()).toEqual({ ...sessionPayload(sessionId).questions[0], draftAnswer: ['option-1'] });
@@ -536,6 +678,7 @@ describe('practice routes', () => {
     expect(uppercaseClearQuestion.statusCode).toBe(400);
     expect(uppercaseClearQuestion.json()).toEqual({ error: 'questionId must be a valid UUID' });
     expect(invalidAnswer.statusCode).toBe(400);
+    expect(emptyOptionId.statusCode).toBe(400);
   });
 
   it('returns draft write errors', async () => {

@@ -20,6 +20,18 @@ describe('loadConfig', () => {
     expect(config.COOKIE_SECRET).toBe('dev-cookie-secret-change-me');
     expect(config.COOKIE_SECURE).toBe(false);
     expect(config.SESSION_TTL_DAYS).toBe(30);
+    expect(config.STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED).toBe(false);
+    expect(config.STUDENT_LOGIN_MAX_FAILURES).toBe(10);
+    expect(config.STUDENT_LOGIN_FAILURE_WINDOW_MINUTES).toBe(30);
+    expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(15);
+    expect(config.ADMIN_SESSION_TTL_HOURS).toBe(8);
+    expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(false);
+    expect(config.ADMIN_IMPORT_ENABLE_RESET).toBe(false);
+    expect(config.RATE_LIMIT_ENABLED).toBe(false);
+    expect(config.RATE_LIMIT_WINDOW_MS).toBe(60_000);
+    expect(config.RATE_LIMIT_MAX).toBe(600);
+    expect(config.CSRF_ORIGIN_CHECK_ENABLED).toBe(false);
+    expect(config.CSRF_ALLOWED_ORIGINS).toEqual(['http://127.0.0.1:5173', 'http://localhost:5173']);
   });
 
   it('loads cookie session settings from environment', () => {
@@ -27,10 +39,34 @@ describe('loadConfig', () => {
       COOKIE_SECRET: 'production-secret',
       COOKIE_SECURE: 'true',
       SESSION_TTL_DAYS: '14',
+      STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED: 'true',
+      STUDENT_LOGIN_MAX_FAILURES: '5',
+      STUDENT_LOGIN_FAILURE_WINDOW_MINUTES: '45',
+      STUDENT_LOGIN_LOCK_MINUTES: '20',
+      ADMIN_SESSION_TTL_HOURS: '6',
+      ADMIN_IMPORT_ENABLE_WRITE: 'true',
+      ADMIN_IMPORT_ENABLE_RESET: 'true',
+      RATE_LIMIT_ENABLED: 'true',
+      RATE_LIMIT_WINDOW_MS: '5000',
+      RATE_LIMIT_MAX: '20',
+      CSRF_ORIGIN_CHECK_ENABLED: 'true',
+      CSRF_ALLOWED_ORIGINS: 'https://student.example.com;https://admin.example.com',
     });
 
     expect(config.COOKIE_SECRET).toBe('production-secret');
     expect(config.COOKIE_SECURE).toBe(true);
     expect(config.SESSION_TTL_DAYS).toBe(14);
+    expect(config.STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED).toBe(true);
+    expect(config.STUDENT_LOGIN_MAX_FAILURES).toBe(5);
+    expect(config.STUDENT_LOGIN_FAILURE_WINDOW_MINUTES).toBe(45);
+    expect(config.STUDENT_LOGIN_LOCK_MINUTES).toBe(20);
+    expect(config.ADMIN_SESSION_TTL_HOURS).toBe(6);
+    expect(config.ADMIN_IMPORT_ENABLE_WRITE).toBe(true);
+    expect(config.ADMIN_IMPORT_ENABLE_RESET).toBe(true);
+    expect(config.RATE_LIMIT_ENABLED).toBe(true);
+    expect(config.RATE_LIMIT_WINDOW_MS).toBe(5000);
+    expect(config.RATE_LIMIT_MAX).toBe(20);
+    expect(config.CSRF_ORIGIN_CHECK_ENABLED).toBe(true);
+    expect(config.CSRF_ALLOWED_ORIGINS).toEqual(['https://student.example.com', 'https://admin.example.com']);
   });
 });

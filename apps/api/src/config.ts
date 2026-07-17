@@ -8,6 +8,25 @@ const configSchema = z.object({
   COOKIE_SECRET: z.string().default('dev-cookie-secret-change-me'),
   COOKIE_SECURE: z.string().optional().transform((value) => value === 'true'),
   SESSION_TTL_DAYS: z.string().optional().transform((value) => parsePositiveInteger(value, 30)),
+  STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  STUDENT_LOGIN_MAX_FAILURES: z.string().optional().transform((value) => parsePositiveInteger(value, 10)),
+  STUDENT_LOGIN_FAILURE_WINDOW_MINUTES: z.string().optional().transform((value) => parsePositiveInteger(value, 30)),
+  STUDENT_LOGIN_LOCK_MINUTES: z.string().optional().transform((value) => parsePositiveInteger(value, 15)),
+  ADMIN_SESSION_TTL_HOURS: z.string().optional().transform((value) => parsePositiveInteger(value, 8)),
+  ADMIN_IMPORT_ALLOWED_ROOTS: z.string().optional().transform(parsePathList),
+  ADMIN_IMPORT_ENABLE_WRITE: z.string().optional().transform((value) => value === 'true'),
+  ADMIN_IMPORT_ENABLE_RESET: z.string().optional().transform((value) => value === 'true'),
+  ADMIN_IMPORT_WORKER_ENABLED: z.string().optional().transform((value) => value !== 'false'),
+  ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 2_000)),
+  ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 5_000)),
+  ADMIN_IMPORT_WORKER_STALE_AFTER_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 5 * 60_000)),
+  RATE_LIMIT_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  RATE_LIMIT_WINDOW_MS: z.string().optional().transform((value) => parsePositiveInteger(value, 60_000)),
+  RATE_LIMIT_MAX: z.string().optional().transform((value) => parsePositiveInteger(value, 600)),
+  CSRF_ORIGIN_CHECK_ENABLED: z.string().optional().transform((value) => value === 'true'),
+  CSRF_ALLOWED_ORIGINS: z.string().optional().transform((value) => (
+    value ? parsePathList(value) : ['http://127.0.0.1:5173', 'http://localhost:5173']
+  )),
 });
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
@@ -15,6 +34,15 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePathList(value: string | undefined): string[] {
+  if (!value) return [];
+
+  return value
+    .split(';')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env) {

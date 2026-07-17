@@ -16,7 +16,9 @@ PostgreSQL
   `-- stores imported question bank and student practice data
 ```
 
-Production health check: `https://exam.acgbot.cc.cd/api/health`.
+Production liveness check: `https://exam.acgbot.cc.cd/api/health`.
+
+Production readiness check: `https://exam.acgbot.cc.cd/api/health/readiness`.
 
 The expected early production size is fewer than 100 users on a 2 core, 2 GB server.
 
@@ -25,7 +27,7 @@ The expected early production size is fewer than 100 users on a 2 core, 2 GB ser
 Native process deployment is preferred first:
 
 1. Install Node matching `package.json` engines, PostgreSQL, and Nginx on Linux.
-2. Run `npm install` from `PracticePlatform`.
+2. Run `npm ci` from the project root.
 3. Run `npm run build --workspaces`.
 4. Configure API runtime environment variables, especially `DATABASE_URL`, `USE_DATABASE=true`, `COOKIE_SECRET`, and `COOKIE_SECURE=true` when behind HTTPS.
 5. Run database migrations with `npm run db:migrate -w @bkyexam-practice/api`.
@@ -43,6 +45,21 @@ server {
     root /srv/bkyexam-practice-platform/apps/web/dist;
     index index.html;
 
+    # Import Jobs realtime progress. The application also returns
+    # X-Accel-Buffering: no, but Nginx buffering is disabled explicitly here
+    # so SSE events are flushed immediately through the reverse proxy.
+    location ~ ^/api/admin/import-jobs/[0-9a-fA-F-]+/events$ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+    }
+
     location /api/ {
         proxy_pass http://127.0.0.1:3000/api/;
         proxy_http_version 1.1;
@@ -58,7 +75,15 @@ server {
 }
 ```
 
-Docker is optional. It may be useful after Phase 1 if deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
+SSE 部署验收至少应确认：
+
+1. `Content-Type` 为 `text/event-stream`。
+2. 响应包含 `X-Accel-Buffering: no`。
+3. Nginx 对 events endpoint 显式设置 `proxy_buffering off`。
+4. `Last-Event-ID` 重连只返回该 cursor 之后的事件。
+5. `cancelled`、`recovered` 和成功/失败终态事件均能在连接关闭前送达。
+
+Docker is optional. It may become useful when deployment scripts, database migrations, and import jobs need stricter packaging. It is not required for the first Linux deployment.
 
 ## Local PostgreSQL
 
@@ -94,7 +119,11 @@ Run migrations after PostgreSQL is healthy:
 npm run db:migrate -w @bkyexam-practice/api
 ```
 
-Migrations run all files in `apps/api/src/db/migrations` in filename order. Phase 3C requires both `0001_initial.sql` and `0002_practice_sessions.sql`; the second migration adds server-side cookie sessions and practice session storage.
+Migrations run all files in `apps/api/src/db/migrations` in filename order. The current runtime requires:
+
+- `0001_initial.sql`
+- `0002_practice_sessions.sql`
+- `0003_practice_drafts.sql`
 
 Then import the source question bank and run a smoke check:
 
@@ -103,7 +132,7 @@ npm run import:db -w @bkyexam-practice/api -- C:\path\to\BKYExam\Monitor\questio
 npm run db:smoke -w @bkyexam-practice/api
 ```
 
-Observed local Docker PostgreSQL result after the real corpus import:
+Observed real PostgreSQL result after the full corpus import on 2026-07-10:
 
 ```json
 {
@@ -119,8 +148,6 @@ Observed local Docker PostgreSQL result after the real corpus import:
 
 This Docker PostgreSQL service is intended for local development only. Production can use native PostgreSQL.
 
-Phase 3C live migration check attempted to start this local Docker PostgreSQL service, but Docker Desktop's Linux engine was not available on the workstation (`//./pipe/dockerDesktopLinuxEngine` was missing). Because PostgreSQL could not be started, the requested live `db:migrate` and `db:smoke` commands were not executed against Docker during that check.
-
 ## Runtime Configuration
 
 The API currently reads configuration from environment variables through `apps/api/src/config.ts`:
@@ -132,7 +159,64 @@ The API currently reads configuration from environment variables through `apps/a
 - `COOKIE_SECRET`: signs cookie data and defaults to `dev-cookie-secret-change-me` for local development. Set a long random value in production.
 - `COOKIE_SECURE`: accepts `true` to require HTTPS-only cookies. Defaults to `false`; set to `true` behind production HTTPS.
 - `SESSION_TTL_DAYS`: positive integer session lifetime in days, default `30`.
+- `STUDENT_LEGACY_PASSWORDLESS_LOGIN_ENABLED`: explicit migration/development escape hatch for old no-password accounts, default `false`; keep `false` in public production.
+- `STUDENT_LOGIN_MAX_FAILURES`: relaxed student login failure threshold, default `10`.
+- `STUDENT_LOGIN_FAILURE_WINDOW_MINUTES`: student login failure counting window, default `30`.
+- `STUDENT_LOGIN_LOCK_MINUTES`: temporary lock duration after threshold, default `15`.
+- `ADMIN_SESSION_TTL_HOURS`: positive integer admin session lifetime in hours, default `8`.
+- `ADMIN_IMPORT_ALLOWED_ROOTS`: semicolon-separated allowlist of directories from which Admin Import Jobs may read source question-bank files.
+- `ADMIN_IMPORT_ENABLE_WRITE`: set to `true` to enable `/api/admin/import-jobs` `mode=import` writes; default `false`. Keep it disabled outside a controlled import window.
+- `ADMIN_IMPORT_ENABLE_RESET`: separate maintenance-only gate for `resetBeforeImport=true`; default `false`. Reset also requires `super_admin`. The current reset transaction deletes the existing corpus before reimport, and PostgreSQL foreign-key cascades also delete dependent practice/attempt/wrongbook learning data. Do not enable this gate for routine imports; take and verify a database backup first.
+- `ADMIN_IMPORT_WORKER_ENABLED`: defaults to `true`; when `USE_DATABASE=true`, production API creates queued import jobs and runs the in-process worker to claim them.
+- `ADMIN_IMPORT_WORKER_POLL_INTERVAL_MS`: worker poll interval; default `2000`.
+- `ADMIN_IMPORT_WORKER_HEARTBEAT_INTERVAL_MS`: running job heartbeat interval; default `5000`.
+- `ADMIN_IMPORT_WORKER_STALE_AFTER_MS`: stale running job timeout before marking failed; default `300000`.
+- `RATE_LIMIT_ENABLED`: set to `true` to enable the in-memory minimum API rate limiter; default `false`.
+- `RATE_LIMIT_WINDOW_MS`: positive integer rate-limit window in milliseconds, default `60000`.
+- `RATE_LIMIT_MAX`: positive integer request count per client/method/route/window, default `600`.
+- `CSRF_ORIGIN_CHECK_ENABLED`: set to `true` to reject unsafe Cookie requests from origins outside the allowlist; default `false`.
+- `CSRF_ALLOWED_ORIGINS`: semicolon-separated allowed browser origins for CSRF origin checks; defaults to local Vite origins.
+- `ADMIN_BOOTSTRAP_LOGIN_NAME`, `ADMIN_BOOTSTRAP_DISPLAY_NAME`, `ADMIN_BOOTSTRAP_PASSWORD`: one-time CLI inputs for `npm run admin:bootstrap`; they are not read by the HTTP server.
 
 The API currently listens on `127.0.0.1`, which matches the intended Nginx reverse-proxy shape.
 
-With `USE_DATABASE=false`, the API can serve in-memory development data for basic route testing, but authenticated practice sessions and durable wrong-question data require PostgreSQL-backed repositories. Production should run with `USE_DATABASE=true` and a migrated database.
+With `USE_DATABASE=false`, the API can serve in-memory development data for basic route testing, but authenticated practice sessions and durable wrong-question data require PostgreSQL-backed repositories. Production must run with `USE_DATABASE=true` and a migrated database.
+
+## Production Gaps
+
+The deployment shape is documented, but the current codebase is not yet publicly production-ready. Before launch, add and verify:
+
+- operational policy and UI for administrator/student account lifecycle; backend Admin User manage API, Admin Student Manage API, student password login enforcement, student password change API, and one-time `super_admin` bootstrap already exist;
+- old-account temporary-password migration execution on the target database; B9.9 now provides the controlled bulk migration CLI, but each environment still needs an approved credential distribution procedure and an actual migration evidence package;
+- secrets management;
+- PostgreSQL backup and restore drill;
+- external metrics store, alerting, and log aggregation; basic structured request logs and `/api/health/metrics` smoke endpoint already exist;
+- rate-limit/CSRF production policy tuning beyond the current configurable minimum implementation;
+- first successful remote run and branch protection for the repository CI workflow; B9.11 evidence tooling now detects that remote CI/branch protection are still missing;
+- one repeatable deployment/rollback procedure on the target host.
+
+The local backup/restore drill is now executable:
+
+```sh
+npm run ops:backup-restore:docker
+```
+
+The local production gate / identity migration audit is also executable:
+
+```sh
+npm run ops:production-gate
+```
+
+The legacy passwordless student migration tool is executable:
+
+```sh
+npm run ops:legacy-student-password-migration -- --limit=50
+```
+
+The deployment evidence validator is executable:
+
+```sh
+npm run ops:deployment-evidence -- --template
+```
+
+Detailed backup, restore, migration, deployment, observability smoke, and CI checklists are maintained in [`production-operations.md`](production-operations.md), [`production-gate-runbook.md`](production-gate-runbook.md), [`production-deployment-evidence.md`](production-deployment-evidence.md), and [`ci-gate-evidence.md`](ci-gate-evidence.md).

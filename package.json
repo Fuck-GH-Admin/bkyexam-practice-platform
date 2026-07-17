@@ -3,13 +3,45 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "npm run dev -w @bkyexam-practice/api",
-    "dev:web": "npm run dev -w @bkyexam-practice/web",
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "typecheck": "npm run typecheck --workspaces"
+    "build:shared": "npm run build -w @bkyexam-practice/shared",
+    "prepare": "npm run build:shared",
+    "docs:audit": "node scripts/audit-docs-consistency.mjs",
+    "dev": "npm run build:shared && npm run dev -w @bkyexam-practice/api",
+    "dev:web": "npm run build:shared && npm run dev -w @bkyexam-practice/web",
+    "build": "npm run build:shared && npm run build -w @bkyexam-practice/api && npm run build -w @bkyexam-practice/web && npm run build -w @bkyexam-practice/admin",
+    "test": "npm run build:shared && npm run test --workspaces",
+    "test:integration:db": "npm run build:shared && npm run test:integration:db -w @bkyexam-practice/api",
+    "test:integration:db:docker": "node scripts/run-postgres-integration.mjs",
+    "smoke:import:full:docker": "node scripts/run-full-import-smoke.mjs",
+    "smoke:import:capacity:docker": "node scripts/run-import-capacity-profile.mjs",
+    "ops:backup-restore:docker": "node scripts/run-backup-restore-drill.mjs",
+    "admin:bootstrap": "npm run admin:bootstrap -w @bkyexam-practice/api",
+    "test:e2e": "npm run build:shared && playwright test",
+    "test:e2e:desktop": "npm run build:shared && playwright test --project=desktop-chromium",
+    "test:e2e:mobile": "npm run build:shared && playwright test --project=mobile-chromium",
+    "test:e2e:install": "playwright install chromium",
+    "test:e2e:install:ci": "playwright install --with-deps chromium",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces && npm run typecheck:e2e",
+    "typecheck:e2e": "tsc -p tests/e2e/tsconfig.json --noEmit",
+    "verify": "npm run docs:audit && npm run test && npm run typecheck && npm run build && npm run test:e2e",
+    "verify:db": "npm run verify && npm run test:integration:db",
+    "verify:docker": "npm run verify && npm run test:integration:db:docker",
+    "ops:production-gate": "npm run ops:production-gate -w @bkyexam-practice/api --",
+    "ops:legacy-student-password-migration": "npm run ops:legacy-student-password-migration -w @bkyexam-practice/api --",
+    "ops:deployment-evidence": "npm run ops:deployment-evidence -w @bkyexam-practice/api --",
+    "ops:staging-load-baseline": "node scripts/run-staging-load-baseline.mjs",
+    "ops:import-maintenance-monitor": "node scripts/run-import-maintenance-monitor.mjs",
+    "dev:admin": "npm run build:shared && npm run dev -w @bkyexam-practice/admin"
   },
-  "engines": { "node": ">=24.0.0" }
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
 }
